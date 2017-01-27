@@ -6,8 +6,8 @@ from os.path import join
 from datetime import datetime
 
 
-CIFAR_DIR = 'datasets/cifar-batches'
-MODEL_DIR = 'models/linear'
+CIFAR_DIR = 'datasets/cifar'
+MODEL_DIR = 'models/conv'
 LOG_DIR = 'logs/{}'.format(str(datetime.now()).split('.')[0].replace(' ', '_'))
 
 
@@ -97,19 +97,59 @@ def main():
     num_samples, width, height, channels = data['X_train'].shape
     num_classes = len(np.unique(data['y_train']))
 
+    # Hyperparameters set up.
+    hidden_size = 500
+    conv_size = [3, 3, 3, 32]
+
+    reg = 1e-4
+    learning_rate = 0.001
+    beta1 = 0.9
+    beta2 = 0.999
+
+    batch_size = 256
+    epochs = 10
+    print_every = 100
+
     # Inputs to graph.
     X = tf.placeholder(tf.float32, shape=[None, width, height, channels])
     y_true = tf.placeholder(tf.int64, shape=[None])
 
     # Graph architecture.
-    W = tf.Variable(
-        tf.random_normal([width * height * channels, num_classes], stddev=0.01)
-    )
-    b = tf.Variable(tf.zeros([num_classes]))
+    Wconv = tf.Variable(tf.random_normal(conv_size, stddev=0.01))
+    bconv = tf.Variable(tf.zeros([conv_size[-1]]))
+    conv = tf.nn.relu(tf.nn.conv2d(
+        X, Wconv,
+        strides=[1, 1, 1, 1],
+        padding='SAME'
+    ) + bconv)
 
-    y_pred = tf.matmul(
-        tf.reshape(X, [-1, width * height * channels]), W
-    ) + b
+    pool = tf.nn.max_pool(
+        conv,
+        ksize=[1, 2, 2, 1],
+        strides=[1, 2, 2, 1],
+        padding='SAME'
+    )
+
+    # TODO: Better shape handling.
+    pool_shape = pool.get_shape()[1:]
+    hidden_shape = [
+        int(pool_shape[0] * pool_shape[1] * pool_shape[2]),
+        hidden_size
+    ]
+
+    W1 = tf.Variable(tf.random_normal(hidden_shape, stddev=0.01))
+    b1 = tf.Variable(tf.zeros([hidden_size]))
+
+    hidden = tf.nn.relu(tf.matmul(
+        tf.reshape(pool, [-1, hidden_shape[0]]), W1
+    ) + b1)
+
+    W2 = tf.Variable(
+        tf.random_normal([hidden_size, num_classes], stddev=0.01)
+    )
+    b2 = tf.Variable(tf.zeros([num_classes]))
+
+    y_pred = tf.matmul(hidden, W2) + b2
 
     # Metrics operations.
     correct = tf.equal(tf.argmax(y_pred, axis=1), y_true)
@@ -120,9 +160,10 @@ def main():
         tf.nn.sparse_softmax_cross_entropy_with_logits(y_pred, y_true)
     )
 
-    reg = 1e-5
     reg_loss = reg * (
-        tf.nn.l2_loss(W)
+        tf.nn.l2_loss(Wconv) +
+        tf.nn.l2_loss(W1) +
+        tf.nn.l2_loss(W2)
     )
 
     loss = data_loss + reg_loss
@@ -133,10 +174,9 @@ def main():
     summarizer = tf.summary.merge_all()
 
     # Training operation; automatically updates all variables using SGD.
-    learning_rate = 0.1
     global_step = tf.Variable(0, trainable=False)
-    train_op = tf.train.GradientDescentOptimizer(
-        learning_rate=learning_rate
+    train_op = tf.train.AdamOptimizer(
+        learning_rate=learning_rate, beta1=beta1, beta2=beta2
     ).minimize(loss, global_step=global_step)
 
     # Operation to save and restore variables on the graph.
@@ -145,17 +185,19 @@ def main():
     # Create initializer for variables.
     init = tf.global_variables_initializer()
 
-    epochs = 10
-    batch_size = 256
-    num_iterations = int(num_samples / batch_size) * epochs
-
     with tf.Session() as sess:
         # Run the initializer, then the rest.
         sess.run(init)
 
         # Create seaprate summary writers for training and validation data.
-        train_writer = tf.summary.FileWriter(LOG_DIR + "/train", sess.graph)
-        val_writer = tf.summary.FileWriter(LOG_DIR + "/val", sess.graph)
+        train_writer = tf.summary.FileWriter(f"{LOG_DIR}/train", sess.graph)
+        val_writer = tf.summary.FileWriter(f"{LOG_DIR}/val", sess.graph)
+
+        # Calculate number of needed iterations.
+        num_iterations = int(num_samples / batch_size) * epochs
+        print("training for {} epochs; total iterations = {}".format(
+            epochs, num_iterations
+        ))
 
         # Run the training operation `num_iterations` times.
         for idx in range(num_iterations):
@@ -169,7 +211,7 @@ def main():
             )
 
             # Get and track metrics for validation and training sets.
-            if idx % 100 == 0 or idx == (num_iterations - 1):
+            if idx % print_every == 0 or idx == (num_iterations - 1):
                 train_writer.add_summary(summary, idx)
 
                 feed = {X: data['X_val'], y_true: data['y_val']}
