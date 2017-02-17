@@ -138,16 +138,9 @@ def main(data_dir, log_dir, model_dir, num_epochs, batch_size, print_every):
     y_pred = tf.matmul(hidden, W2) + b2
 
     # Metrics operations.
-    # TODO: Find better way to measure (why threshold at 0.5 and over scores?)
-    # TODO: Perform streaming_ variant instead.
-    thresholded = y_pred > 0.5
-    y_pred_binary = tf.where(
-        thresholded,
-        tf.ones(tf.shape(thresholded)),
-        tf.zeros(tf.shape(y_pred))
+    auc, update_auc_op = tf.contrib.metrics.streaming_auc(
+        y_pred, y_true, curve='PR'
     )
-    correct = tf.equal(y_pred_binary, y_true)
-    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
 
     # Data and regularization loss operations.
     data_loss = tf.reduce_mean(
@@ -164,7 +157,7 @@ def main(data_dir, log_dir, model_dir, num_epochs, batch_size, print_every):
 
     # Declare and merge summary values.
     tf.summary.scalar('loss', loss)
-    tf.summary.scalar('accuracy', accuracy)
+    tf.summary.scalar('auc', auc)
     summarizer = tf.summary.merge_all()
 
     # Training operation; automatically updates all variables using SGD.
@@ -200,9 +193,11 @@ def main(data_dir, log_dir, model_dir, num_epochs, batch_size, print_every):
         try:
             while not coord.should_stop():
                 # Run the training operation.
-                _, summary, train_loss, train_acc, step = sess.run(
-                    [train_op, summarizer, loss, accuracy, global_step]
-                )
+                (
+                    _, _, summary, train_loss, train_auc, step
+                ) = sess.run([
+                    train_op, update_auc_op, summarizer, loss, auc, global_step
+                ])
 
                 # Get and track metrics for validation and training sets.
                 if step % print_every == 0:
@@ -217,11 +212,11 @@ def main(data_dir, log_dir, model_dir, num_epochs, batch_size, print_every):
                     # val_writer.add_summary(summary, idx)
 
                     line = (
-                        'iter = {}, train_loss = {:.2f}, train_acc = {:.2f}, '
+                        'iter = {}, train_loss = {:.2f}, train_auc = {:.2f}, '
                         # 'val_loss = {:.2f}, val_acc = {:.2f}'
                     )
                     print(line.format(
-                        step, train_loss, train_acc,  # val_loss, val_acc
+                        step, train_loss, train_auc,  # val_loss, val_acc
                     ))
 
                     saver.save(sess, os.path.join(log_dir, 'conv'), step)
@@ -229,11 +224,11 @@ def main(data_dir, log_dir, model_dir, num_epochs, batch_size, print_every):
         except tf.errors.OutOfRangeError:
             if step % print_every != 0:
                 line = (
-                    'iter = {}, train_loss = {:.2f}, train_acc = {:.2f}, '
+                    'iter = {}, train_loss = {:.2f}, train_auc = {:.2f}, '
                     # 'val_loss = {:.2f}, val_acc = {:.2f}'
                 )
                 print(line.format(
-                    step, train_loss, train_acc,  # val_loss, val_acc
+                    step, train_loss, train_auc,  # val_loss, val_acc
                 ))
             print('finished training -- epoch limit reached')
         finally:
