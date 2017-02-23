@@ -120,8 +120,10 @@ def image_to_example(data_dir, classes, image_id):
 @click.command()
 @click.option('--data-dir', default='datasets/voc')
 @click.option('--output-dir', default='datasets/voc/tf')
-def main(data_dir, output_dir):
+def voc(data_dir, output_dir):
     """
+    Prepare VOC dataset for ingestion.
+
     Converts the VOC dataset into three (one per split) TFRecords files.
     """
     print(f'Saving output_dir = {output_dir}')
@@ -139,7 +141,3 @@ def main(data_dir, output_dir):
             writer.write(example.SerializeToString())
 
         writer.close()
-
-
-if __name__ == '__main__':
-    main()
