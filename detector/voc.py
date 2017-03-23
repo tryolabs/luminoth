@@ -88,6 +88,14 @@ def _bytes(value):
     )
 
 
+def _string(value):
+    value = [value] if not isinstance(value, list) else value
+    value = [v.encode('utf-8') for v in value]
+    return tf.train.Feature(
+        bytes_list=tf.train.BytesList(value=value)
+    )
+
+
 def image_to_example(data_dir, classes, image_id):
     annotation_path = get_image_annotation(data_dir, image_id)
     image_path = get_image_path(data_dir, image_id)
@@ -101,10 +109,12 @@ def image_to_example(data_dir, classes, image_id):
     label = [1 if cls in objects else 0 for cls in classes]
 
     # Feature dictionary representing the image.
+    # TODO: Add bndbox data.
     sample = {
         'width': _int64(int(annotation['size']['width'])),
         'height': _int64(int(annotation['size']['height'])),
         'depth': _int64(int(annotation['size']['depth'])),
+        'filename': _string(annotation['filename']),
 
         'image_raw': _bytes(image),
         'label': _int64(label),
@@ -120,7 +130,9 @@ def image_to_example(data_dir, classes, image_id):
 @click.command()
 @click.option('--data-dir', default='datasets/voc')
 @click.option('--output-dir', default='datasets/voc/tf')
-def voc(data_dir, output_dir):
+@click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])
+@click.option('ignore_splits', '--ignore-split', multiple=True)
+def voc(data_dir, output_dir, splits, ignore_splits):
     """
     Prepare VOC dataset for ingestion.
 
@@ -130,8 +142,10 @@ def voc(data_dir, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
     classes = read_classes(data_dir)
+    splits = [s for s in splits if s not in set(ignore_splits)]
+    print(f'Generating outputs for splits = {", ".join(splits)}')
 
-    for split in ['train', 'val', 'test']:
+    for split in splits:
         print(f'Converting split = {split}')
         record_file = os.path.join(output_dir, f'{split}.tfrecords')
         writer = tf.python_io.TFRecordWriter(record_file)
