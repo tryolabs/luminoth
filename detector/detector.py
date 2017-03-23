@@ -87,8 +87,6 @@ def inputs(data_dir, num_epochs=NUM_EPOCHS, split='train'):
 def inference(X, is_training=True):
     """
     Build the model for performing inference on input X.
-
-    Adds regularization losses to the TF `losses` collection.
     """
     inception_v3 = get_network_fn('inception_v3', NUM_CLASSES, is_training=is_training)
     logits, end_points = inception_v3(X)
@@ -98,53 +96,6 @@ def inference(X, is_training=True):
         tf.summary.scalar('sparsity/' + end_point, tf.nn.zero_fraction(var))
 
     return logits, end_points
-
-    hidden_size = 500
-    conv_size = [3, 3, 3, 32]
-
-    Wconv = tf.Variable(tf.random_normal(conv_size, stddev=0.01))
-    tf.add_to_collection('losses', L2_REG * tf.nn.l2_loss(Wconv))
-
-    bconv = tf.Variable(tf.zeros([conv_size[-1]]))
-    conv = tf.nn.relu(tf.nn.conv2d(
-        X, Wconv,
-        strides=[1, 1, 1, 1],
-        padding='SAME'
-    ) + bconv)
-
-    pool = tf.nn.max_pool(
-        conv,
-        ksize=[1, 2, 2, 1],
-        strides=[1, 2, 2, 1],
-        padding='SAME'
-    )
-
-    # TODO: Better shape handling.
-    pool_shape = pool.get_shape()[1:]
-    hidden_shape = [
-        int(pool_shape[0] * pool_shape[1] * pool_shape[2]),
-        hidden_size
-    ]
-
-    W1 = tf.Variable(tf.random_normal(hidden_shape, stddev=0.01))
-    tf.add_to_collection('losses', L2_REG * tf.nn.l2_loss(W1))
-
-    b1 = tf.Variable(tf.zeros([hidden_size]))
-
-    hidden = tf.nn.relu(tf.matmul(
-        tf.reshape(pool, [-1, hidden_shape[0]]), W1
-    ) + b1)
-
-    W2 = tf.Variable(
-        tf.random_normal([hidden_size, NUM_CLASSES], stddev=0.01)
-    )
-    tf.add_to_collection('losses', L2_REG * tf.nn.l2_loss(W2))
-
-    b2 = tf.Variable(tf.zeros([NUM_CLASSES]))
-
-    y_pred = tf.matmul(hidden, W2) + b2
-
-    return y_pred
 
 
 def metrics(logits, labels):
