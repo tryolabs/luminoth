@@ -32,13 +32,11 @@ def test(model_dir, dataset_dir, image_file, print_inline):
 
     image_raw = np.array(imread(image_file))
     image = tf.placeholder(
-        tf.float32
+        tf.float32, [None, None, 3]
     )
-    # resized_image = tf.image.resize_images(
-    #     image, [IMAGE_SIZE, IMAGE_SIZE]
-    # )
-    resized_image = tf.image.resize_image_with_crop_or_pad(
-        image, IMAGE_SIZE, IMAGE_SIZE
+
+    resized_image = tf.image.resize_images(
+        image, [IMAGE_SIZE, IMAGE_SIZE]
     )
     resized_image.set_shape([IMAGE_SIZE, IMAGE_SIZE, 3])
     std_image = tf.image.per_image_standardization(resized_image)
