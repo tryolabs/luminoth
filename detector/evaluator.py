@@ -28,6 +28,7 @@ def evaluate_once(saver, writer, summarizer, model_dir, split='val'):
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
             step = ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1]
+            print(f'loaded checkpoint from {ckpt.model_checkpoint_path}')
         else:
             print('no checkpoint available')
             return
@@ -49,6 +50,7 @@ def evaluate_once(saver, writer, summarizer, model_dir, split='val'):
                     for metric, value in zip(metrics, values)
                     if metric.op.name.startswith('auc')
                 ])
+                print(f'metric report: {metrics_report}')
 
         except tf.errors.OutOfRangeError:
             line = 'iter = {}, {}'
@@ -86,7 +88,7 @@ def evaluate(data_dir, log_dir, model_dir, split, interval):
     X, y_true = inputs(data_dir, num_epochs=1, split=split)
 
     # Graph architecture.
-    y_pred = inference(X)
+    y_pred, _ = inference(X, is_training=False)
 
     # Metrics operations.
     metrics(y_pred, y_true)
@@ -109,4 +111,5 @@ def evaluate(data_dir, log_dir, model_dir, split, interval):
 
     while True:
         evaluate_once(saver, writer, summarizer, model_dir)
+        print('finished "evaluate_once"')
         time.sleep(interval)
