@@ -75,7 +75,7 @@ def get_image_annotation(root, image_id):
 
 
 def _int64(value):
-    value = [value] if not isinstance(value, list) else value
+    value = [int(value)] if not isinstance(value, list) else value
     return tf.train.Feature(
         int64_list=tf.train.Int64List(value=value)
     )
@@ -110,19 +110,48 @@ def image_to_example(data_dir, classes, image_id):
 
     # Feature dictionary representing the image.
     # TODO: Add bndbox data.
+
+
+    object_features = []
+    for b in annotation['object']:
+        object_feature = {
+            'name': _string(b['name']),
+            'xmin': _int64(b['bndbox']['xmin']),
+            'ymin': _int64(b['bndbox']['ymin']),
+            'xmax': _int64(b['bndbox']['xmax']),
+            'ymax': _int64(b['bndbox']['ymax']),
+        }
+        object_feature = tf.train.Features(feature=object_feature)
+        object_features.append(object_feature)
+
+    # objects = tf.train.Features(feature=object_features)
+    # objects = tf.train.FeatureLists(feature_list=object_features)
+    # objects_feature = tf.train.Feature(bytes_list=objects)
+
+    object_feature_lists = {
+        'name': tf.train.FeatureList(feature=[_string(b['name']) for b in annotation['object']]),
+        'xmin': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmin']) for b in annotation['object']]),
+        'ymin': tf.train.FeatureList(feature=[_int64(b['bndbox']['ymin']) for b in annotation['object']]),
+        'xmax': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmax']) for b in annotation['object']]),
+        'ymax': tf.train.FeatureList(feature=[_int64(b['bndbox']['ymax']) for b in annotation['object']]),
+    }
+
+    object_features = tf.train.FeatureLists(feature_list=object_feature_lists)
+    object_features_example = tf.train.SequenceExample(feature_lists=object_features)
+
     sample = {
         'width': _int64(int(annotation['size']['width'])),
         'height': _int64(int(annotation['size']['height'])),
         'depth': _int64(int(annotation['size']['depth'])),
         'filename': _string(annotation['filename']),
-
         'image_raw': _bytes(image),
         'label': _int64(label),
     }
 
     # Now build an `Example` protobuf object and save with the writer.
-    features = tf.train.Features(feature=sample)
-    example = tf.train.Example(features=features)
+    context = tf.train.Features(feature=sample)
+    example = tf.train.SequenceExample(feature_lists=object_features, context=context)
+    # example = tf.train.SequenceExample(feature_lists=features)
 
     return example
 
