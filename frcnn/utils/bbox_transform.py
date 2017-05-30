@@ -8,6 +8,12 @@
 import numpy as np
 
 def bbox_transform(ex_rois, gt_rois):
+    """
+    Bounding box parametrization following:
+    "Rich feature hierarchies for accurate object detection and semantic segmentation"
+    R. Girshick, et al.
+    https://arxiv.org/pdf/1311.2524.pdf
+    """
     ex_widths = ex_rois[:, 2] - ex_rois[:, 0] + 1.0
     ex_heights = ex_rois[:, 3] - ex_rois[:, 1] + 1.0
     ex_ctr_x = ex_rois[:, 0] + 0.5 * ex_widths

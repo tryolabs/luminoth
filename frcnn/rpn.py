@@ -17,6 +17,7 @@ class RPN(snt.AbstractModule):
         self._kernel_shape = kernel_shape
 
         self._initializer = tf.random_normal_initializer(mean=0.0, stddev=0.01)
+        self._rpn_activation = tf.nn.relu
 
         self._instantiate_layers()
 
@@ -28,8 +29,6 @@ class RPN(snt.AbstractModule):
                 kernel_shape=self._kernel_shape,
                 initializers={'w': self._initializer}, name='conv'
             )
-
-            self._rpn_activation = tf.nn.relu
 
             self._rpn_cls = Conv2D(
                 output_channels=self._num_anchors * 2, kernel_shape=[1, 1],
