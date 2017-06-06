@@ -256,7 +256,7 @@ class AnchorTarget(snt.AbstractModule):
         We use the original code found in `rbgirshick/py-faster-rcnn`
         """
         return generate_anchors(
-            ratios=self._anchor_ratios, scales=self._anchor_scales
+            ratios=np.array(self._anchor_ratios), scales=np.array(self._anchor_scales)
         )
 
     def _bbox_overlaps(self, boxes, gt_boxes):
