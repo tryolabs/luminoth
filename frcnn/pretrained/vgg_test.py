@@ -27,6 +27,5 @@ class VGGTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
             # with width and height between 500 and 600 we should have this output
             self.assertEqual(out.shape, (1, 32, 32, 512))
 
-
 if __name__ == "__main__":
     tf.test.main()

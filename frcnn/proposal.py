@@ -5,7 +5,7 @@ import numpy as np
 from utils.bbox_transform import bbox_transform_inv, clip_boxes
 from utils.nms import nms
 
-class ProposalLayer(snt.AbstractModule):
+class Proposal(snt.AbstractModule):
     """
     Outputs object detection proposals by applying estimated bounding-box
     transformations to a set of regular boxes (called "anchors").
@@ -15,7 +15,7 @@ class ProposalLayer(snt.AbstractModule):
     TODO: Better documentation.
     """
     def __init__(self, anchors, feat_stride=[16], name='proposal_layer'):
-        super(ProposalLayer, self).__init__(name=name)
+        super(Proposal, self).__init__(name=name)
         self._anchors = anchors
         self._num_anchors = self.anchors.shape[0]
         self._feat_stride = feat_stride
@@ -68,6 +68,7 @@ class ProposalLayer(snt.AbstractModule):
 
         # 1. Generate proposals from bbox deltas and shifted anchors
         # Convert anchors into proposals via bbox transformations
+        # TODO: Dudas si realmente necesita _anchors o realmente las boxes.
         proposals = bbox_transform_inv(self._anchors, rpn_bbox_pred)
 
         # 2. Clip predicted boxes to image

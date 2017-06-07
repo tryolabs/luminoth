@@ -35,17 +35,15 @@ class AnchorTarget(snt.AbstractModule):
 
     Returns:
         labels: label for each anchor
-        bbox_targets: bbox regresion values for earch anchor
+        bbox_targets: bbox regresion values for each anchor
         bbox_inside_weights: TODO: ??
         bbox_outside_weights: TODO: ??
 
     """
-    def __init__(self, anchor_scales, anchor_ratios, feat_stride=[16],
-                 name='anchor_target'):
+    def __init__(self, anchors, feat_stride=[16], name='anchor_target'):
         super(AnchorTarget, self).__init__(name=name)
-        self._anchor_scales = anchor_scales
-        self._anchor_ratios = anchor_ratios
-        self._num_anchors = self.anchors.shape[0]
+        self._anchors = anchors
+        self._num_anchors = self._anchors.shape[0]
         self._feat_stride = feat_stride
 
         self._allowed_border = 0
@@ -115,7 +113,7 @@ class AnchorTarget(snt.AbstractModule):
 
         shift_x, shift_y = np.meshgrid(shift_x, shift_y) # in W H order
 
-        # K is H x W
+        # K (shifts shape) is H x W
         shifts = np.vstack(
             (shift_x.ravel(), shift_y.ravel(),
              shift_x.ravel(), shift_y.ravel())
@@ -129,7 +127,7 @@ class AnchorTarget(snt.AbstractModule):
         K = shifts.shape[0]  # ( W * H ?)
 
         all_anchors = (
-            self.anchors.reshape((1, A, 4)) +
+            self._anchors.reshape((1, A, 4)) +
             shifts.reshape((1, K, 4)).transpose((1, 0, 2)))
 
         all_anchors = all_anchors.reshape((K * A, 4))
@@ -243,22 +241,6 @@ class AnchorTarget(snt.AbstractModule):
 
         return labels, bbox_targets, bbox_inside_weights, bbox_outside_weights
 
-    @property
-    def anchors(self):
-        if not hasattr(self, '_anchors') or self._anchors is None:
-            self._anchors = self._generate_anchors()
-        return self._anchors
-
-    def _generate_anchors(self):
-        """
-        Generate anchors based on the ratios and scales.
-
-        We use the original code found in `rbgirshick/py-faster-rcnn`
-        """
-        return generate_anchors(
-            ratios=np.array(self._anchor_ratios), scales=np.array(self._anchor_scales)
-        )
-
     def _bbox_overlaps(self, boxes, gt_boxes):
         """
         For each bounding box calculate overlap with groundtruth boxes.
@@ -272,7 +254,6 @@ class AnchorTarget(snt.AbstractModule):
 
         assert boxes.shape[0] == groundtruth_boxes.shape[0]
         assert boxes.shape[1] == 4
-        # TODO: Why 5?!!
         assert groundtruth_boxes.shape[1] == 5
 
         return bbox_transform(

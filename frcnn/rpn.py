@@ -10,7 +10,7 @@ from utils.generate_anchors import generate_anchors
 
 class RPN(snt.AbstractModule):
     def __init__(self, anchor_scales, anchor_ratios, num_channels=512,
-                 kernel_shape=[3, 3], is_training=False, name='rpn'):
+                 kernel_shape=[3, 3], name='rpn'):
         """RPN"""
         super(RPN, self).__init__(name=name)
 
@@ -36,8 +36,6 @@ class RPN(snt.AbstractModule):
         # TODO: Do we need the anchors? Can't we just use len(self._anchor_scales) * len(self._anchor_ratios)
         self._num_anchors = self.anchors.shape[0]
 
-        print(self.anchors.shape)
-
         self._num_channels = num_channels
         self._kernel_shape = kernel_shape
 
@@ -52,7 +50,7 @@ class RPN(snt.AbstractModule):
             self._rpn = Conv2D(
                 output_channels=self._num_channels,
                 kernel_shape=self._kernel_shape,
-                initializers={'w': self._initializer, 'b': self._initializer}, name='conv'
+                initializers={'w': self._initializer}, name='conv'
             )
 
             self._rpn_cls = Conv2D(
@@ -72,9 +70,7 @@ class RPN(snt.AbstractModule):
         """
         TODO: We don't have BatchNorm yet.
         """
-        rpn = self._rpn_activation(
-            self._rpn(pretrained))
-
+        rpn = self._rpn_activation(self._rpn(pretrained))
         rpn_cls_score = self._rpn_cls(rpn)
         rpn_cls_score_reshape = self.spatial_reshape_layer(rpn_cls_score, 2)
         rpn_cls_prob = self.spatial_softmax(rpn_cls_score_reshape)

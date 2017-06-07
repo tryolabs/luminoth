@@ -17,12 +17,14 @@ class RCNN(snt.AbstractModule):
 
             # Define initializaers/partitioners/regualizers
             self._layers = [
-                snt.Linear(layer_size,
-                           name="fc_{}".format(i),
-                           initializers=self._initializers,
-                           partitioners=self._partitioners,
-                           regularizers=self._regularizers,
-                           use_bias=self.use_bias)
+                snt.Linear(
+                    layer_size,
+                    name="fc_{}".format(i),
+                    initializers=self._initializers,
+                    partitioners=self._partitioners,
+                    regularizers=self._regularizers,
+                    use_bias=self.use_bias
+                )
                 for i, layer_size in enumerate(self._layer_sizes)
             ]
 
@@ -37,6 +39,9 @@ class RCNN(snt.AbstractModule):
 
 
     def _build(self, pooled_layer):
+        """
+        TODO: El pooled layer es el volumen con todos los ROI o es uno por cada ROI?
+        """
         net = pooled_layer
         for i, layer in enumerate(self._layers):
             net = layer(net)
