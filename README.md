@@ -20,3 +20,12 @@ Run the evaluator (separate process) with:
 ```
 $ python -m detector evaluate --split=val
 ```
+
+
+FRCNN
+=====
+
+To build Cython extensions:
+```
+$ python setup.py build_ext --inplace
+```

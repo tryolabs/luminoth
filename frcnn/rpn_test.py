@@ -4,7 +4,7 @@ import numpy as np
 
 from sonnet.testing.parameterized import parameterized
 
-from rpn import RPN
+from .rpn import RPN
 
 class RPNTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
     def setUp(self):
@@ -38,7 +38,10 @@ class RPNTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
             net = RPN(self.anchor_scales, [])
 
     def testBasic(self):
-        model = RPN(self.anchor_scales, self.anchor_ratios, self.num_channels, self.kernel_shape)
+        model = RPN(
+            self.anchor_scales, self.anchor_ratios, self.num_channels,
+            self.kernel_shape
+        )
         # With an image of (100, 100, 3) we get a VGG output of (32, 32, 512) (plus the batch number)
         pretrained_output_shape = (1, 32, 32, 512)
         pretrained_output = tf.placeholder(tf.float32, shape=pretrained_output_shape)
@@ -47,7 +50,9 @@ class RPNTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
         with self.test_session() as sess:
             # As in the case of a real session we need to initialize the variables.
             sess.run(tf.global_variables_initializer())
-            layers_inst = sess.run(layers, feed_dict={pretrained_output: np.random.rand(*pretrained_output_shape)})
+            layers_inst = sess.run(layers, feed_dict={
+                pretrained_output: np.random.rand(*pretrained_output_shape)
+            })
 
         # Since pretrained
         rpn_shape = layers_inst['rpn'].shape

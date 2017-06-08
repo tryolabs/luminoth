@@ -5,7 +5,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 from sonnet.python.modules.conv import Conv2D
-from utils.generate_anchors import generate_anchors
+from .utils.generate_anchors import generate_anchors
 
 
 class RPN(snt.AbstractModule):

@@ -2,8 +2,8 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from utils.bbox_transform import bbox_transform_inv, clip_boxes
-from utils.nms import nms
+from .utils.bbox_transform import bbox_transform_inv, clip_boxes
+from .utils.nms import nms
 
 class Proposal(snt.AbstractModule):
     """
@@ -17,7 +17,7 @@ class Proposal(snt.AbstractModule):
     def __init__(self, anchors, feat_stride=[16], name='proposal_layer'):
         super(Proposal, self).__init__(name=name)
         self._anchors = anchors
-        self._num_anchors = self.anchors.shape[0]
+        self._num_anchors = self._anchors.shape[0]
         self._feat_stride = feat_stride
 
         # Filtering config  TODO: Use external configuration

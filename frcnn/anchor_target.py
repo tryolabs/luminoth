@@ -2,9 +2,8 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from utils.generate_anchors import generate_anchors
-from utils.cython_bbox import bbox_overlaps
-from utils.bbox_transform import bbox_transform
+from .utils.bbox import bbox_overlaps
+from .utils.bbox_transform import bbox_transform
 
 
 class AnchorTarget(snt.AbstractModule):
@@ -54,7 +53,7 @@ class AnchorTarget(snt.AbstractModule):
         self._batch_size = 256
         self._bbox_inside_weights = (1.0, 1.0, 1.0, 1.0)
 
-    def _build(self, rpn_cls_score, gt_boxes):
+    def _build(self, rpn_cls_score, gt_boxes, im_info):
         """
         Args:
             rpn_cls_score: A Tensor with the class score for every anchor
@@ -84,15 +83,18 @@ class AnchorTarget(snt.AbstractModule):
             bbox_inside_weights, bbox_outside_weights
         ) = tf.py_func(
             self._anchor_target_layer_np,
-            [rpn_cls_score, gt_boxes],
+            [rpn_cls_score, gt_boxes, im_info],
             [tf.float32, tf.float32, tf.float32, tf.float32]
 
         )
 
-        return labels, bbox_targets, bbox_inside_weights, bbox_outside_weights
+        return {
+            'labels': labels,
+            'bbox_targets': bbox_targets,
+        }  # missing bbox_inside_weights, bbox_outside_weights
 
 
-    def _anchor_target_layer(self, rpn_cls_score):
+    def _anchor_target_layer(self, rpn_cls_score, gt_boxes, im_info):
         """
         Function working with Tensors instead of instances for proper
         computing in the Tensorflow graph.
@@ -100,7 +102,7 @@ class AnchorTarget(snt.AbstractModule):
         raise NotImplemented()
 
 
-    def _anchor_target_layer_np(self, rpn_cls_score, gt_boxes):
+    def _anchor_target_layer_np(self, rpn_cls_score, gt_boxes, im_info):
         """
         Function to be executed with tf.py_func
         """
@@ -123,8 +125,8 @@ class AnchorTarget(snt.AbstractModule):
         # cell K shifts (K, 1, 4) to get
         # shift anchors (K, A, 4)
         # reshape to (K*A, 4) shifted anchors
-        A = self._num_anchors
-        K = shifts.shape[0]  # ( W * H ?)
+        A = self._num_anchors  # 3 x 3 = 9 (usually)
+        K = shifts.shape[0]  # H x W
 
         all_anchors = (
             self._anchors.reshape((1, A, 4)) +
@@ -132,6 +134,7 @@ class AnchorTarget(snt.AbstractModule):
 
         all_anchors = all_anchors.reshape((K * A, 4))
 
+        # We have "W x H x k" anchors
         total_anchors = int(K * A)
 
         # only keep anchors inside the image
