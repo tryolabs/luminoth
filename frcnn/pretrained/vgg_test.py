@@ -4,7 +4,8 @@ import numpy as np
 
 from sonnet.testing.parameterized import parameterized
 
-from vgg import VGG
+from .vgg import VGG
+
 
 class VGGTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
     def setUp(self):

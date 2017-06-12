@@ -88,10 +88,7 @@ class AnchorTarget(snt.AbstractModule):
 
         )
 
-        return {
-            'labels': labels,
-            'bbox_targets': bbox_targets,
-        }  # missing bbox_inside_weights, bbox_outside_weights
+        return labels, bbox_targets  # missing bbox_inside_weights, bbox_outside_weights
 
 
     def _anchor_target_layer(self, rpn_cls_score, gt_boxes, im_info):

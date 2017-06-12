@@ -2,8 +2,10 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
+
 class RCNN(snt.AbstractModule):
     """RCNN """
+
     def __init__(self, num_classes, layer_sizes=[4096, 4096], name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
@@ -20,10 +22,8 @@ class RCNN(snt.AbstractModule):
                 snt.Linear(
                     layer_size,
                     name="fc_{}".format(i),
-                    initializers=self._initializers,
-                    partitioners=self._partitioners,
-                    regularizers=self._regularizers,
-                    use_bias=self.use_bias
+                    # initializers=self._initializers,
+                    # regularizers=self._regularizers,
                 )
                 for i, layer_size in enumerate(self._layer_sizes)
             ]
@@ -37,12 +37,12 @@ class RCNN(snt.AbstractModule):
                 self._num_classes * 4, name="fc_bbox"
             )
 
-
     def _build(self, pooled_layer):
         """
         TODO: El pooled layer es el volumen con todos los ROI o es uno por cada ROI?
+        TODO: Donde puedo comparar los resultados con las labels posta?
         """
-        net = pooled_layer
+        net = tf.contrib.layers.flatten(pooled_layer)
         for i, layer in enumerate(self._layers):
             net = layer(net)
             net = self._activation(net)
@@ -53,7 +53,3 @@ class RCNN(snt.AbstractModule):
         bbox_net = self._bbox_layer(net)
 
         return classification_prob, bbox_net
-
-
-
-

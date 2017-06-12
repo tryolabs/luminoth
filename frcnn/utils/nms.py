@@ -9,6 +9,7 @@
 
 import numpy as np
 
+# https://stackoverflow.com/questions/42879109/tensorflow-non-maximum-suppression
 
 def nms(dets, thresh):
     """Pure Python NMS baseline."""

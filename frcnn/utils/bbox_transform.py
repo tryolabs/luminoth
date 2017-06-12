@@ -7,6 +7,7 @@
 
 import numpy as np
 
+
 def bbox_transform(ex_rois, gt_rois):
     """
     Bounding box parametrization following:
@@ -34,6 +35,7 @@ def bbox_transform(ex_rois, gt_rois):
     targets = np.vstack(
         (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
     return targets
+
 
 def bbox_transform_inv(boxes, deltas):
     """
@@ -69,7 +71,8 @@ def bbox_transform_inv(boxes, deltas):
     ctr_y = boxes[:, 1] + 0.5 * heights
 
     # The dx, dy deltas are relative while the dw, dh deltas are "log relative"
-    # d[:, x::y] is used for having a `(num_boxes, 1)` shape instead of `(num_boxes,)`
+    # d[:, x::y] is used for having a `(num_boxes, 1)` shape instead of
+    # `(num_boxes,)`
     dx = deltas[:, 0::4]
     dy = deltas[:, 1::4]
     dw = deltas[:, 2::4]
@@ -95,6 +98,7 @@ def bbox_transform_inv(boxes, deltas):
     pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h
 
     return pred_boxes
+
 
 def clip_boxes(boxes, im_shape):
     """

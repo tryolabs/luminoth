@@ -7,13 +7,16 @@ from sonnet.testing.parameterized import parameterized
 from .anchor_target import AnchorTarget
 from .utils.generate_anchors import generate_anchors
 
+
 class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+
     def setUp(self):
         super(AnchorTargetTest, self).setUp()
         # Setup anchors
         self.anchor_scales = np.array([8, 16, 32])
         self.anchor_ratios = np.array([0.5, 1, 2])
-        self.anchors = generate_anchors(ratios=self.anchor_ratios, scales=self.anchor_scales)
+        self.anchors = generate_anchors(
+            ratios=self.anchor_ratios, scales=self.anchor_scales)
 
     def testBasic(self):
         model = AnchorTarget(self.anchors)
@@ -21,7 +24,8 @@ class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
         gt_boxes_shape = (3, 4)  # 3 ground truth boxes.
         im_info_shape = (2,)
 
-        rpn_cls_score_ph = tf.placeholder(tf.float32, shape=rpn_cls_score_shape)
+        rpn_cls_score_ph = tf.placeholder(
+            tf.float32, shape=rpn_cls_score_shape)
         gt_boxes_ph = tf.placeholder(tf.float32, shape=gt_boxes_shape)
         im_info_ph = tf.placeholder(tf.float32, shape=im_info_shape)
 
