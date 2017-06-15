@@ -104,32 +104,8 @@ def image_to_example(data_dir, classes, image_id):
     annotation = read_xml(annotation_path)
     image = read_image(image_path)
 
-    # Represent the label as a list of 0s and 1s (one per class).
-    objects = set(obj['name'] for obj in annotation['object'])
-    label = [1 if cls in objects else 0 for cls in classes]
-
-    # Feature dictionary representing the image.
-    # TODO: Add bndbox data.
-
-
-    object_features = []
-    for b in annotation['object']:
-        object_feature = {
-            'name': _string(b['name']),
-            'xmin': _int64(b['bndbox']['xmin']),
-            'ymin': _int64(b['bndbox']['ymin']),
-            'xmax': _int64(b['bndbox']['xmax']),
-            'ymax': _int64(b['bndbox']['ymax']),
-        }
-        object_feature = tf.train.Features(feature=object_feature)
-        object_features.append(object_feature)
-
-    # objects = tf.train.Features(feature=object_features)
-    # objects = tf.train.FeatureLists(feature_list=object_features)
-    # objects_feature = tf.train.Feature(bytes_list=objects)
-
     object_feature_lists = {
-        'name': tf.train.FeatureList(feature=[_string(b['name']) for b in annotation['object']]),
+        'label': tf.train.FeatureList(feature=[_int64(classes.index(b['name'])) for b in annotation['object']]),
         'xmin': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmin']) for b in annotation['object']]),
         'ymin': tf.train.FeatureList(feature=[_int64(b['bndbox']['ymin']) for b in annotation['object']]),
         'xmax': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmax']) for b in annotation['object']]),
@@ -137,7 +113,6 @@ def image_to_example(data_dir, classes, image_id):
     }
 
     object_features = tf.train.FeatureLists(feature_list=object_feature_lists)
-    object_features_example = tf.train.SequenceExample(feature_lists=object_features)
 
     sample = {
         'width': _int64(int(annotation['size']['width'])),
@@ -145,7 +120,6 @@ def image_to_example(data_dir, classes, image_id):
         'depth': _int64(int(annotation['size']['depth'])),
         'filename': _string(annotation['filename']),
         'image_raw': _bytes(image),
-        'label': _int64(label),
     }
 
     # Now build an `Example` protobuf object and save with the writer.

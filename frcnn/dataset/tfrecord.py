@@ -13,7 +13,6 @@ class TFRecordDataset(Dataset):
 
         self._context_features = {
             'image_raw': tf.FixedLenFeature([], tf.string),
-            'label': tf.FixedLenFeature([self._num_classes], tf.int64),
             'filename': tf.FixedLenFeature([], tf.string),
             'width': tf.FixedLenFeature([], tf.int64),
             'height': tf.FixedLenFeature([], tf.int64),
@@ -21,7 +20,7 @@ class TFRecordDataset(Dataset):
         }
 
         self._sequence_features = {
-            'label': tf.VarLenFeature(tf.string),
+            'label': tf.VarLenFeature(tf.int64),
             'xmin': tf.VarLenFeature(tf.int64),
             'xmax': tf.VarLenFeature(tf.int64),
             'ymin': tf.VarLenFeature(tf.int64),
@@ -63,14 +62,13 @@ class TFRecordDataset(Dataset):
         image_shape = tf.stack([height, width, 3])
         image = tf.reshape(image, image_shape)
 
-        label = tf.cast(context_example['label'], tf.int32)
-
+        label = self.sparse_to_tensor(sequence_example['label'])
         xmin = self.sparse_to_tensor(sequence_example['xmin'])
         xmax = self.sparse_to_tensor(sequence_example['xmax'])
         ymin = self.sparse_to_tensor(sequence_example['ymin'])
         ymax = self.sparse_to_tensor(sequence_example['ymax'])
 
-        bboxes = tf.stack([xmin, ymin, xmax, ymax], axis=1)
+        bboxes = tf.stack([xmin, ymin, xmax, ymax, label], axis=1)
 
         queue = tf.RandomShuffleQueue(
             capacity=100,
