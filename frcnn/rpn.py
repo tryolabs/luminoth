@@ -70,12 +70,12 @@ class RPN(snt.AbstractModule):
         """
         TODO: We don't have BatchNorm yet.
         """
-        rpn = self._rpn_activation(self._rpn(pretrained))
-        rpn_cls_score = self._rpn_cls(rpn)
-        rpn_cls_score_reshape = self.spatial_reshape_layer(rpn_cls_score, 2)
-        rpn_cls_prob = self.spatial_softmax(rpn_cls_score_reshape)
-        rpn_cls_prob_reshape = self.spatial_reshape_layer(rpn_cls_prob, self._num_anchors * 2)
-        rpn_bbox_pred = self._rpn_bbox(rpn)
+        rpn = self._rpn_activation(self._rpn(pretrained))  # TODO(debug): shape (1, 21, 31, 512)
+        rpn_cls_score = self._rpn_cls(rpn)  # TODO(debug): shape (1, 21, 31, 18)
+        rpn_cls_score_reshape = self.spatial_reshape_layer(rpn_cls_score, 2)  # TODO(debug): shape (1, 21, 279, 2)
+        rpn_cls_prob = self.spatial_softmax(rpn_cls_score_reshape)  # TODO(debug): shape (1, 21, 279, 2)
+        rpn_cls_prob_reshape = self.spatial_reshape_layer(rpn_cls_prob, self._num_anchors * 2)  # TODO(debug): shape (1, 21, 31, 18)
+        rpn_bbox_pred = self._rpn_bbox(rpn)  # TODO(debug): shape (1, 21, 31, 36)
 
         return {
             'rpn': rpn,

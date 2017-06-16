@@ -3,7 +3,6 @@ import sonnet as snt
 import tensorflow as tf
 
 from .anchor_target import AnchorTarget
-from .config import Config
 from .dataset import TFRecordDataset
 from .pretrained import VGG
 from .proposal import Proposal
@@ -52,11 +51,11 @@ class FasterRCNN(snt.AbstractModule):
         pretrained_output = self._pretrained(image)
         rpn_layers = self._rpn(pretrained_output, is_training=is_training)
         # TODO: We should rename the
-        rpn_cls_prob = rpn_layers['rpn_cls_prob_reshape']
-        rpn_bbox_pred = rpn_layers['rpn_bbox_pred']
+        rpn_cls_prob = rpn_layers['rpn_cls_prob_reshape']  # TODO(debug): shape (1, 21, 31, 18)
+        rpn_bbox_pred = rpn_layers['rpn_bbox_pred']  # TODO(debug): shape (1, 21, 31, 36)
 
         rpn_labels, rpn_bbox = self._anchor_target(
-            rpn_layers['rpn_cls_score_reshape'], gt_boxes, image_shape)
+            rpn_cls_prob, gt_boxes, image_shape)
 
         blob, scores = self._proposal(
             rpn_layers['rpn_cls_prob'], rpn_layers['rpn_bbox_pred'])
@@ -64,6 +63,7 @@ class FasterRCNN(snt.AbstractModule):
 
         # TODO: Missing mapping classification_bbox to real coordinates.
         # (and trimming, and NMS?)
+        # TODO: Missing gt_boxes labels!
         classification_prob, classification_bbox = self._rcnn(roi_pool)
 
         # TODO: We are returning only rpn tensors for training RPN.

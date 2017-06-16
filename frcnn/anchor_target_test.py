@@ -21,7 +21,7 @@ class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
     def testBasic(self):
         model = AnchorTarget(self.anchors)
         rpn_cls_score_shape = (1, 32, 32, model._num_anchors * 2)
-        gt_boxes_shape = (3, 4)  # 3 ground truth boxes.
+        gt_boxes_shape = (1, 4)  # 1 ground truth boxes.
         im_info_shape = (2,)
 
         rpn_cls_score_ph = tf.placeholder(
@@ -36,8 +36,8 @@ class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             out_inst = sess.run(out, feed_dict={
                 rpn_cls_score_ph: np.random.rand(*rpn_cls_score_shape),
-                gt_boxes_ph: np.random.rand(*gt_boxes_shape),
-                im_info_ph: np.random.rand(*im_info_shape),
+                gt_boxes_ph: [[ 45,  42, 455, 342]],
+                im_info_ph: [375, 500],
             })
 
 
