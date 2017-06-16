@@ -3,8 +3,9 @@ import tensorflow as tf
 
 slim = tf.contrib.slim
 
+from .pretrained import Pretrained
 
-class VGG(snt.AbstractModule):
+class VGG(Pretrained):
     def __init__(self, name='vgg'):
         super(VGG, self).__init__(name=name)
 
