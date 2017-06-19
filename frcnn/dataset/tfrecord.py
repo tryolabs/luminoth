@@ -9,6 +9,7 @@ from .dataset import Dataset
 class TFRecordDataset(Dataset):
 
     def __init__(self, name='tfrecord_dataset', **kwargs):
+        self._random_shuffle = kwargs.pop('random_shuffle', False)
         super(TFRecordDataset, self).__init__(name=name, **kwargs)
 
         self._context_features = {
@@ -56,7 +57,9 @@ class TFRecordDataset(Dataset):
         image_raw = tf.image.decode_jpeg(context_example['image_raw'])
         tf.summary.image('image_raw', image_raw, max_outputs=20)
 
-        image = tf.image.per_image_standardization(image_raw)
+        # Do we need per_image_standardization? Do it depend on pretrained?
+        # image = tf.image.per_image_standardization(image_raw)
+        image = tf.cast(image_raw, tf.float32)
         height = tf.cast(context_example['height'], tf.int32)
         width = tf.cast(context_example['width'], tf.int32)
         image_shape = tf.stack([height, width, 3])
@@ -70,13 +73,21 @@ class TFRecordDataset(Dataset):
 
         bboxes = tf.stack([xmin, ymin, xmax, ymax, label], axis=1)
 
-        queue = tf.RandomShuffleQueue(
-            capacity=100,
-            min_after_dequeue=20,
-            dtypes=[tf.float32, tf.int32],
-            names=['image', 'bboxes'],
-            name='tfrecord_queue'
-        )
+        if self._random_shuffle:
+            queue = tf.RandomShuffleQueue(
+                capacity=100,
+                min_after_dequeue=20,
+                dtypes=[tf.float32, tf.int32],
+                names=['image', 'bboxes'],
+                name='tfrecord_random_queue'
+            )
+        else:
+            queue = tf.FIFOQueue(
+                capacity=100,
+                dtypes=[tf.float32, tf.int32],
+                names=['image', 'bboxes'],
+                name='tfrecord_fifo_queue'
+            )
 
         enqueue_ops = [queue.enqueue({
             'image': image,
