@@ -7,7 +7,7 @@ import tensorflow.contrib.slim as slim
 from sonnet.python.modules.conv import Conv2D
 
 from .anchor_target import AnchorTarget
-from .proposal import Proposal
+from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
 from .utils.ops import spatial_softmax, spatial_reshape_layer
 
@@ -56,10 +56,10 @@ class RPN(snt.AbstractModule):
                 name='bbox_conv'
             )
 
-            # AnchorTarget and Proposal and RPN modules and should live in this scope
+            # AnchorTarget and RPNProposal and RPN modules and should live in this scope
             # TODO: Anchor target only in training. Is there a problem if we create it when not training?
             self._anchor_target = AnchorTarget(self._num_anchors)
-            self._proposal = Proposal(self._num_anchors)
+            self._proposal = RPNProposal(self._num_anchors)
 
     def _build(self, pretrained, gt_boxes, image_shape, all_anchors, is_training=True):
         """

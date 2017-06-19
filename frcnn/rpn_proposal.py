@@ -5,7 +5,7 @@ import numpy as np
 from .utils.bbox_transform import bbox_transform_inv, clip_boxes
 from .utils.nms import nms
 
-class Proposal(snt.AbstractModule):
+class RPNProposal(snt.AbstractModule):
     """
     Outputs object detection proposals by applying estimated bounding-box
     transformations to a set of regular boxes (called "anchors").
@@ -13,11 +13,9 @@ class Proposal(snt.AbstractModule):
     Applies NMS and top-N filtering to proposals to limit the number of proposals.
 
     TODO: Better documentation.
-
-    TODO: Rename to RPNProposal?
     """
     def __init__(self, num_anchors, feat_stride=[16], name='proposal_layer'):
-        super(Proposal, self).__init__(name=name)
+        super(RPNProposal, self).__init__(name=name)
         self._num_anchors = num_anchors
         self._feat_stride = feat_stride
 
@@ -28,22 +26,10 @@ class Proposal(snt.AbstractModule):
         self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
-        # rois, rois_scores = tf.py_func(
-        #     self._proposal_layer_np, [rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape],
-        #     [tf.float32, tf.float32]
-        # )
-
-        # TODO: Better verification that proposal_layer_tf is working correctly.
-        rois_tf, rois_scores_tf = self._proposal_layer_tf(rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape)
-
-        return rois_tf, rois_scores_tf
-
-
-    def _proposal_layer_tf(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
         """
-        Function working with Tensors instead of instances for proper
-        computing in the Tensorflow graph.
+        TODO: Comments (for review you can find an old version in the logs when it was called proposal.py)
         """
+
         scores = tf.slice(rpn_cls_prob, [0, 0, 0, self._num_anchors], [-1, -1, -1, -1])
         rpn_bbox_pred = tf.reshape(rpn_bbox_pred, (-1, 4))
         scores = tf.reshape(scores, (-1, 1))
@@ -100,69 +86,5 @@ class Proposal(snt.AbstractModule):
         blobs = tf.concat([batch_inds, x_min, y_min, x_max, y_max], axis=1)
         return blobs, scores
 
-    def _proposal_layer_np(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
-        """
-        Function to be executed with tf.py_func
+        return rois_tf, rois_scores_tf
 
-        Comment from original codebase:
-            Algorithm:
-                for each (H, W) location i
-                  generate A anchor boxes centered on cell i
-                  apply predicted bbox deltas at cell i to each of the A anchors
-                clip predicted boxes to image
-                remove predicted boxes with either height or width < threshold
-                sort all (proposal, score) pairs by score from highest to lowest
-                take top pre_nms_topN proposals before NMS
-                apply NMS with threshold 0.7 to remaining proposals
-                take after_nms_topN proposals after NMS
-                return the top proposals (-> RoIs top, scores top)
-
-        Args:
-            rpn_cls_prob:
-                Objectness probability for each anchor.
-                Shape (batch_size, H, W, num_anchors * 2)
-            rpn_bbox_pred:
-                RPN bbox delta for each anchor
-                Shape (batch_size, H, W, num_anchors * 4)
-        """
-        # Lets take only the first probability (objectness)
-        scores = rpn_cls_prob[:, :, :, self._num_anchors:]
-
-        # Flatten bbox and scores to have a one to one easy matching.
-        rpn_bbox_pred = rpn_bbox_pred.reshape((-1, 4))
-        scores = scores.reshape((-1, 1))
-
-        # 1. Generate proposals from bbox deltas and shifted anchors
-        # Convert anchors into proposals via bbox transformations
-        # TODO: Dudas si realmente necesita _anchors o realmente las boxes. PORQUE SOY ESTUPIDO?!
-        # TODO: Kill me
-        proposals = bbox_transform_inv(all_anchors, rpn_bbox_pred)
-
-        # 2. Clip predicted boxes to image
-        proposals = clip_boxes(proposals, im_shape)
-
-        # 4. sort all (proposal, score) pairs by score from highest to lowest
-        order = scores.ravel().argsort()[::-1]
-
-        # 5. take top pre_nms_topN (e.g. 6000)
-        if self._pre_nms_top_n > 0:
-            order = order[:self._pre_nms_top_n]
-        proposals = proposals[order, :]
-        scores = scores[order]
-
-        # 6. apply nms (e.g. threshold = 0.7)
-        # 7. take after_nms_topN (e.g. 300)
-        # 8. return the top proposals (-> RoIs top)
-        keep = nms(np.hstack((proposals, scores)), self._nms_threshold)
-        if self._post_nms_top_n > 0:
-            keep = keep[:self._post_nms_top_n]
-        proposals = proposals[keep, :]
-        scores = scores[keep]
-
-        # Output rois blob
-        # Our RPN implementation only supports a single input image, so all
-        # batch inds are 0
-        batch_inds = np.zeros((proposals.shape[0], 1), dtype=np.float32)
-        blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
-
-        return blob, scores
