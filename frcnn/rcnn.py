@@ -17,13 +17,10 @@ class RCNN(snt.AbstractModule):
     def _instantiate_layers(self):
         with self._enter_variable_scope():
 
-            # Define initializaers/partitioners/regualizers
             self._layers = [
                 snt.Linear(
                     layer_size,
                     name="fc_{}".format(i),
-                    # initializers=self._initializers,
-                    # regularizers=self._regularizers,
                 )
                 for i, layer_size in enumerate(self._layer_sizes)
             ]

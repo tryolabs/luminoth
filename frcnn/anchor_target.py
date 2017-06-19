@@ -39,10 +39,9 @@ class AnchorTarget(snt.AbstractModule):
         bbox_outside_weights: TODO: ??
 
     """
-    def __init__(self, anchors, feat_stride=[16], name='anchor_target'):
+    def __init__(self, num_anchors, feat_stride=[16], name='anchor_target'):
         super(AnchorTarget, self).__init__(name=name)
-        self._anchors = anchors
-        self._num_anchors = self._anchors.shape[0]
+        self._num_anchors = num_anchors
         self._feat_stride = feat_stride
 
         self._allowed_border = 0
@@ -53,7 +52,7 @@ class AnchorTarget(snt.AbstractModule):
         self._batch_size = 256
         self._bbox_inside_weights = (1.0, 1.0, 1.0, 1.0)
 
-    def _build(self, rpn_cls_prob, gt_boxes, im_info):
+    def _build(self, rpn_cls_prob, gt_boxes, im_info, all_anchors):
         """
         Args:
             rpn_cls_prob: A Tensor with the class probability for every anchor
@@ -87,7 +86,7 @@ class AnchorTarget(snt.AbstractModule):
             # bbox_inside_weights, bbox_outside_weights
         ) = tf.py_func(
             self._anchor_target_layer_np,
-            [rpn_cls_prob, gt_boxes, im_info],
+            [rpn_cls_prob, gt_boxes, im_info, all_anchors],
             [tf.float32, tf.float32]
 
         )
@@ -95,7 +94,7 @@ class AnchorTarget(snt.AbstractModule):
         return labels, bbox_targets  # missing bbox_inside_weights, bbox_outside_weights
 
 
-    def _anchor_target_layer(self, rpn_cls_prob, gt_boxes, im_info):
+    def _anchor_target_layer(self, rpn_cls_prob, gt_boxes, im_info, all_anchors):
         """
         Function working with Tensors instead of instances for proper
         computing in the Tensorflow graph.
@@ -103,39 +102,16 @@ class AnchorTarget(snt.AbstractModule):
         raise NotImplemented()
 
 
-    def _anchor_target_layer_np(self, rpn_cls_prob, gt_boxes, im_info):
+    def _anchor_target_layer_np(self, rpn_cls_prob, gt_boxes, im_info, all_anchors):
+
+        np.random.seed(0)  # TODO: Remove, just for reproducibility
         """
         Function to be executed with tf.py_func
         """
-        height, width = rpn_cls_prob.shape[1:3]  # TODO(debug): rpn_cls_prob.shape = (1, 23, 279, 2)
 
-        # 1. Generate proposals from bbox deltas and shifted anchors
-        shift_x = np.arange(0, width) * self._feat_stride
-        shift_y = np.arange(0, height) * self._feat_stride
-
-        shift_x, shift_y = np.meshgrid(shift_x, shift_y) # in W H order
-
-        # K (shifts shape) is H x W
-        shifts = np.vstack(
-            (shift_x.ravel(), shift_y.ravel(),
-             shift_x.ravel(), shift_y.ravel())
-        ).transpose()
-
-        # add A anchors (1, A, 4) to
-        # cell K shifts (K, 1, 4) to get
-        # shift anchors (K, A, 4)
-        # reshape to (K*A, 4) shifted anchors
-        A = self._num_anchors  # 3 x 3 = 9 (usually)
-        K = shifts.shape[0]  # H x W
-
-        all_anchors = (
-            self._anchors.reshape((1, A, 4)) +
-            shifts.reshape((1, K, 4)).transpose((1, 0, 2)))
-
-        all_anchors = all_anchors.reshape((K * A, 4))
-
+        height, width = rpn_cls_prob.shape[1:3]
         # We have "W x H x k" anchors
-        total_anchors = int(K * A)
+        total_anchors = all_anchors.shape[0]
 
         # only keep anchors inside the image
         inds_inside = np.where(
@@ -224,24 +200,25 @@ class AnchorTarget(snt.AbstractModule):
             bbox_outside_weights, total_anchors, inds_inside, fill=0)
 
         # labels
-        labels = labels.reshape((1, height, width, A)).transpose(0, 3, 1, 2)
-        labels = labels.reshape((1, 1, A * height, width))
+        labels = labels.reshape((1, height, width, self._num_anchors)).transpose(0, 3, 1, 2)
+        labels = labels.reshape((1, 1, self._num_anchors * height, width))
 
         # bbox_targets
         bbox_targets = bbox_targets.reshape(
-            (1, height, width, A * 4)
+            (1, height, width, self._num_anchors * 4)
         ).transpose(0, 3, 1, 2)
 
         # bbox_inside_weights
         bbox_inside_weights = bbox_inside_weights.reshape(
-            (1, height, width, A * 4)
+            (1, height, width, self._num_anchors * 4)
         ).transpose(0, 3, 1, 2)
 
         # bbox_outside_weights
         bbox_outside_weights = bbox_outside_weights.reshape(
-            (1, height, width, A * 4)
+            (1, height, width, self._num_anchors * 4)
         ).transpose(0, 3, 1, 2)
 
+        # TODO: Decide what to do with weights
         return labels, bbox_targets
 
     def _bbox_overlaps(self, boxes, gt_boxes):
