@@ -84,7 +84,5 @@ class RPNProposal(snt.AbstractModule):
         y_min, x_min, y_max, x_max = tf.split(value=proposals, num_or_size_splits=4, axis=1)
         batch_inds = tf.zeros((tf.shape(proposals)[0], 1), dtype=tf.float32)
         blobs = tf.concat([batch_inds, x_min, y_min, x_max, y_max], axis=1)
+
         return blobs, scores
-
-        return rois_tf, rois_scores_tf
-

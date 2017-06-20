@@ -2,6 +2,7 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
+from .rcnn_target import RCNNTarget
 
 class RCNN(snt.AbstractModule):
     """RCNN """
@@ -26,7 +27,7 @@ class RCNN(snt.AbstractModule):
             ]
 
             self._classifier_layer = snt.Linear(
-                self._num_classes, name="fc_classifier"
+                self._num_classes + 1, name="fc_classifier"
             )
 
             # TODO: Not random initializer
@@ -34,7 +35,11 @@ class RCNN(snt.AbstractModule):
                 self._num_classes * 4, name="fc_bbox"
             )
 
-    def _build(self, pooled_layer):
+            self._rcnn_target = RCNNTarget(self._num_classes)
+
+
+
+    def _build(self, pooled_layer, proposals, gt_boxes):
         """
         TODO: El pooled layer es el volumen con todos los ROI o es uno por cada ROI?
         TODO: Donde puedo comparar los resultados con las labels posta?
@@ -45,8 +50,39 @@ class RCNN(snt.AbstractModule):
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
-        classification_net = self._classifier_layer(net)
-        classification_prob = tf.nn.softmax(classification_net)
-        bbox_net = self._bbox_layer(net)
+        cls_score = self._classifier_layer(net)
+        prob = tf.nn.softmax(cls_score)
+        bbox_offsets = self._bbox_layer(net)
 
-        return classification_prob, bbox_net
+        proposals_targets, bbox_targets = self._rcnn_target(proposals, bbox_offsets, prob, gt_boxes)
+
+        return {
+            'cls_score': cls_score,
+            'cls_prob': prob,
+            'bbox_offsets': bbox_offsets,
+            'cls_targets': proposals_targets,
+            'bbox_offsets_targets': bbox_targets,
+        }
+
+    def loss(self, cls_prediction, cls_target, bbox_prediction, bbox_target):
+        """
+        Returns cost for RCNN based on:
+
+        Args:
+            cls_prediction: Class probability for each proposal.
+                Shape: (num_proposals, num_classes + 1)
+            cls_target: Correct class for each proposal, based in p
+            bbox_prediction: Bbox class prediction adjust.
+                Shape: (num_proposals, num_classes * 4)
+            gt_boxes: Ground truth boxes in the dataset.
+                Shape: (num_gt_boxes, 5) (4 points and 1 for true label)
+
+        prediction_dict['refined_box_encodings'],
+        prediction_dict['class_predictions_with_background'],
+        prediction_dict['proposal_boxes'],
+        prediction_dict['num_proposals'],
+        groundtruth_boxlists,
+        groundtruth_classes_with_background_list
+
+        """
+        pass

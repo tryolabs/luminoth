@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from .utils.bbox import bbox_overlaps
-from .utils.bbox_transform import bbox_transform
+from .utils.bbox_transform import bbox_transform, unmap
 
 
 class AnchorTarget(snt.AbstractModule):
@@ -113,7 +113,7 @@ class AnchorTarget(snt.AbstractModule):
         # We have "W x H x k" anchors
         total_anchors = all_anchors.shape[0]
 
-        # only keep anchors inside the image
+        # only keep anchors inside the image (TODO: We should do this when anchors are original generated in network or does it fuck with our dimensions.)
         inds_inside = np.where(
             (all_anchors[:, 0] >= -self._allowed_border) &
             (all_anchors[:, 1] >= -self._allowed_border) &
@@ -169,7 +169,7 @@ class AnchorTarget(snt.AbstractModule):
                 bg_inds, size=(len(bg_inds) - num_bg), replace=False)
             labels[disable_inds] = -1
 
-        # TODO: Not necessary to define first bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
+        # Returns bbox targets with shape (len(inds_inside), 4)
         bbox_targets = self._compute_targets(anchors, gt_boxes[argmax_overlaps, :]).astype(np.float32)
 
         bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
@@ -190,13 +190,11 @@ class AnchorTarget(snt.AbstractModule):
         bbox_outside_weights[labels == 1, :] = positive_weights
         bbox_outside_weights[labels == 0, :] = negative_weights
 
-        labels = self._unmap(
-            labels, total_anchors, inds_inside, fill=-1)
-        bbox_targets = self._unmap(
-            bbox_targets, total_anchors, inds_inside, fill=0)
-        bbox_inside_weights = self._unmap(
+        labels = unmap(labels, total_anchors, inds_inside, fill=-1)
+        bbox_targets = unmap(bbox_targets, total_anchors, inds_inside, fill=0)
+        bbox_inside_weights = unmap(
             bbox_inside_weights, total_anchors, inds_inside, fill=0)
-        bbox_outside_weights = self._unmap(
+        bbox_outside_weights = unmap(
             bbox_outside_weights, total_anchors, inds_inside, fill=0)
 
         # labels
@@ -238,20 +236,3 @@ class AnchorTarget(snt.AbstractModule):
 
         return bbox_transform(
             boxes, groundtruth_boxes[:, :4]).astype(np.float32, copy=False)
-
-    def _unmap(self, data, count, inds, fill=0):
-        """
-        Unmap a subset of item (data) back to the original set of items (of
-        size count)
-
-        # TODO(vierja): Revisar si es necesario
-        """
-        if len(data.shape) == 1:
-            ret = np.empty((count, ), dtype=np.float32)
-            ret.fill(fill)
-            ret[inds] = data
-        else:
-            ret = np.empty((count, ) + data.shape[1:], dtype=np.float32)
-            ret.fill(fill)
-            ret[inds, :] = data
-        return ret

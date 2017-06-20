@@ -114,3 +114,21 @@ def clip_boxes(boxes, im_shape):
     # y2 < im_shape[0]
     boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
     return boxes
+
+
+def unmap(data, count, inds, fill=0):
+    """
+    Unmap a subset of item (data) back to the original set of items (of
+    size count)
+
+    # TODO(vierja): Revisar si es necesario
+    """
+    if len(data.shape) == 1:
+        ret = np.empty((count, ), dtype=np.float32)
+        ret.fill(fill)
+        ret[inds] = data
+    else:
+        ret = np.empty((count, ) + data.shape[1:], dtype=np.float32)
+        ret.fill(fill)
+        ret[inds, :] = data
+    return ret

@@ -127,12 +127,12 @@ class RPN(snt.AbstractModule):
 
         with self._enter_variable_scope():
             # Flatten labels.
-            rpn_cls_target = tf.cast(tf.reshape(rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')  # TODO(debug): shape: (57753,)
+            rpn_cls_target = tf.cast(tf.reshape(rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
             # Transform to boolean tensor with True only when != -1 (else == -1 -> False)
-            labels_not_ignored = tf.not_equal(rpn_cls_target, -1, name='labels_not_ignored')  # TODO(debug): shape: (57753,)
+            labels_not_ignored = tf.not_equal(rpn_cls_target, -1, name='labels_not_ignored')
 
             # Flatten rpn_cls_prob (only anchors, not completely).
-            rpn_cls_prob = tf.reshape(rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')  # TODO(debug): shape: (6417, 2)
+            rpn_cls_prob = tf.reshape(rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')
 
             # Now we only have the labels we are going to compare with the
             # cls probability. We need to remove the background.
