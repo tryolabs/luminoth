@@ -103,7 +103,7 @@ class FasterRCNN(snt.AbstractModule):
         # TODO: Missing mapping classification_bbox to real coordinates.
         # (and trimming, and NMS?)
         # TODO: Missing gt_boxes labels!
-        classification_prob, classification_bbox = self._rcnn(roi_pool)
+        classification_prediction = self._rcnn(roi_pool, rpn_prediction['proposals'], gt_boxes)
 
         # We need to apply bbox_transform_inv using classification_bbox delta and NMS?
 
@@ -112,9 +112,9 @@ class FasterRCNN(snt.AbstractModule):
         return {
             'all_anchors': all_anchors,
             'rpn_prediction': rpn_prediction,
+            'classification_prediction': classification_prediction,
             'roi_pool': roi_pool,
-            'classification_prob': classification_prob,
-            'classification_bbox': classification_bbox,
+            'gt_boxes': gt_boxes,
             'rpn_drawn_image': drawn_image,
         }
 
@@ -126,12 +126,16 @@ class FasterRCNN(snt.AbstractModule):
         """
         Compute the joint training loss for Faster RCNN.
         """
-        # TODO: Esta mal usar `self` aca por la loss tambien depende de `gt_boxes`
+
         rpn_loss_dict = self._rpn.loss(
             prediction_dict['rpn_prediction']
         )
 
-        for loss_tensor in rpn_loss_dict.values():
+        rcnn_loss_dict = self._rcnn.loss(
+            prediction_dict['classification_prediction']
+        )
+
+        for loss_tensor in list(rpn_loss_dict.values()) + list(rcnn_loss_dict.values()):
             tf.losses.add_loss(loss_tensor)
 
         # TODO: Should we use get_total_loss here?

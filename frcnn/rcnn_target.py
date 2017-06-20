@@ -25,7 +25,7 @@ class RCNNTarget(snt.AbstractModule):
         """
         Returns:
             TODO: Review implementetion with py-faster-rcnn ProposalTargetLayer
-
+            TODO: It is possible to have two correct classes for a proposal?
         """
         (proposals_label, bbox_targets) = tf.py_func(
             self.proposal_target_layer,

@@ -10,6 +10,7 @@ from .anchor_target import AnchorTarget
 from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
 from .utils.ops import spatial_softmax, spatial_reshape_layer
+from .utils.losses import smooth_l1_loss
 
 
 class RPN(snt.AbstractModule):
@@ -145,7 +146,7 @@ class RPN(snt.AbstractModule):
             # TODO: In other implementations they use `sparse_softmax_cross_entropy_with_logits` with `reduce_mean`. Should we use that?
             log_loss = tf.losses.log_loss(cls_target, cls_prob)
             # TODO: For logs
-            log_loss = tf.identity(log_loss, name='log_loss')
+            cls_loss = tf.identity(log_loss, name='log_loss')
 
             # Finally, we need to calculate the regression loss over `rpn_bbox_target`
             # and `rpn_bbox_pred`.
@@ -159,37 +160,10 @@ class RPN(snt.AbstractModule):
             rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
             rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
 
-            smooth_l1_loss = self._smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
+            reg_loss = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
 
             # TODO: How do we weight losses?
             return {
-                'rpn_cls_loss': log_loss,
-                'rpn_reg_loss': smooth_l1_loss,
+                'rpn_cls_loss': cls_loss,
+                'rpn_reg_loss': reg_loss,
             }
-
-    def _smooth_l1_loss(self, bbox_prediction, bbox_target, sigma=1.0):
-        """
-        Return Smooth L1 Loss for bounding box prediction.
-
-        Args:
-            bbox_prediction: shape (1, H, W, num_anchors * 4)
-            bbox_target:     shape (1, H, W, num_anchors * 4)
-
-
-        Smooth L1 loss is defined as:
-
-        0.5 * x^2                  if |x| < d
-        abs(x) - 0.5               if |x| >= d
-
-        Where d = 1 and x = prediction - target
-
-        """
-        sigma2 = sigma ** 2
-        diff = bbox_prediction - bbox_target
-        abs_diff = tf.abs(diff)
-        abs_diff_lt_sigma2 = tf.less(abs_diff, 1.0 / sigma2)
-        bbox_loss = tf.reduce_sum(
-            tf.where(abs_diff_lt_sigma2, 0.5 * tf.square(abs_diff), abs_diff - 0.5),
-            [1]
-        )
-        return tf.reduce_mean(bbox_loss)
