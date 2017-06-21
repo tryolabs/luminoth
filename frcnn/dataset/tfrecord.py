@@ -55,10 +55,9 @@ class TFRecordDataset(Dataset):
         # Decode and preprocess the example (crop, adjust mean and variance).
         # image_jpeg = tf.decode_raw(example['image_raw'], tf.string)
         image_raw = tf.image.decode_jpeg(context_example['image_raw'])
-        tf.summary.image('image_raw', image_raw, max_outputs=20)
+        # tf.summary.image('image_raw', image_raw, max_outputs=20)
 
         # Do we need per_image_standardization? Do it depend on pretrained?
-        # image = tf.image.per_image_standardization(image_raw)
         image = tf.cast(image_raw, tf.float32)
         height = tf.cast(context_example['height'], tf.int32)
         width = tf.cast(context_example['width'], tf.int32)
