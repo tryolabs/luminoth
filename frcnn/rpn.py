@@ -127,43 +127,44 @@ class RPN(snt.AbstractModule):
         # - then we can use `tf.losses.log_loss` which returns a tensor.
 
         with self._enter_variable_scope():
-            # Flatten labels.
-            rpn_cls_target = tf.cast(tf.reshape(rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
-            # Transform to boolean tensor with True only when != -1 (else == -1 -> False)
-            labels_not_ignored = tf.not_equal(rpn_cls_target, -1, name='labels_not_ignored')
+            with tf.name_scope('RPNLoss'):
+                # Flatten labels.
+                rpn_cls_target = tf.cast(tf.reshape(rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
+                # Transform to boolean tensor with True only when != -1 (else == -1 -> False)
+                labels_not_ignored = tf.not_equal(rpn_cls_target, -1, name='labels_not_ignored')
 
-            # Flatten rpn_cls_prob (only anchors, not completely).
-            rpn_cls_prob = tf.reshape(rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')
+                # Flatten rpn_cls_prob (only anchors, not completely).
+                rpn_cls_prob = tf.reshape(rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')
 
-            # Now we only have the labels we are going to compare with the
-            # cls probability. We need to remove the background.
-            labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored, name='labels')
-            cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
+                # Now we only have the labels we are going to compare with the
+                # cls probability. We need to remove the background.
+                labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored, name='labels')
+                cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
 
-            # We need to transform `labels` to `cls_prob` shape.
-            cls_target = tf.one_hot(labels, depth=2)
+                # We need to transform `labels` to `cls_prob` shape.
+                cls_target = tf.one_hot(labels, depth=2)
 
-            # TODO: In other implementations they use `sparse_softmax_cross_entropy_with_logits` with `reduce_mean`. Should we use that?
-            log_loss = tf.losses.log_loss(cls_target, cls_prob)
-            # TODO: For logs
-            cls_loss = tf.identity(log_loss, name='log_loss')
+                # TODO: In other implementations they use `sparse_softmax_cross_entropy_with_logits` with `reduce_mean`. Should we use that?
+                log_loss = tf.losses.log_loss(cls_target, cls_prob)
+                # TODO: For logs
+                cls_loss = tf.identity(log_loss, name='log_loss')
 
-            # Finally, we need to calculate the regression loss over `rpn_bbox_target`
-            # and `rpn_bbox_pred`.
-            # Since `rpn_bbox_target` is obtained from AnchorTargetLayer then we
-            # just need to apply SmoothL1Loss.
-            rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
-            rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])
+                # Finally, we need to calculate the regression loss over `rpn_bbox_target`
+                # and `rpn_bbox_pred`.
+                # Since `rpn_bbox_target` is obtained from AnchorTargetLayer then we
+                # just need to apply SmoothL1Loss.
+                rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
+                rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])
 
-            # We only care for positive labels
-            positive_labels = tf.equal(rpn_cls_target, 1)
-            rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
-            rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
+                # We only care for positive labels
+                positive_labels = tf.equal(rpn_cls_target, 1)
+                rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
+                rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
 
-            reg_loss = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
+                reg_loss = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
 
-            # TODO: How do we weight losses?
-            return {
-                'rpn_cls_loss': cls_loss,
-                'rpn_reg_loss': reg_loss,
-            }
+                # TODO: How do we weight losses?
+                return {
+                    'rpn_cls_loss': cls_loss,
+                    'rpn_reg_loss': reg_loss,
+                }
