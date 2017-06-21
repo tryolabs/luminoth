@@ -20,21 +20,13 @@ from .dataset import TFRecordDataset
 @click.option('--debug', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint_file, log_dir, save_every, debug):
 
-    # load_pretrained = True
-    # load_from_checkpoint = True
-    # vgg_weights = '/Users/javier/Downloads/vgg_16.ckpt'
-    # model_dir = 'models/'
-    # checkpoint_file = 'models/fasterrcnn-445'
-    # log_dir = '/tmp/fasterrcnn-train'
-    # saver_every = 10
-
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = FasterRCNN(Config, num_classes=num_classes)
-    dataset = TFRecordDataset()
+    dataset = TFRecordDataset(Config, num_classes=num_classes)
     train_dataset = dataset()
 
     train_image = train_dataset['image']

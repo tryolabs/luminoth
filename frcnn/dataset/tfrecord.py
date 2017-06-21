@@ -8,9 +8,9 @@ from .dataset import Dataset
 
 class TFRecordDataset(Dataset):
 
-    def __init__(self, name='tfrecord_dataset', **kwargs):
+    def __init__(self, config, name='tfrecord_dataset', **kwargs):
         self._random_shuffle = kwargs.pop('random_shuffle', False)
-        super(TFRecordDataset, self).__init__(name=name, **kwargs)
+        super(TFRecordDataset, self).__init__(config, name=name, **kwargs)
 
         self._context_features = {
             'image_raw': tf.FixedLenFeature([], tf.string),
