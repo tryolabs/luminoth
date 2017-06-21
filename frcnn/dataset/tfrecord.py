@@ -72,25 +72,28 @@ class TFRecordDataset(Dataset):
 
         bboxes = tf.stack([xmin, ymin, xmax, ymax, label], axis=1)
 
+        filename = tf.cast(context_example['filename'], tf.string)
+
         if self._random_shuffle:
             queue = tf.RandomShuffleQueue(
                 capacity=100,
                 min_after_dequeue=20,
-                dtypes=[tf.float32, tf.int32],
-                names=['image', 'bboxes'],
+                dtypes=[tf.float32, tf.int32, tf.string],
+                names=['image', 'bboxes', 'filename'],
                 name='tfrecord_random_queue'
             )
         else:
             queue = tf.FIFOQueue(
                 capacity=100,
-                dtypes=[tf.float32, tf.int32],
-                names=['image', 'bboxes'],
+                dtypes=[tf.float32, tf.int32, tf.string],
+                names=['image', 'bboxes', 'filename'],
                 name='tfrecord_fifo_queue'
             )
 
         enqueue_ops = [queue.enqueue({
             'image': image,
-            'bboxes': bboxes
+            'bboxes': bboxes,
+            'filename': filename,
         })] * 4
 
         tf.train.add_queue_runner(tf.train.QueueRunner(queue, enqueue_ops))

@@ -38,6 +38,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
     train_dataset = dataset()
 
     train_image = train_dataset['image']
+    train_filename = train_dataset['filename']
     # TODO: This is not the best place to configure rank? Why is rank not
     # transmitted through the queue
     train_image.set_shape((None, None, 3))
@@ -127,14 +128,14 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
 
                 run_metadata = tf.RunMetadata()
 
-                _, summary, train_loss, step, pred_dict, *_ = sess.run([
-                train_op, summarizer, total_loss, global_step, prediction_dict, metric_ops
+                _, summary, train_loss, step, pred_dict, filename, *_ = sess.run([
+                train_op, summarizer, total_loss, global_step, prediction_dict, train_filename, metric_ops
                 ], run_metadata=run_metadata)
 
                 count_images += 1
 
                 tf.logging.info('train_loss: {}'.format(train_loss))
-                tf.logging.info('step: {}'.format(step))
+                tf.logging.info('step: {}, filename: {}'.format(step, filename))
 
                 values = sess.run(metrics)
 
