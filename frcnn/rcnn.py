@@ -103,14 +103,14 @@ class RCNN(snt.AbstractModule):
                 # First we need to calculate the log loss betweetn cls_prob and cls_target
 
                 # We only care for the targets that are >= 0
-                not_ignored = tf.reshape(tf.greater_equal(cls_target, 0), [-1])
+                not_ignored = tf.reshape(tf.greater_equal(cls_target, 0), [-1], name='not_ignored')
                 # We apply boolean mask to both prob and target.
-                cls_prob_labeled = tf.boolean_mask(cls_prob, not_ignored)
-                cls_target_labeled = tf.boolean_mask(cls_target, not_ignored)
+                cls_prob_labeled = tf.boolean_mask(cls_prob, not_ignored, name='cls_prob_labeled')
+                cls_target_labeled = tf.boolean_mask(cls_target, not_ignored, name='cls_target_labeled')
 
                 # Transform to one-hot vector
                 cls_target_one_hot = tf.one_hot(
-                    cls_target_labeled, depth=self._num_classes + 1)
+                    cls_target_labeled, depth=self._num_classes + 1, name='cls_target_one_hot')
 
                 # TODO: Same doubt as RPN, should we use sparse_softmax_cross_entropy?
                 cls_loss = tf.losses.log_loss(cls_target_one_hot, cls_prob_labeled)
@@ -122,21 +122,22 @@ class RCNN(snt.AbstractModule):
 
                 # We only want the non-background labels bounding boxes.
                 not_ignored = tf.reshape(tf.greater(cls_target, 0), [-1])
-                bbox_offsets_labeled = tf.boolean_mask(bbox_offsets, not_ignored)
+                bbox_offsets_labeled = tf.boolean_mask(bbox_offsets, not_ignored, name='bbox_offsets_labeled')
                 bbox_offsets_target_labeled = tf.boolean_mask(
-                    bbox_offsets_target, not_ignored)
+                    bbox_offsets_target, not_ignored, name='bbox_offsets_target_labeled')
 
-                cls_target_labeled = tf.boolean_mask(cls_target, not_ignored)
+                cls_target_labeled = tf.boolean_mask(cls_target, not_ignored, name='cls_target_labeled')
+
                 cls_target_one_hot = tf.one_hot(
-                    cls_target_labeled, depth=self._num_classes)
+                    cls_target_labeled, depth=self._num_classes, name='cls_target_one_hot')
 
                 # cls_target now is (num_labeled, num_classes)
-                bbox_flatten = tf.reshape(bbox_offsets_labeled, [-1, 4])
+                bbox_flatten = tf.reshape(bbox_offsets_labeled, [-1, 4], name='bbox_flatten')
 
                 # We use the flatten cls_target_one_hot as boolean mask for the bboxes.
-                cls_flatten = tf.cast(tf.reshape(cls_target_one_hot, [-1]), tf.bool)
+                cls_flatten = tf.cast(tf.reshape(cls_target_one_hot, [-1]), tf.bool, 'cls_flatten_as_bool')
 
-                bbox_offset_cleaned = tf.boolean_mask(bbox_flatten, cls_flatten)
+                bbox_offset_cleaned = tf.boolean_mask(bbox_flatten, cls_flatten, 'bbox_offset_cleaned')
 
                 reg_loss = smooth_l1_loss(bbox_offset_cleaned, bbox_offsets_target_labeled)
 

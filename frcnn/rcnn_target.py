@@ -72,7 +72,10 @@ class RCNNTarget(snt.AbstractModule):
         overlaps_with_label = max_overlaps > 0.5
         # Get label for proposal with labels
         overlaps_best_label = overlaps.argmax(axis=1)
-        proposals_label[overlaps_with_label] = overlaps_best_label[overlaps_with_label] + 1
+        # Having the index of the gt bbox with the best label we need to get the label for
+        # each gt box and sum it one because 0 is used for background.
+        # we only assign to proposals with `overlaps_with_label`.
+        proposals_label[overlaps_with_label] = (gt_boxes[:,4][overlaps_best_label] + 1)[overlaps_with_label]
 
         # proposals_label now has [0, num_classes + 1] for proposals we are
         # going to use and -1 for the ones we should ignore.
@@ -123,7 +126,7 @@ class RCNNTarget(snt.AbstractModule):
         # We create the same array but with the proposals
         proposals_with_target = proposals[proposal_with_target_idx]
 
-        # We create our tagets with bbox_transform
+        # We create our targets with bbox_transform
         bbox_targets = bbox_transform(proposals_with_target, proposals_gt_boxes)
         # TODO: We should normalize it in order for bbox_targets to have zero
         # mean and unit variance according to the paper.

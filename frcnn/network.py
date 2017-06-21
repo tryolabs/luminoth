@@ -77,6 +77,7 @@ class FasterRCNN(snt.AbstractModule):
         tf.summary.image('top_10_rpn_boxes', drawn_image, max_outputs=20)
         # TODO: We should return a "prediction_dict" with all the required tensors (for results, loss and monitoring)
         return {
+            'image_shape': image_shape,
             'all_anchors': all_anchors,
             'rpn_prediction': rpn_prediction,
             'classification_prediction': classification_prediction,
