@@ -10,23 +10,7 @@ from .rpn import RPN
 
 from .utils.generate_anchors import generate_anchors as generate_anchors_reference
 from .utils.ops import meshgrid
-
-
-
-def draw_bboxes(image, bboxes, topn=10):
-    # change fucking order
-    #. we asume bboxes has batch
-    bboxes = tf.slice(bboxes, [0, 0], [topn, 5])
-    batch, x1, y1, x2, y2 = tf.split(value=bboxes, num_or_size_splits=5, axis=1)
-
-    x1 = x1 / tf.cast(tf.shape(image)[2], tf.float32)
-    y1 = y1 / tf.cast(tf.shape(image)[1], tf.float32)
-    x2 = x2 / tf.cast(tf.shape(image)[2], tf.float32)
-    y2 = y2 / tf.cast(tf.shape(image)[1], tf.float32)
-
-    bboxes = tf.concat([batch, y1, x1, y2, x2], axis=1)
-    bboxes = tf.expand_dims(bboxes, 0)
-    return tf.image.draw_bounding_boxes(image, bboxes)
+from .utils.image import draw_bboxes
 
 
 class FasterRCNN(snt.AbstractModule):
@@ -38,32 +22,13 @@ class FasterRCNN(snt.AbstractModule):
         self._cfg = config
         self._num_classes = num_classes
 
-        # TODO: Better module config
-        # if not isinstance(anchor_scales, collections.Iterable):
-        #     raise TypeError("anchor_scales must be iterable")
-        # anchor_scales = tuple(anchor_scales)
+        self._anchor_base_size = self._cfg.ANCHOR_BASE_SIZE
+        self._anchor_scales = np.array(self._cfg.ANCHOR_SCALES)
+        self._anchor_ratios = np.array(self._cfg.ANCHOR_RATIOS)
+        self._anchor_stride = self._cfg.ANCHOR_STRIDE
 
-        # if not isinstance(anchor_ratios, collections.Iterable):
-        #     raise TypeError("anchor_ratios must be iterable")
-        # anchor_ratios = tuple(anchor_ratios)
-
-        # if not isinstance(kernel_shape, collections.Iterable):
-        #     raise TypeError("kernel_shape must be iterable")
-        # kernel_shape = tuple(kernel_shape)
-
-        # if not anchor_scales:
-        #     raise ValueError("anchor_scales must not be empty")
-        # if not anchor_ratios:
-        #     raise ValueError("anchor_ratios must not be empty")
-        # self._anchor_scales = anchor_scales
-        # self._anchor_ratios = anchor_ratios
-
-        self._rpn_base_size = 16
-        self._rpn_scales = np.array([8, 16, 32])
-        self._rpn_ratios = np.array([0.5, 1, 2])
-        self._rpn_stride = 16
         self._anchor_reference = generate_anchors_reference(
-            self._rpn_base_size, self._rpn_ratios, self._rpn_scales
+            self._anchor_base_size, self._anchor_ratios, self._anchor_scales
         )
         self._num_anchors = self._anchor_reference.shape[0]
 
@@ -143,12 +108,11 @@ class FasterRCNN(snt.AbstractModule):
         return tf.losses.get_total_loss()
 
     def _generate_anchors(self, feature_map):
-
         feature_map_shape = tf.shape(feature_map)[1:3]
         grid_width = feature_map_shape[1]
         grid_height = feature_map_shape[0]
-        shift_x = tf.range(grid_width) * self._rpn_stride
-        shift_y = tf.range(grid_height) * self._rpn_stride
+        shift_x = tf.range(grid_width) * self._anchor_stride
+        shift_y = tf.range(grid_height) * self._anchor_stride
         shift_x, shift_y = meshgrid(shift_x, shift_y)
 
         shift_x = tf.reshape(shift_x, [-1])
