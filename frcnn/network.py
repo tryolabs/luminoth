@@ -13,10 +13,10 @@ from .utils.ops import meshgrid
 
 
 
-def draw_bboxes(image, bboxes):
+def draw_bboxes(image, bboxes, topn=10):
     # change fucking order
     #. we asume bboxes has batch
-    bboxes = tf.slice(bboxes, [0, 0], [10, 5])
+    bboxes = tf.slice(bboxes, [0, 0], [topn, 5])
     batch, x1, y1, x2, y2 = tf.split(value=bboxes, num_or_size_splits=5, axis=1)
 
     x1 = x1 / tf.cast(tf.shape(image)[2], tf.float32)
@@ -106,8 +106,10 @@ class FasterRCNN(snt.AbstractModule):
         classification_prediction = self._rcnn(roi_pool, rpn_prediction['proposals'], gt_boxes)
 
         # We need to apply bbox_transform_inv using classification_bbox delta and NMS?
-
         drawn_image = draw_bboxes(image, rpn_prediction['proposals'])
+
+        tf.summary.image('image', image, max_outputs=20)
+        tf.summary.image('top_10_rpn_boxes', drawn_image, max_outputs=20)
         # TODO: We should return a "prediction_dict" with all the required tensors (for results, loss and monitoring)
         return {
             'all_anchors': all_anchors,
@@ -117,7 +119,6 @@ class FasterRCNN(snt.AbstractModule):
             'gt_boxes': gt_boxes,
             'rpn_drawn_image': drawn_image,
         }
-
 
     def load_from_checkpoints(self, checkpoints):
         pass
@@ -142,7 +143,6 @@ class FasterRCNN(snt.AbstractModule):
         return tf.losses.get_total_loss()
 
     def _generate_anchors(self, feature_map):
-        # self.anchor_reference
 
         feature_map_shape = tf.shape(feature_map)[1:3]
         grid_width = feature_map_shape[1]
