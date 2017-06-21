@@ -142,7 +142,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
                     saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
                 writer.add_summary(summary, step)
-                writer.add_run_metadata(run_metadata, f'step{step}')
+                writer.add_run_metadata(run_metadata, 'step{}'.format(step))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(step, train_loss))
