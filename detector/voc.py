@@ -60,18 +60,18 @@ def load_split(root, split='train'):
     if split not in ['train', 'val', 'test']:
         raise ValueError
 
-    split_path = os.path.join(root, 'ImageSets', 'Main', f'{split}.txt')
+    split_path = os.path.join(root, 'ImageSets', 'Main', '{}.txt'.format(split))
     with open(split_path) as f:
         for line in f:
             yield line.strip()
 
 
 def get_image_path(root, image_id):
-    return os.path.join(root, 'JPEGImages', f'{image_id}.jpg')
+    return os.path.join(root, 'JPEGImages', '{}.jpg'.format(image_id))
 
 
 def get_image_annotation(root, image_id):
-    return os.path.join(root, 'Annotations', f'{image_id}.xml')
+    return os.path.join(root, 'Annotations', '{}.xml'.format(image_id))
 
 
 def _int64(value):
@@ -135,26 +135,33 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('--output-dir', default='datasets/voc/tf')
 @click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])
 @click.option('ignore_splits', '--ignore-split', multiple=True)
-def voc(data_dir, output_dir, splits, ignore_splits):
+@click.option('--only-filename')
+def voc(data_dir, output_dir, splits, ignore_splits, only_filename):
     """
     Prepare VOC dataset for ingestion.
 
     Converts the VOC dataset into three (one per split) TFRecords files.
     """
-    print(f'Saving output_dir = {output_dir}')
+    print('Saving output_dir = {}'.format(output_dir))
     os.makedirs(output_dir, exist_ok=True)
 
     classes = read_classes(data_dir)
     splits = [s for s in splits if s not in set(ignore_splits)]
-    print(f'Generating outputs for splits = {", ".join(splits)}')
+    print('Generating outputs for splits = {}'.format(", ".join(splits)))
 
     for split in splits:
-        print(f'Converting split = {split}')
-        record_file = os.path.join(output_dir, f'{split}.tfrecords')
+        print('Converting split = {}'.format(split))
+        if only_filename:
+            record_filename = '{}-{}.tfrecords'.format(split, only_filename)
+        else:
+            record_filename = '{}.tfrecords'.format(split)
+
+        record_file = os.path.join(output_dir, record_filename)
         writer = tf.python_io.TFRecordWriter(record_file)
 
         for image_id in load_split(data_dir, split):
-            example = image_to_example(data_dir, classes, image_id)
-            writer.write(example.SerializeToString())
+            if not only_filename or only_filename == image_id:
+                example = image_to_example(data_dir, classes, image_id)
+                writer.write(example.SerializeToString())
 
         writer.close()
