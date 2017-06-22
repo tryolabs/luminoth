@@ -57,7 +57,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
 
     total_loss = model.loss(prediction_dict)
 
-    initial_learning_rate = 0.001
+    initial_learning_rate = 0.0001
 
     learning_rate = tf.get_variable(
         "learning_rate",
@@ -74,7 +74,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
         trainable=False,
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
 
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9)
 
     # TODO: We should define `var_list`
     train_op = optimizer.minimize(total_loss, global_step=global_step)
