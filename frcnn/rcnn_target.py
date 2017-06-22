@@ -112,17 +112,22 @@ class RCNNTarget(snt.AbstractModule):
         """
         Next step is to calculate the proper targets for the proposals labeled
         based on the values of the ground-truth boxes.
+        We have to use only the proposals labeled >= 1, each matching with
+        the proper gt_boxes
         """
-        # We have to use only the proposals labeled >= 1, each matching with
-        # the proper gt_boxes
+
+        # Get the ids of the proposals that matter for bbox_target comparisson.
         proposal_with_target_idx = np.nonzero(proposals_label > 0)[0]
-        # We have to substract 1 because of the offset of the background class.
-        proposals_label_with_target = proposals_label[proposal_with_target_idx] - 1
-        # We cast them as ints since we want to use it for indexing.
-        proposals_label_with_target = proposals_label_with_target.astype(np.int32)
-        # We create a numpy array with shape (num_positive_proposals, 4),
-        # having the ideal GT boxes for each proposal.
-        proposals_gt_boxes = gt_boxes[proposals_label_with_target]
+
+        # Get top gt_box for every proposal, top_gt_idx shape (1000,) with values < gt_boxes.shape[0]
+        top_gt_idx = overlaps.argmax(axis=1)
+
+        # Get the corresponding ground truth box only for the proposals with target.
+        gt_boxes_ids = top_gt_idx[proposal_with_target_idx]
+
+        # Get the values of the ground truth boxes. This is shaped (num_proposals, 5) because we also have the label.
+        proposals_gt_boxes = gt_boxes[gt_boxes_ids]
+
         # We create the same array but with the proposals
         proposals_with_target = proposals[proposal_with_target_idx]
 
