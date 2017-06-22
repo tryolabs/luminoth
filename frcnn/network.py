@@ -40,7 +40,7 @@ class FasterRCNN(snt.AbstractModule):
         self._rcnn_reg_loss_weight = 2.0
 
         with self._enter_variable_scope():
-            self._pretrained = VGG()
+            self._pretrained = VGG(trainable=self._cfg.PRETRAINED_TRAINABLE)
             self._rpn = RPN(self._num_anchors)
             self._roi_pool = ROIPoolingLayer()
             self._rcnn = RCNN(self._num_classes)

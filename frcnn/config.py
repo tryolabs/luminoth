@@ -11,3 +11,6 @@ class Config:
     NUM_EPOCHS = 10
     BATCH_SIZE = 1
     TRAIN_SUBSET = 'train'
+
+    # Pretrained
+    PRETRAINED_TRAINABLE = False
