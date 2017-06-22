@@ -127,6 +127,9 @@ class RCNN(snt.AbstractModule):
                     bbox_offsets_target, not_ignored, name='bbox_offsets_target_labeled')
 
                 cls_target_labeled = tf.boolean_mask(cls_target, not_ignored, name='cls_target_labeled')
+                # `cls_target_labeled` is based on `cls_target` which has `num_classes` + 1 classes.
+                # for making `one_hot` with depth `num_classes` to work we need to lower them to make them 0-index.
+                cls_target_labeled = cls_target_labeled - 1
 
                 cls_target_one_hot = tf.one_hot(
                     cls_target_labeled, depth=self._num_classes, name='cls_target_one_hot')
