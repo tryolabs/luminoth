@@ -32,6 +32,13 @@ class FasterRCNN(snt.AbstractModule):
         )
         self._num_anchors = self._anchor_reference.shape[0]
 
+
+        self._rpn_cls_loss_weight = 1.0
+        self._rpn_reg_loss_weight = 2.0
+
+        self._rcnn_cls_loss_weight = 1.0
+        self._rcnn_reg_loss_weight = 2.0
+
         with self._enter_variable_scope():
             self._pretrained = VGG()
             self._rpn = RPN(self._num_anchors)
@@ -93,7 +100,6 @@ class FasterRCNN(snt.AbstractModule):
         """
         Compute the joint training loss for Faster RCNN.
         """
-
         rpn_loss_dict = self._rpn.loss(
             prediction_dict['rpn_prediction']
         )
@@ -102,11 +108,20 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['classification_prediction']
         )
 
-        for loss_tensor in list(rpn_loss_dict.values()) + list(rcnn_loss_dict.values()):
+        # Losses have a weight assigned.
+        rpn_loss_dict['rpn_cls_loss'] = rpn_loss_dict['rpn_cls_loss'] * self._rpn_cls_loss_weight
+        rpn_loss_dict['rpn_reg_loss'] = rpn_loss_dict['rpn_reg_loss'] * self._rpn_reg_loss_weight
+
+        rcnn_loss_dict['rcnn_cls_loss'] = rcnn_loss_dict['rcnn_cls_loss'] * self._rcnn_cls_loss_weight
+        rcnn_loss_dict['rcnn_reg_loss'] = rcnn_loss_dict['rcnn_reg_loss'] * self._rcnn_reg_loss_weight
+
+        for loss_name, loss_tensor in list(rpn_loss_dict.items()) + list(rcnn_loss_dict.items()):
+            tf.summary.scalar(loss_name, loss_tensor, collections=['Losses'])
             tf.losses.add_loss(loss_tensor)
 
-        # TODO: Should we use get_total_loss here?
-        return tf.losses.get_total_loss()
+        total_loss = tf.losses.get_total_loss()
+        tf.summary.scalar('total_loss', total_loss, collections=['Losses'])
+        return total_loss
 
     def _generate_anchors(self, feature_map):
         feature_map_shape = tf.shape(feature_map)[1:3]
