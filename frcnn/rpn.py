@@ -4,16 +4,19 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
+
 from sonnet.python.modules.conv import Conv2D
 
 from .anchor_target import AnchorTarget
 from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
-from .utils.ops import spatial_softmax, spatial_reshape_layer
 from .utils.losses import smooth_l1_loss
+from .utils.ops import spatial_softmax, spatial_reshape_layer
+from .utils.vars import variable_summaries
 
 
 class RPN(snt.AbstractModule):
+
     def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3], name='rpn'):
         """RPN - Region Proposal Network
 
@@ -24,7 +27,8 @@ class RPN(snt.AbstractModule):
         """
         super(RPN, self).__init__(name=name)
 
-        # TODO: Do we need the anchors? Can't we just use len(self._anchor_scales) * len(self._anchor_ratios)
+        # TODO: Do we need the anchors? Can't we just use
+        # len(self._anchor_scales) * len(self._anchor_ratios)
         self._num_anchors = num_anchors
 
         self._num_channels = num_channels
@@ -58,7 +62,8 @@ class RPN(snt.AbstractModule):
             )
 
             # AnchorTarget and RPNProposal and RPN modules and should live in this scope
-            # TODO: Anchor target only in training. Is there a problem if we create it when not training?
+            # TODO: Anchor target only in training. Is there a problem if we
+            # create it when not training?
             self._anchor_target = AnchorTarget(self._num_anchors)
             self._proposal = RPNProposal(self._num_anchors)
 
@@ -70,7 +75,8 @@ class RPN(snt.AbstractModule):
         rpn_cls_score = self._rpn_cls(rpn)
         rpn_cls_score_reshape = spatial_reshape_layer(rpn_cls_score, 2)
         rpn_cls_prob = spatial_softmax(rpn_cls_score_reshape)
-        rpn_cls_prob_reshape = spatial_reshape_layer(rpn_cls_prob, self._num_anchors * 2)
+        rpn_cls_prob_reshape = spatial_reshape_layer(
+            rpn_cls_prob, self._num_anchors * 2)
         rpn_bbox_pred = self._rpn_bbox(rpn)
 
         rpn_labels, rpn_bbox = self._anchor_target(
@@ -78,6 +84,13 @@ class RPN(snt.AbstractModule):
 
         proposals, scores = self._proposal(
             rpn_cls_prob_reshape, rpn_bbox_pred, all_anchors, image_shape)
+
+        variable_summaries(self._rpn.w, 'rpn_conv_W', ['RPN'])
+        variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['RPN'])
+        variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['RPN'])
+
+        variable_summaries(scores, 'rpn_scores', ['RPN'])
+        variable_summaries(rpn_cls_prob_reshape, 'rpn_cls_prob', ['RPN'])
 
         return {
             'rpn': rpn,
@@ -117,9 +130,9 @@ class RPN(snt.AbstractModule):
         rpn_bbox_target = prediction_dict['rpn_bbox_target']
         rpn_bbox_pred = prediction_dict['rpn_bbox_pred']
 
-
         # First, we need to calculate classification loss over `rpn_cls_prob`
-        # and `rpn_cls_target`. Ignoring all anchors where `rpn_cls_target = -1`.
+        # and `rpn_cls_target`. Ignoring all anchors where `rpn_cls_target =
+        # -1`.
 
         # For classification loss we use log loss of two classes. So we need to:
         # - filter `rpn_cls_prob` that are ignored. We need to reshape both labels and prob
@@ -129,22 +142,29 @@ class RPN(snt.AbstractModule):
         with self._enter_variable_scope():
             with tf.name_scope('RPNLoss'):
                 # Flatten labels.
-                rpn_cls_target = tf.cast(tf.reshape(rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
-                # Transform to boolean tensor with True only when != -1 (else == -1 -> False)
-                labels_not_ignored = tf.not_equal(rpn_cls_target, -1, name='labels_not_ignored')
+                rpn_cls_target = tf.cast(tf.reshape(
+                    rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
+                # Transform to boolean tensor with True only when != -1 (else
+                # == -1 -> False)
+                labels_not_ignored = tf.not_equal(
+                    rpn_cls_target, -1, name='labels_not_ignored')
 
                 # Flatten rpn_cls_prob (only anchors, not completely).
-                rpn_cls_prob = tf.reshape(rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')
+                rpn_cls_prob = tf.reshape(
+                    rpn_cls_prob, [-1, 2], name='rpn_cls_prob_flatten')
 
                 # Now we only have the labels we are going to compare with the
                 # cls probability. We need to remove the background.
-                labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored, name='labels')
+                labels = tf.boolean_mask(
+                    rpn_cls_target, labels_not_ignored, name='labels')
                 cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
 
                 # We need to transform `labels` to `cls_prob` shape.
                 cls_target = tf.one_hot(labels, depth=2)
 
-                # TODO: In other implementations they use `sparse_softmax_cross_entropy_with_logits` with `reduce_mean`. Should we use that?
+                # TODO: In other implementations they use
+                # `sparse_softmax_cross_entropy_with_logits` with
+                # `reduce_mean`. Should we use that?
                 log_loss = tf.losses.log_loss(cls_target, cls_prob)
                 # TODO: For logs
                 cls_loss = tf.identity(log_loss, name='log_loss')
@@ -158,12 +178,12 @@ class RPN(snt.AbstractModule):
 
                 # We only care for positive labels
                 positive_labels = tf.equal(rpn_cls_target, 1)
-                rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
+                rpn_bbox_target = tf.boolean_mask(
+                    rpn_bbox_target, positive_labels)
                 rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
 
                 reg_loss = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
 
-                # TODO: How do we weight losses?
                 return {
                     'rpn_cls_loss': cls_loss,
                     'rpn_reg_loss': reg_loss,

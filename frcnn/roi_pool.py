@@ -1,8 +1,8 @@
 import sonnet as snt
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
 import numpy as np
 
-slim = tf.contrib.slim
 
 CROP = 'crop'
 ROI_POOLING = 'roi_pooling'

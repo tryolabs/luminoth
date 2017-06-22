@@ -46,7 +46,6 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
     prediction_dict = model(train_image, train_bboxes)
 
     saver = snt.get_saver(model)
-    summarizer = tf.summary.merge_all()
 
     if pretrained_weights:
         # TODO: Calling _pretrained _load_weights sucks. We need better abstraction
@@ -57,8 +56,6 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
         load_op = tf.no_op(name='not_loading_pretrained')
 
     total_loss = model.loss(prediction_dict)
-
-    tf.summary.scalar('loss', total_loss)
 
     initial_learning_rate = 0.001
 
@@ -93,6 +90,13 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
     metrics = tf.get_collection('metrics')
 
     tf.logging.info('Starting training for {}'.format(model))
+
+    summarizer = tf.summary.merge([
+        tf.summary.merge_all(),
+        tf.summary.merge_all(key='Losses'),
+        tf.summary.merge_all(key='RPN'),
+        tf.summary.merge_all(key='RCNN'),
+    ])
 
     with tf.Session() as sess:
         sess.run(init_op)  # initialized variables
@@ -129,13 +133,13 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
                 tf.logging.info('train_loss: {}'.format(train_loss))
                 tf.logging.info('step: {}, filename: {}'.format(step, filename))
 
-                values = sess.run(metrics)
-
                 if step % save_every == 0:
                     saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
-                writer.add_summary(summary, step)
-                writer.add_run_metadata(run_metadata, 'step{}'.format(step))
+                if not debug:
+                    values = sess.run(metrics)
+                    writer.add_summary(summary, step)
+                    writer.add_run_metadata(run_metadata, 'step{}'.format(step))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(step, train_loss))
