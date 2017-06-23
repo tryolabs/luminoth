@@ -18,14 +18,17 @@ from .dataset import TFRecordDataset
 @click.option('--log_dir', default='/tmp/frcnn/')
 @click.option('--save_every', default=10)
 @click.option('--debug', is_flag=True)
-def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint_file, log_dir, save_every, debug):
+@click.option('--run-name', default='train')
+@click.option('--with-rcnn', default=True)
+def train(num_classes, pretrained_net, pretrained_weights, model_dir,
+          checkpoint_file, log_dir, save_every, debug, run_name, with_rcnn):
 
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    model = FasterRCNN(Config, num_classes=num_classes)
+    model = FasterRCNN(Config, num_classes=num_classes, with_rcnn=with_rcnn)
     dataset = TFRecordDataset(Config, num_classes=num_classes)
     train_dataset = dataset()
 
@@ -105,7 +108,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
             saver.restore(sess, checkpoint_file)
 
         writer = tf.summary.FileWriter(
-            os.path.join(log_dir, 'train'), sess.graph
+            os.path.join(log_dir, run_name), sess.graph
         )
 
         coord = tf.train.Coordinator()

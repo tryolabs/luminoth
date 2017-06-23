@@ -16,7 +16,7 @@ from .utils.image import draw_bboxes
 class FasterRCNN(snt.AbstractModule):
     """Faster RCNN Network"""
 
-    def __init__(self, config, with_rcnn=False, num_classes=None, name='fasterrcnn'):
+    def __init__(self, config, with_rcnn=True, num_classes=None, name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
         self._cfg = config
