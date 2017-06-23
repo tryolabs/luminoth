@@ -93,9 +93,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
 
     summarizer = tf.summary.merge([
         tf.summary.merge_all(),
-        tf.summary.merge_all(key='Losses'),
-        tf.summary.merge_all(key='RPN'),
-        tf.summary.merge_all(key='RCNN'),
+        model.summary,
     ])
 
     with tf.Session() as sess:
@@ -121,7 +119,6 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir, checkpoint
 
         try:
             while not coord.should_stop():
-
                 run_metadata = tf.RunMetadata()
 
                 _, summary, train_loss, step, pred_dict, filename, *_ = sess.run([
