@@ -1,6 +1,7 @@
 import click
-import tensorflow as tf
 import os
+import random
+import tensorflow as tf
 
 from lxml import etree
 
@@ -97,6 +98,8 @@ def _string(value):
 
 
 def image_to_example(data_dir, classes, image_id):
+
+    print('image_to_example: {}'.format(image_id))
     annotation_path = get_image_annotation(data_dir, image_id)
     image_path = get_image_path(data_dir, image_id)
 
@@ -104,12 +107,37 @@ def image_to_example(data_dir, classes, image_id):
     annotation = read_xml(annotation_path)
     image = read_image(image_path)
 
+    object_features_values = {
+        'label': [],
+        'xmin': [],
+        'ymin': [],
+        'xmax': [],
+        'ymax': [],
+    }
+
+    for b in annotation['object']:
+        try:
+            label_id = classes.index(b['name'])
+        except ValueError:
+            continue
+
+        object_features_values['label'].append(_int64(label_id))
+        object_features_values['xmin'].append(_int64(b['bndbox']['xmin']))
+        object_features_values['ymin'].append(_int64(b['bndbox']['ymin']))
+        object_features_values['xmax'].append(_int64(b['bndbox']['xmax']))
+        object_features_values['ymax'].append(_int64(b['bndbox']['ymin']))
+
+    if len(object_features_values['label']) == 0:
+        # No bounding box matches the available classes.
+        print('\tignoring {}'.format(image_id))
+        return
+
     object_feature_lists = {
-        'label': tf.train.FeatureList(feature=[_int64(classes.index(b['name'])) for b in annotation['object']]),
-        'xmin': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmin']) for b in annotation['object']]),
-        'ymin': tf.train.FeatureList(feature=[_int64(b['bndbox']['ymin']) for b in annotation['object']]),
-        'xmax': tf.train.FeatureList(feature=[_int64(b['bndbox']['xmax']) for b in annotation['object']]),
-        'ymax': tf.train.FeatureList(feature=[_int64(b['bndbox']['ymax']) for b in annotation['object']]),
+        'label': tf.train.FeatureList(feature=object_features_values['label']),
+        'xmin': tf.train.FeatureList(feature=object_features_values['xmin']),
+        'ymin': tf.train.FeatureList(feature=object_features_values['ymin']),
+        'xmax': tf.train.FeatureList(feature=object_features_values['xmax']),
+        'ymax': tf.train.FeatureList(feature=object_features_values['ymax']),
     }
 
     object_features = tf.train.FeatureLists(feature_list=object_feature_lists)
@@ -136,7 +164,10 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])
 @click.option('ignore_splits', '--ignore-split', multiple=True)
 @click.option('--only-filename')
-def voc(data_dir, output_dir, splits, ignore_splits, only_filename):
+@click.option('--limit-examples', type=int)
+@click.option('--limit-classes', type=int)
+def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
+        limit_examples, limit_classes):
     """
     Prepare VOC dataset for ingestion.
 
@@ -146,6 +177,14 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename):
     os.makedirs(output_dir, exist_ok=True)
 
     classes = read_classes(data_dir)
+
+    if limit_classes:
+        print(classes)
+        classes = random.sample(classes, limit_classes)
+        print('Limiting to {} classes: {}'.format(
+            limit_classes, classes
+        ))
+
     splits = [s for s in splits if s not in set(ignore_splits)]
     print('Generating outputs for splits = {}'.format(", ".join(splits)))
 
@@ -153,15 +192,25 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename):
         print('Converting split = {}'.format(split))
         if only_filename:
             record_filename = '{}-{}.tfrecords'.format(split, only_filename)
+        elif limit_examples:
+            record_filename = '{}-top{}-{}classes.tfrecords'.format(split, limit_examples, limit_classes)
         else:
             record_filename = '{}.tfrecords'.format(split)
 
         record_file = os.path.join(output_dir, record_filename)
         writer = tf.python_io.TFRecordWriter(record_file)
 
-        for image_id in load_split(data_dir, split):
+        total_examples = 0
+        for num, image_id in enumerate(load_split(data_dir, split)):
             if not only_filename or only_filename == image_id:
+                # Using limit on classes it's possible for an image_to_example
+                # to return None (because no classes match).
                 example = image_to_example(data_dir, classes, image_id)
-                writer.write(example.SerializeToString())
+                if example:
+                    total_examples += 1
+                    writer.write(example.SerializeToString())
+
+            if limit_examples and total_examples == limit_examples:
+                break
 
         writer.close()
