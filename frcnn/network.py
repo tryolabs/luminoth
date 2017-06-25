@@ -129,36 +129,40 @@ class FasterRCNN(snt.AbstractModule):
             return total_loss
 
     def _generate_anchors(self, feature_map):
-        feature_map_shape = tf.shape(feature_map)[1:3]
-        grid_width = feature_map_shape[1]
-        grid_height = feature_map_shape[0]
-        shift_x = tf.range(grid_width) * self._anchor_stride
-        shift_y = tf.range(grid_height) * self._anchor_stride
-        shift_x, shift_y = meshgrid(shift_x, shift_y)
+        with self._enter_variable_scope():
+            with tf.name_scope('generate_anchors'):
+                feature_map_shape = tf.shape(feature_map)[1:3]
+                grid_width = feature_map_shape[1]
+                grid_height = feature_map_shape[0]
+                shift_x = tf.range(grid_width) * self._anchor_stride
+                shift_y = tf.range(grid_height) * self._anchor_stride
+                shift_x, shift_y = meshgrid(shift_x, shift_y)
 
-        shift_x = tf.reshape(shift_x, [-1])
-        shift_y = tf.reshape(shift_y, [-1])
+                shift_x = tf.reshape(shift_x, [-1])
+                shift_y = tf.reshape(shift_y, [-1])
 
-        shifts = tf.stack(
-            [shift_x, shift_y, shift_x, shift_y],
-            axis=0
-        )
+                shifts = tf.stack(
+                    [shift_x, shift_y, shift_x, shift_y],
+                    axis=0
+                )
 
-        shifts = tf.transpose(shifts)
-        # Shifts now is a (H x W, 4) Tensor
+                shifts = tf.transpose(shifts)
+                # Shifts now is a (H x W, 4) Tensor
 
-        # TODO: We should implement anchor_reference as Tensor
-        num_anchors = self._anchor_reference.shape[0]
-        num_anchor_points = tf.shape(shifts)[0]
+                # TODO: We should implement anchor_reference as Tensor
+                num_anchors = self._anchor_reference.shape[0]
+                num_anchor_points = tf.shape(shifts)[0]
 
-        all_anchors = (
-            self._anchor_reference.reshape((1, num_anchors, 4)) +
-            tf.transpose(tf.reshape(shifts, (1, num_anchor_points, 4)), (1, 0, 2))
-        )
+                all_anchors = (
+                    self._anchor_reference.reshape((1, num_anchors, 4)) +
+                    tf.transpose(tf.reshape(shifts, (1, num_anchor_points, 4)), (1, 0, 2))
+                )
 
-        all_anchors = tf.reshape(all_anchors, (num_anchors * num_anchor_points, 4))
+                all_anchors = tf.reshape(all_anchors, (num_anchors * num_anchor_points, 4))
 
-        return all_anchors
+                all_anchors = tf.identity(all_anchors, name='all_anchors')
+
+                return all_anchors
 
     @property
     def summary(self):

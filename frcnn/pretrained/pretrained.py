@@ -23,8 +23,8 @@ class Pretrained(snt.AbstractModule):
             Load weights operation
         """
 
-        module_variables = snt.get_variables_in_module(self)
-        # assert len(module_variables) > 0
+        module_variables = snt.get_variables_in_module(self, tf.GraphKeys.GLOBAL_VARIABLES)
+        assert len(module_variables) > 0
 
         load_variables = []
         variables = [(v, v.op.name) for v in module_variables]
