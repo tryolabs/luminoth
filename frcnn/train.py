@@ -19,9 +19,11 @@ from .dataset import TFRecordDataset
 @click.option('--save_every', default=10)
 @click.option('--debug', is_flag=True)
 @click.option('--run-name', default='train')
-@click.option('--with-rcnn', default=True)
+@click.option('--with-rcnn', default=True, type=bool)
+@click.option('--no-log', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
-          checkpoint_file, log_dir, save_every, debug, run_name, with_rcnn):
+          checkpoint_file, log_dir, save_every, debug, run_name, with_rcnn,
+          no_log):
 
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -107,9 +109,10 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         if checkpoint_file:
             saver.restore(sess, checkpoint_file)
 
-        writer = tf.summary.FileWriter(
-            os.path.join(log_dir, run_name), sess.graph
-        )
+        if not no_log:
+            writer = tf.summary.FileWriter(
+                os.path.join(log_dir, run_name), sess.graph
+            )
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -133,13 +136,14 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                 tf.logging.info('train_loss: {}'.format(train_loss))
                 tf.logging.info('step: {}, filename: {}'.format(step, filename))
 
-                if step % save_every == 0:
-                    saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
+                if not no_log:
+                    if step % save_every == 0:
+                        saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
-                if not debug:
-                    values = sess.run(metrics)
-                    writer.add_summary(summary, step)
-                    writer.add_run_metadata(run_metadata, 'step{}'.format(step))
+                    if not debug:
+                        values = sess.run(metrics)
+                        writer.add_summary(summary, step)
+                        writer.add_run_metadata(run_metadata, 'step{}'.format(step))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(step, train_loss))
