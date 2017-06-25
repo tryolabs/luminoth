@@ -166,8 +166,9 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('--only-filename')
 @click.option('--limit-examples', type=int)
 @click.option('--limit-classes', type=int)
+@click.option('--seed', type=int, default=0)
 def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
-        limit_examples, limit_classes):
+        limit_examples, limit_classes, seed):
     """
     Prepare VOC dataset for ingestion.
 
@@ -179,7 +180,7 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
     classes = read_classes(data_dir)
 
     if limit_classes:
-        print(classes)
+        random.seed(seed)
         classes = random.sample(classes, limit_classes)
         print('Limiting to {} classes: {}'.format(
             limit_classes, classes
