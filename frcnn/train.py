@@ -98,7 +98,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         trainable=False,
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9)
+    optimizer = tf.train.AdamOptimizer()  # TODO: parameter tunning
 
     # TODO: We should define `var_list`
     train_op = optimizer.minimize(total_loss, global_step=global_step)
