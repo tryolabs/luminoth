@@ -10,7 +10,7 @@ from .rpn import RPN
 
 from .utils.generate_anchors import generate_anchors as generate_anchors_reference
 from .utils.ops import meshgrid
-from .utils.image import draw_bboxes
+from .utils.image import draw_bboxes, normalize_bboxes
 
 
 class FasterRCNN(snt.AbstractModule):
@@ -66,16 +66,20 @@ class FasterRCNN(snt.AbstractModule):
                 we have (x1, y1, x2, y2)
         """
         image_shape = tf.shape(image)[1:3]
-        pretrained_output = self._pretrained(image)
-        all_anchors = self._generate_anchors(pretrained_output)
+        pretrained_feature_map = self._pretrained(image)
+        all_anchors = self._generate_anchors(pretrained_feature_map)
         rpn_prediction = self._rpn(
-            pretrained_output, gt_boxes, image_shape, all_anchors, is_training=is_training)
+            pretrained_feature_map, gt_boxes, image_shape, all_anchors,
+            is_training=is_training
+        )
 
         prediction_dict = {
+            'image': image,
             'image_shape': image_shape,
             'all_anchors': all_anchors,
-            'rpn_prediction': rpn_prediction,
             'gt_boxes': gt_boxes,
+            'pretrained_feature_map': pretrained_feature_map,
+            'rpn_prediction': rpn_prediction,
         }
 
         if self._with_rcnn:
@@ -89,11 +93,13 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['classification_prediction'] = classification_prediction
             prediction_dict['roi_pool'] = roi_pool
 
+
+        rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
+
         tf.summary.image('image', image, max_outputs=20)
         tf.summary.image('top_1_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20)
         tf.summary.image('top_10_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 10), max_outputs=20)
         tf.summary.image('top_20_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 20), max_outputs=20)
-        # TODO: We should return a "prediction_dict" with all the required tensors (for results, loss and monitoring)
 
         return prediction_dict
 
@@ -149,7 +155,6 @@ class FasterRCNN(snt.AbstractModule):
                 shifts = tf.transpose(shifts)
                 # Shifts now is a (H x W, 4) Tensor
 
-                # TODO: We should implement anchor_reference as Tensor
                 num_anchors = self._anchor_reference.shape[0]
                 num_anchor_points = tf.shape(shifts)[0]
 
@@ -159,13 +164,14 @@ class FasterRCNN(snt.AbstractModule):
                 )
 
                 all_anchors = tf.reshape(all_anchors, (num_anchors * num_anchor_points, 4))
-
-                all_anchors = tf.identity(all_anchors, name='all_anchors')
-
                 return all_anchors
 
     @property
     def summary(self):
+        """
+        Generate merged summary of all the sub-summaries used inside the
+        Faster R-CNN network.
+        """
         summaries = [
             tf.summary.merge_all(key='Losses'),
             tf.summary.merge_all(key='RPN'),

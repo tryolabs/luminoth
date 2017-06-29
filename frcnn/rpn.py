@@ -112,7 +112,7 @@ class RPN(snt.AbstractModule):
             'rpn_cls_score_original': rpn_cls_score_original,
             'rpn_bbox_pred': rpn_bbox_pred,
             'rpn_bbox_pred_original': rpn_bbox_pred_original,
-            'proposals': proposal_prediction['nms_blobs'],
+            'proposals': proposal_prediction['nms_proposals'],
             'scores': proposal_prediction['nms_proposals_scores'],
             'proposal_prediction': proposal_prediction,
         }
