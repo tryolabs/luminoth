@@ -19,8 +19,8 @@ from .utils.image_vis import (
 @click.option('--pretrained-weights')
 @click.option('--model-dir', default='models/')
 @click.option('--checkpoint-file')
-@click.option('--log_dir', default='/tmp/frcnn/')
-@click.option('--save_every', default=10)
+@click.option('--log-dir', default='/tmp/frcnn/')
+@click.option('--save-every', default=10)
 @click.option('--debug', is_flag=True)
 @click.option('--run-name', default='train')
 @click.option('--with-rcnn', default=True, type=bool)
@@ -40,6 +40,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     train_image = train_dataset['image']
     train_filename = train_dataset['filename']
+    train_scale_factor = train_dataset['scale_factor']
     # TODO: This is not the best place to configure rank? Why is rank not
     # transmitted through the queue
     train_image.set_shape((None, None, 3))
@@ -131,8 +132,9 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
             while not coord.should_stop():
                 run_metadata = tf.RunMetadata()
 
-                _, summary, train_loss, step, pred_dict, filename, *_ = sess.run([
-                train_op, summarizer, total_loss, global_step, prediction_dict, train_filename, metric_ops
+                _, summary, train_loss, step, pred_dict, filename, scale_factor, *_ = sess.run([
+                    train_op, summarizer, total_loss, global_step,
+                    prediction_dict, train_filename, train_scale_factor, metric_ops
                 ], run_metadata=run_metadata)
 
                 print('Scaled image with {}'.format(scale_factor))
