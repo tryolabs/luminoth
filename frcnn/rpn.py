@@ -63,8 +63,7 @@ class RPN(snt.AbstractModule):
 
 
             self._proposal = RPNProposal(self._num_anchors)
-            if is_training:
-                self._anchor_target = AnchorTarget(self._num_anchors)
+            self._anchor_target = AnchorTarget(self._num_anchors)
 
     def _build(self, pretrained_feature_map, gt_boxes, image_shape, all_anchors,
                is_training=True):
