@@ -1,11 +1,8 @@
 import sonnet as snt
 import tensorflow as tf
-import numpy as np
 
-from .utils.bbox_transform import bbox_transform_inv, clip_boxes
 from .utils.bbox_transform_tf import bbox_decode
-from .utils.nms import nms
-from .utils.debug import debug
+
 
 class RPNProposal(snt.AbstractModule):
     """

@@ -39,6 +39,7 @@ class RCNNTarget(snt.AbstractModule):
         """
         First we need to calculate the true class of proposals based on gt_boxes.
         """
+        np.random.seed(0)  # TODO: For reproducibility.
 
         # Remove batch id from proposals
         proposals = proposals[:,1:]

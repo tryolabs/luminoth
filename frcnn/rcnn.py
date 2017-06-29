@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from .rcnn_target import RCNNTarget
+from .rcnn_proposal import RCNNProposal
 from .utils.losses import smooth_l1_loss
 from .utils.vars import variable_summaries
 
@@ -39,15 +40,33 @@ class RCNN(snt.AbstractModule):
             )
 
             self._rcnn_target = RCNNTarget(self._num_classes)
+            self._rcnn_proposal = RCNNProposal(self._num_classes)
 
     def _build(self, pooled_layer, proposals, gt_boxes):
         """
+        Classifies proposals based on the pooled feature map.
+
+        pooled_layer:
+            Feature map
+            Shape (num_proposals, pool_height, pool_width, 512).
+        proposals:
+            Shape (num_proposals, 4)
+
         TODO: El pooled layer es el volumen con todos los ROI o es uno por cada ROI?
         TODO: Donde puedo comparar los resultados con las labels posta?
         """
+
+        prediction_dict = {}
+
+        # We treat num proposals as batch number so that when flattening we actually
+        # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
         net = tf.contrib.layers.flatten(pooled_layer)
+
+        prediction_dict['flatten_net'] = net  # TODO: debug tmp
+        # After flattening we are lef with a (num_proposals, pool_height * pool_width * 512) tensor.
         for i, layer in enumerate(self._layers):
             net = layer(net)
+            prediction_dict['layer_{}_out'.format(i)] = net  # TODO: debug tmp
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
             variable_summaries(layer.w, 'layer_{}_W'.format(i), ['RCNN'])
@@ -59,16 +78,22 @@ class RCNN(snt.AbstractModule):
         proposals_target, bbox_target = self._rcnn_target(
             proposals, bbox_offsets, prob, gt_boxes)
 
+        objects, objects_labels, objects_labels_prob = self._rcnn_proposal(
+            proposals, bbox_offsets, prob)
+
         variable_summaries(prob, 'prob', ['RCNN'])
         variable_summaries(bbox_offsets, 'bbox_offsets', ['RCNN'])
 
-        return {
-            'cls_score': cls_score,
-            'cls_prob': prob,
-            'bbox_offsets': bbox_offsets,
-            'cls_target': proposals_target,
-            'bbox_offsets_target': bbox_target,
-        }
+        prediction_dict['cls_score'] = cls_score
+        prediction_dict['cls_prob'] = prob
+        prediction_dict['bbox_offsets'] = bbox_offsets
+        prediction_dict['cls_target'] = proposals_target
+        prediction_dict['bbox_offsets_target'] = bbox_target
+        prediction_dict['objects'] = objects
+        prediction_dict['objects_labels'] = objects_labels
+        prediction_dict['objects_labels_prob'] = objects_labels_prob
+
+        return prediction_dict
 
     def loss(self, prediction_dict):
         """
@@ -111,7 +136,9 @@ class RCNN(snt.AbstractModule):
                 # We only care for the targets that are >= 0
                 not_ignored = tf.reshape(tf.greater_equal(
                     cls_target, 0), [-1], name='not_ignored')
-                # We apply boolean mask to both prob and target.
+                # We apply boolean mask to score, prob and target.
+                cls_score_labeled = tf.boolean_mask(
+                    cls_score, not_ignored, name='cls_score_labeled')
                 cls_prob_labeled = tf.boolean_mask(
                     cls_prob, not_ignored, name='cls_prob_labeled')
                 cls_target_labeled = tf.boolean_mask(
@@ -121,10 +148,12 @@ class RCNN(snt.AbstractModule):
                 cls_target_one_hot = tf.one_hot(
                     cls_target_labeled, depth=self._num_classes + 1, name='cls_target_one_hot')
 
-                # TODO: Same doubt as RPN, should we use
-                # sparse_softmax_cross_entropy?
-                cls_loss = tf.losses.log_loss(
-                    cls_target_one_hot, cls_prob_labeled)
+                # We get cross entropy loss of each proposal.
+                cross_entropy_per_proposal = tf.nn.softmax_cross_entropy_with_logits(
+                    labels=cls_target_one_hot, logits=cls_score_labeled
+                )
+
+                prediction_dict['cross_entropy_per_proposal'] = cross_entropy_per_proposal
 
                 # Second we need to calculate the smooth l1 loss between
                 # `bbox_offsets` and `bbox_offsets_target`.
@@ -160,13 +189,15 @@ class RCNN(snt.AbstractModule):
                 bbox_offset_cleaned = tf.boolean_mask(
                     bbox_flatten, cls_flatten, 'bbox_offset_cleaned')
 
-                reg_loss = smooth_l1_loss(
+                reg_loss_per_proposal = smooth_l1_loss(
                     bbox_offset_cleaned, bbox_offsets_target_labeled)
 
+                prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+
                 # Hack to avoid having nan loss.
-                reg_loss = tf.cond(tf.is_nan(reg_loss), lambda: tf.constant(0.0, dtype=tf.float32), lambda: reg_loss)
+                # reg_loss = tf.cond(tf.is_nan(reg_loss), lambda: tf.constant(0.0, dtype=tf.float32), lambda: reg_loss)
 
                 return {
-                    'rcnn_cls_loss': cls_loss,
-                    'rcnn_reg_loss': reg_loss,
+                    'rcnn_cls_loss': tf.reduce_mean(cross_entropy_per_proposal),
+                    'rcnn_reg_loss': tf.reduce_mean(reg_loss_per_proposal),
                 }

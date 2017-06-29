@@ -83,11 +83,10 @@ class FasterRCNN(snt.AbstractModule):
         }
 
         if self._with_rcnn:
-            roi_pool = self._roi_pool(rpn_prediction['proposals'], pretrained_output)
+            roi_pool = self._roi_pool(rpn_prediction['proposals'], pretrained_feature_map)
 
             # TODO: Missing mapping classification_bbox to real coordinates.
             # (and trimming, and NMS?)
-            # TODO: Missing gt_boxes labels!
             classification_prediction = self._rcnn(roi_pool, rpn_prediction['proposals'], gt_boxes)
 
             prediction_dict['classification_prediction'] = classification_prediction
