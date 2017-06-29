@@ -125,7 +125,7 @@ def image_to_example(data_dir, classes, image_id):
         object_features_values['xmin'].append(_int64(b['bndbox']['xmin']))
         object_features_values['ymin'].append(_int64(b['bndbox']['ymin']))
         object_features_values['xmax'].append(_int64(b['bndbox']['xmax']))
-        object_features_values['ymax'].append(_int64(b['bndbox']['ymin']))
+        object_features_values['ymax'].append(_int64(b['bndbox']['ymax']))
 
     if len(object_features_values['label']) == 0:
         # No bounding box matches the available classes.
