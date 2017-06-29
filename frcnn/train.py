@@ -7,6 +7,10 @@ import click
 from .network import FasterRCNN
 from .config import Config
 from .dataset import TFRecordDataset
+from .utils.image_vis import (
+    draw_top_nms_proposals, draw_batch_proposals, draw_rpn_cls_loss,
+    draw_rpn_bbox_pred, draw_rpn_bbox_pred_with_target
+)
 
 
 @click.command()
@@ -130,6 +134,15 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                 _, summary, train_loss, step, pred_dict, filename, *_ = sess.run([
                 train_op, summarizer, total_loss, global_step, prediction_dict, train_filename, metric_ops
                 ], run_metadata=run_metadata)
+
+                print('Scaled image with {}'.format(scale_factor))
+                print('Image size: {}'.format(pred_dict['image_shape']))
+                draw_top_nms_proposals(pred_dict, 0.9)
+                draw_batch_proposals(pred_dict)
+                draw_rpn_cls_loss(pred_dict)
+                draw_rpn_bbox_pred(pred_dict)
+                draw_rpn_bbox_pred_with_target(pred_dict)
+                draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
 
                 count_images += 1
 
