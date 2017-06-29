@@ -46,8 +46,12 @@ class VGG(Pretrained):
             trainable=self._trainable)
         return net
 
-    def _preprocess(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
-        num_channels = 3
+    def _preprocess(self, inputs):
+        inputs = self._substract_channels(inputs)
+        return inputs
+
+    def _substract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
+        num_channels = len(means)
         channels = tf.split(axis=3, num_or_size_splits=num_channels, value=inputs)
         for i in range(num_channels):
             channels[i] -= means[i]
