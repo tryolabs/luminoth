@@ -19,6 +19,7 @@ from .utils.image_vis import (
 @click.option('--pretrained-weights')
 @click.option('--model-dir', default='models/')
 @click.option('--checkpoint-file')
+@click.option('--ignore-scope')
 @click.option('--log-dir', default='/tmp/frcnn/')
 @click.option('--save-every', default=10)
 @click.option('--debug', is_flag=True)
@@ -26,8 +27,8 @@ from .utils.image_vis import (
 @click.option('--with-rcnn', default=True, type=bool)
 @click.option('--no-log', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
-          checkpoint_file, log_dir, save_every, debug, run_name, with_rcnn,
-          no_log):
+          checkpoint_file, ignore_scope, log_dir, save_every, debug, run_name,
+          with_rcnn, no_log):
 
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -54,6 +55,18 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     # train_bboxes = tf.expand_dims(train_bboxes, 0)
 
     prediction_dict = model(train_image, train_bboxes)
+
+    model_variables = snt.get_normalized_variable_map(model, tf.GraphKeys.GLOBAL_VARIABLES)
+    if ignore_scope:
+        total_model_variables = len(model_variables)
+        model_variables = {
+            k: v for k, v in model_variables.items() if ignore_scope not in k
+        }
+        new_total_model_variables = len(model_variables)
+        tf.logging.info('Not loading/saving {} variables with scope "{}"'.format(
+            total_model_variables - new_total_model_variables, ignore_scope))
+
+        partial_saver = tf.train.Saver(var_list=model_variables)
 
     saver = snt.get_saver(model)
 
@@ -112,7 +125,13 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
         # Restore all variables from checkpoint file
         if checkpoint_file:
-            saver.restore(sess, checkpoint_file)
+            # TODO: We are better than this.
+
+            # If ignore_scope is set, we don't load those variables from checkpoint.
+            if ignore_scope:
+                partial_saver.restore(sess, checkpoint_file)
+            else:
+                saver.restore(sess, checkpoint_file)
 
         if not no_log:
             writer = tf.summary.FileWriter(
@@ -153,6 +172,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
                 if not no_log:
                     if step % save_every == 0:
+                        # We don't support partial saver.
                         saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
                     if not debug:

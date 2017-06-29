@@ -1,6 +1,6 @@
 import sonnet as snt
 import tensorflow as tf
-import numpy as np
+
 
 class Dataset(snt.AbstractModule):
     def __init__(self, config, **kwargs):
