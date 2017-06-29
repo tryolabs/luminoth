@@ -386,3 +386,27 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     print('Loss is {}'.format(loss))
     imgcat_pil(image_pil)
 
+
+def draw_object_prediction(pred_dict, topn=50):
+    print('Display top scored objects with label.')
+    objects = pred_dict['classification_prediction']['objects']
+    objects_labels = pred_dict['classification_prediction']['objects_labels']
+    objects_labels_prob = pred_dict['classification_prediction']['objects_labels_prob']
+
+    sorted_idx = objects_labels_prob.argsort()
+
+    objects = objects[sorted_idx]
+    objects_labels = objects_labels[sorted_idx]
+    objects_labels_prob = objects_labels_prob[sorted_idx]
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for num_object, (object_, label, prob) in enumerate(zip(objects, objects_labels, objects_labels_prob)):
+        bbox = list(object_)
+        draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+        draw.text(tuple([bbox[0], bbox[1]]), text='{} - {:.2f}'.format(label, prob), font=font, fill=(0, 0, 0, 255))
+
+        if num_object < topn:
+            break
+
+    imgcat_pil(image_pil)
