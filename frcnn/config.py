@@ -1,8 +1,8 @@
 
 class Config:
-    ANCHOR_SCALES = [8, 16, 32]
+    ANCHOR_SCALES = [0.5, 1, 2]
     ANCHOR_RATIOS = [0.5, 1, 2]
-    ANCHOR_BASE_SIZE = 16
+    ANCHOR_BASE_SIZE = 256
     ANCHOR_STRIDE = 16
 
     # Dataset
