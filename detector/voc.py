@@ -61,7 +61,8 @@ def load_split(root, split='train'):
     if split not in ['train', 'val', 'test']:
         raise ValueError
 
-    split_path = os.path.join(root, 'ImageSets', 'Main', '{}.txt'.format(split))
+    split_path = os.path.join(
+        root, 'ImageSets', 'Main', '{}.txt'.format(split))
     with open(split_path) as f:
         for line in f:
             yield line.strip()
@@ -152,8 +153,9 @@ def image_to_example(data_dir, classes, image_id):
 
     # Now build an `Example` protobuf object and save with the writer.
     context = tf.train.Features(feature=sample)
-    example = tf.train.SequenceExample(feature_lists=object_features, context=context)
-    # example = tf.train.SequenceExample(feature_lists=features)
+    example = tf.train.SequenceExample(
+        feature_lists=object_features, context=context
+    )
 
     return example
 
@@ -163,10 +165,10 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('--output-dir', default='datasets/voc/tf')
 @click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])
 @click.option('ignore_splits', '--ignore-split', multiple=True)
-@click.option('--only-filename')
-@click.option('--limit-examples', type=int)
-@click.option('--limit-classes', type=int)
-@click.option('--seed', type=int, default=0)
+@click.option('--only-filename', help='Create dataset with a single example.')
+@click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')
+@click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')
+@click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')
 def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
         limit_examples, limit_classes, seed):
     """
@@ -194,7 +196,9 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
         if only_filename:
             record_filename = '{}-{}.tfrecords'.format(split, only_filename)
         elif limit_examples:
-            record_filename = '{}-top{}-{}classes.tfrecords'.format(split, limit_examples, limit_classes)
+            record_filename = '{}-top{}-{}classes.tfrecords'.format(
+                split, limit_examples, limit_classes
+            )
         else:
             record_filename = '{}.tfrecords'.format(split)
 
