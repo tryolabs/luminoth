@@ -12,5 +12,8 @@ class Config:
     BATCH_SIZE = 1
     TRAIN_SUBSET = 'train'
 
+    IMAGE_MIN_SIZE = 600
+    IMAGE_MAX_SIZE = 1024
+
     # Pretrained
     PRETRAINED_TRAINABLE = False
