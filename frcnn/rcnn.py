@@ -42,7 +42,7 @@ class RCNN(snt.AbstractModule):
             self._rcnn_target = RCNNTarget(self._num_classes)
             self._rcnn_proposal = RCNNProposal(self._num_classes)
 
-    def _build(self, pooled_layer, proposals, gt_boxes):
+    def _build(self, pooled_layer, proposals, gt_boxes, im_shape):
         """
         Classifies proposals based on the pooled feature map.
 
@@ -76,7 +76,7 @@ class RCNN(snt.AbstractModule):
         bbox_offsets = self._bbox_layer(net)
 
         proposals_target, bbox_target = self._rcnn_target(
-            proposals, bbox_offsets, prob, gt_boxes)
+            proposals, prob, gt_boxes, im_shape)
 
         objects, objects_labels, objects_labels_prob = self._rcnn_proposal(
             proposals, bbox_offsets, prob)

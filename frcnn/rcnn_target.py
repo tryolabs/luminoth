@@ -21,7 +21,7 @@ class RCNNTarget(snt.AbstractModule):
         self._background_threshold_high = 0.4
         self._background_threshold_low = 0.1
 
-    def _build(self, proposals, rois, scores, gt_boxes):
+    def _build(self, proposals, scores, gt_boxes, im_shape):
         """
         Returns:
             TODO: Review implementetion with py-faster-rcnn ProposalTargetLayer
@@ -29,13 +29,13 @@ class RCNNTarget(snt.AbstractModule):
         """
         (proposals_label, bbox_targets) = tf.py_func(
             self.proposal_target_layer,
-            [proposals, rois, scores, gt_boxes],
+            [proposals, scores, gt_boxes, im_shape],
             [tf.float32] * 2
          )
 
         return proposals_label, bbox_targets
 
-    def proposal_target_layer(self, proposals, rois, scores, gt_boxes):
+    def proposal_target_layer(self, proposals, scores, gt_boxes, im_shape):
         """
         First we need to calculate the true class of proposals based on gt_boxes.
         """
@@ -107,8 +107,6 @@ class RCNNTarget(snt.AbstractModule):
                 bg_inds, size=(len(bg_inds) - num_bg), replace=False
             )
             proposals_label[disable_inds] = -1
-
-        # Now we have our `proposals_label` ready to compare with `scores`
 
         """
         Next step is to calculate the proper targets for the proposals labeled
