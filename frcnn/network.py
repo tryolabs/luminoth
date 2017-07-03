@@ -116,6 +116,8 @@ class FasterRCNN(snt.AbstractModule):
             rpn_loss_dict['rpn_cls_loss'] = rpn_loss_dict['rpn_cls_loss'] * self._rpn_cls_loss_weight
             rpn_loss_dict['rpn_reg_loss'] = rpn_loss_dict['rpn_reg_loss'] * self._rpn_reg_loss_weight
 
+            prediction_dict['rpn_loss_dict'] = rpn_loss_dict
+
             if self._with_rcnn:
                 rcnn_loss_dict = self._rcnn.loss(
                     prediction_dict['classification_prediction']
@@ -123,6 +125,8 @@ class FasterRCNN(snt.AbstractModule):
 
                 rcnn_loss_dict['rcnn_cls_loss'] = rcnn_loss_dict['rcnn_cls_loss'] * self._rcnn_cls_loss_weight
                 rcnn_loss_dict['rcnn_reg_loss'] = rcnn_loss_dict['rcnn_reg_loss'] * self._rcnn_reg_loss_weight
+
+                prediction_dict['rcnn_loss_dict'] = rcnn_loss_dict
             else:
                 rcnn_loss_dict = {}
 
