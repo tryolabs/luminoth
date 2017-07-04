@@ -6,6 +6,8 @@ def variable_summaries(var, name, collections):
     with tf.name_scope(name):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean, collections)
+        num_params = tf.reduce_prod(tf.shape(var))
+        tf.summary.scalar('num_params', num_params, collections)
         with tf.name_scope('stddev'):
             stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
         tf.summary.scalar('stddev', stddev, collections)

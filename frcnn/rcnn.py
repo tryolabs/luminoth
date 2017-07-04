@@ -60,10 +60,12 @@ class RCNN(snt.AbstractModule):
 
         # We treat num proposals as batch number so that when flattening we actually
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
-        net = tf.contrib.layers.flatten(pooled_layer)
+        flatten_net = tf.contrib.layers.flatten(pooled_layer)
+        net = tf.identity(flatten_net)
 
         prediction_dict['flatten_net'] = net  # TODO: debug tmp
         # After flattening we are lef with a (num_proposals, pool_height * pool_width * 512) tensor.
+        # The first dimension works as batch size when applied to snt.Linear.
         for i, layer in enumerate(self._layers):
             net = layer(net)
             prediction_dict['layer_{}_out'.format(i)] = net  # TODO: debug tmp
