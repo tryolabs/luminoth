@@ -106,12 +106,12 @@ class RPN(snt.AbstractModule):
 
         # TODO: Remove unnecesary variables from prediction dictionary.
         prediction_dict = {
-            'rpn_feature': rpn_feature,
+            # 'rpn_feature': rpn_feature,
             'rpn_cls_prob': rpn_cls_prob,
             'rpn_cls_score': rpn_cls_score,
-            'rpn_cls_score_original': rpn_cls_score_original,
+            # 'rpn_cls_score_original': rpn_cls_score_original,
             'rpn_bbox_pred': rpn_bbox_pred,
-            'rpn_bbox_pred_original': rpn_bbox_pred_original,
+            # 'rpn_bbox_pred_original': rpn_bbox_pred_original,
             'proposals': proposal_prediction['nms_proposals'],
             'scores': proposal_prediction['nms_proposals_scores'],
             'proposal_prediction': proposal_prediction,

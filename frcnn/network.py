@@ -78,7 +78,7 @@ class FasterRCNN(snt.AbstractModule):
             'image_shape': image_shape,
             'all_anchors': all_anchors,
             'gt_boxes': gt_boxes,
-            'pretrained_feature_map': pretrained_feature_map,
+            # 'pretrained_feature_map': pretrained_feature_map,
             'rpn_prediction': rpn_prediction,
         }
 
@@ -91,10 +91,10 @@ class FasterRCNN(snt.AbstractModule):
                 roi_pool, rpn_prediction['proposals'], gt_boxes, image_shape)
 
             prediction_dict['classification_prediction'] = classification_prediction
-            prediction_dict['roi_pool'] = roi_pool
+            # prediction_dict['roi_pool'] = roi_pool
 
 
-        rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
+        # rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
 
         tf.summary.image('image', image, max_outputs=20)
         tf.summary.image('top_1_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20)
