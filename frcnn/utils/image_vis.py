@@ -555,7 +555,7 @@ def draw_object_prediction(pred_dict, topn=50):
         draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
         draw.text(tuple([bbox[0], bbox[1]]), text='{} - {:.2f}'.format(label, prob), font=font, fill=(0, 0, 0, 255))
 
-        if num_object < topn:
+        if num_object >= topn:
             break
 
     imgcat_pil(image_pil)
