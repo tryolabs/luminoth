@@ -20,8 +20,8 @@ class RPNProposal(snt.AbstractModule):
 
         # Filtering config  TODO: Use external configuration
         self._pre_nms_top_n = 12000  # TODO: Not used in TF version
-        self._post_nms_top_n = 2000
-        self._nms_threshold = 0.7
+        self._post_nms_top_n = 1500
+        self._nms_threshold = 0.6
         self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
