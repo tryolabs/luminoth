@@ -10,7 +10,8 @@ from .dataset import TFRecordDataset
 from .utils.image_vis import (
     draw_top_nms_proposals, draw_batch_proposals, draw_rpn_cls_loss,
     draw_rpn_bbox_pred, draw_rpn_bbox_pred_with_target, draw_positive_anchors,
-    draw_anchors, draw_object_prediction
+    draw_anchors, draw_object_prediction, draw_rcnn_cls_batch, draw_rcnn_cls_batch_errors,
+    draw_rcnn_reg_batch_errors
 )
 
 
@@ -168,6 +169,10 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                 draw_rpn_bbox_pred_with_target(pred_dict)
                 draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
                 draw_object_prediction(pred_dict)
+                draw_rcnn_cls_batch(pred_dict)
+                draw_rcnn_cls_batch_errors(pred_dict)
+                draw_rcnn_cls_batch_errors(pred_dict, worst=False)
+                draw_rcnn_reg_batch_errors(pred_dict)
 
                 count_images += 1
 

@@ -387,11 +387,160 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     imgcat_pil(image_pil)
 
 
+def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
+    print('Show the bboxes used for training classifier. (GT labels are -1 from cls targets)')
+    print('blue => GT, green => foreground, red => background')
+
+    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
+    cls_targets = pred_dict['classification_prediction']['cls_target']
+    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+
+    batch_idx = np.where(cls_targets != -1)[0]
+
+    proposals = proposals[batch_idx]
+    cls_targets = cls_targets[batch_idx]
+    bbox_offsets_targets = bbox_offsets_targets[batch_idx]
+
+    bboxes = bbox_transform_inv(proposals, bbox_offsets_targets)
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for bbox, cls_target in zip(bboxes, cls_targets):
+        bbox = list(bbox.astype(int))
+        if cls_target > 0:
+            fill = (0, 255, 0, 20)
+            outline = (0, 255, 0, 100)
+        else:
+            fill = (255, 0, 0, 20)
+            outline = (255, 0, 0, 100)
+
+        draw.rectangle(bbox, fill=fill, outline=outline)
+        draw.text(tuple(bbox[:2]), text=str(int(cls_target)), font=font, fill=fill)
+
+    gt_boxes = pred_dict['gt_boxes']
+    for gt_box in gt_boxes:
+        draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
+        draw.text(tuple(gt_box[:2]), text=str(gt_box[4]), font=font, fill=(0, 0, 255, 255))
+
+    imgcat_pil(image_pil)
+
+
+def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, worst=True, n=10):
+    print('Show the {} classification errors in batch used for training classifier.'.format('worst' if worst else 'best'))
+    print('blue => GT, green => foreground, red => background')
+
+    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
+    cls_targets = pred_dict['classification_prediction']['cls_target']
+    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+
+    batch_idx = np.where(cls_targets != -1)[0]
+
+    proposals = proposals[batch_idx]
+    cls_targets = cls_targets[batch_idx]
+    bbox_offsets_targets = bbox_offsets_targets[batch_idx]
+
+    # Cross entropy per proposal already has >= 0 target batches (not ignored proposals)
+    cross_entropy_per_proposal = pred_dict['classification_prediction']['cross_entropy_per_proposal']
+
+    if worst:
+        selected_idx = cross_entropy_per_proposal.argsort()[::-1][:n]
+    else:
+        selected_idx = cross_entropy_per_proposal.argsort()[:n]
+
+    cross_entropy_per_proposal = cross_entropy_per_proposal[selected_idx]
+    proposals = proposals[selected_idx]
+    cls_targets = cls_targets[selected_idx]
+    bbox_offsets_targets = bbox_offsets_targets[selected_idx]
+
+    bboxes = bbox_transform_inv(proposals, bbox_offsets_targets)
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for bbox, cls_target, error in zip(bboxes, cls_targets, cross_entropy_per_proposal):
+        bbox = list(bbox.astype(int))
+        if cls_target > 0:
+            fill = (0, 255, 0, 20)
+            outline = (0, 255, 0, 100)
+        else:
+            fill = (255, 0, 0, 20)
+            outline = (255, 0, 0, 100)
+
+        draw.rectangle(bbox, fill=fill, outline=outline)
+        draw.text(tuple(bbox[:2]), text='{:.2f}'.format(error), font=font, fill=fill)
+
+    gt_boxes = pred_dict['gt_boxes']
+    for gt_box in gt_boxes:
+        draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
+        # draw.text(tuple(gt_box[:2]), text=str(gt_box[4]), font=font, fill=(0, 0, 255, 255))
+
+    imgcat_pil(image_pil)
+
+
+def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
+    print('Show the {} regression errors in batch used for training classifier.'.format('worst' if worst else 'best'))
+    print('blue => GT, green => foreground, red => background')
+
+    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
+    cls_targets = pred_dict['classification_prediction']['cls_target']
+    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+    bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
+
+    batch_idx = np.where(cls_targets > 0)[0]
+
+    proposals = proposals[batch_idx]
+    cls_targets = cls_targets[batch_idx]
+    bbox_offsets_targets = bbox_offsets_targets[batch_idx]
+    bbox_offsets = bbox_offsets[batch_idx]
+    reg_loss_per_proposal = pred_dict['classification_prediction']['reg_loss_per_proposal']
+
+    cls_targets = cls_targets - 1
+
+    bbox_offsets_idx_pairs = np.stack(np.array([cls_targets * 4, cls_targets * 4 + 1, cls_targets * 4 + 2, cls_targets * 4 + 3]), axis=1)
+    bbox_offsets = np.take(bbox_offsets, bbox_offsets_idx_pairs.astype(np.int))
+
+    bboxes = bbox_transform_inv(proposals, bbox_offsets)
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for proposal, bbox, cls_target, error in zip(proposals, bboxes, cls_targets, reg_loss_per_proposal):
+        bbox = list(bbox.astype(int))
+        proposal = list(proposal.astype(int))
+
+        if cls_target > 0:
+            fill = (0, 255, 0, 20)
+            outline = (0, 255, 0, 100)
+            proposal_fill = (255, 255, 30, 20)
+            proposal_outline = (255, 255, 30, 100)
+        else:
+            fill = (255, 0, 0, 20)
+            outline = (255, 0, 0, 100)
+            proposal_fill = (255, 30, 255, 20)
+            proposal_outline = (255, 30, 255, 100)
+
+        draw.rectangle(bbox, fill=fill, outline=outline)
+        draw.rectangle(proposal, fill=proposal_fill, outline=proposal_outline)
+        draw.text(tuple(bbox[:2]), text='{:.3f}'.format(error), font=font, fill=fill)
+
+        draw.line([(proposal[0], proposal[1]), (bbox[0], bbox[1])], fill=(0,0,0,170), width=1)
+        draw.line([(proposal[2], proposal[1]), (bbox[2], bbox[1])], fill=(0,0,0,170), width=1)
+        draw.line([(proposal[2], proposal[3]), (bbox[2], bbox[3])], fill=(0,0,0,170), width=1)
+        draw.line([(proposal[0], proposal[3]), (bbox[0], bbox[3])], fill=(0,0,0,170), width=1)
+
+    gt_boxes = pred_dict['gt_boxes']
+    for gt_box in gt_boxes:
+        draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
+
+    imgcat_pil(image_pil)
+
+
 def draw_object_prediction(pred_dict, topn=50):
     print('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
     objects_labels = pred_dict['classification_prediction']['objects_labels']
     objects_labels_prob = pred_dict['classification_prediction']['objects_labels_prob']
+
+    if len(objects_labels) == 0:
+        tf.logging.warning('No objects detected. Probably all classified as background.')
 
     sorted_idx = objects_labels_prob.argsort()
 
