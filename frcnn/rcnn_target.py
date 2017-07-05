@@ -91,6 +91,11 @@ class RCNNTarget(snt.AbstractModule):
         # we only assign to proposals with `overlaps_with_label`.
         proposals_label[overlaps_with_label] = (gt_boxes[:,4][overlaps_best_label] + 1)[overlaps_with_label]
 
+        # Finally we get the closest proposal for each ground truth box and mark it as positive.
+        # TODO: Check when not tired
+        gt_argmax_overlaps = overlaps.argmax(axis=0)
+        proposals_label[gt_argmax_overlaps] = gt_boxes[:,4] + 1
+
         # proposals_label now has [0, num_classes + 1] for proposals we are
         # going to use and -1 for the ones we should ignore.
 
