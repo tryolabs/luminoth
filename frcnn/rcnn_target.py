@@ -56,20 +56,7 @@ class RCNNTarget(snt.AbstractModule):
         np.random.seed(0)  # TODO: For reproducibility.
 
         # Remove batch id from proposals
-        all_proposals = proposals[:,1:]
-
-        # only keep anchors inside the image
-        # TODO: We should do this when anchors are original generated in
-        # network or does it fuck with our dimensions.
-        inds_inside = np.where(
-            (all_proposals[:, 0] >= 0) &
-            (all_proposals[:, 1] >= 0) &
-            (all_proposals[:, 2] < im_shape[1]) &
-            (all_proposals[:, 3] < im_shape[0])
-        )[0]
-
-        # keep only inside all_proposals
-        proposals = all_proposals[inds_inside, :]
+        proposals = proposals[:,1:]
 
         overlaps = bbox_overlaps(
             # We need to use float and ascontiguousarray because of Cython
@@ -164,15 +151,9 @@ class RCNNTarget(snt.AbstractModule):
         # We unmap `bbox_targets` to get back our final array shaped
         # `(num_proposals, 4)` filling the proposals with bbox target with 0.
 
-        # We first unmap targets to proposal_labesl (containing the length of inside bboxes)
+        # We unmap targets to proposal_labels (containing the length of proposals)
         bbox_targets = unmap(
             bbox_targets, proposals_label.shape[0], proposal_with_target_idx, fill=0)
-        # Then we unmap to all_proposals with inds_inside.
-        bbox_targets = unmap(
-            bbox_targets, all_proposals.shape[0], inds_inside, fill=0)
-        # Proposals labels doesn't need double unmap.
-        proposals_label = unmap(
-            proposals_label, all_proposals.shape[0], inds_inside, fill=-1)
 
         # TODO: Bbox targes now have shape (x, 4) but maybe it should have shape
         # (num_proposals, num_classes * 4).
