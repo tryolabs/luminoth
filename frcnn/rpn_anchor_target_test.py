@@ -4,14 +4,14 @@ import numpy as np
 
 from sonnet.testing.parameterized import parameterized
 
-from .anchor_target import AnchorTarget
+from .rpn_anchor_target import RPNAnchorTarget
 from .utils.generate_anchors import generate_anchors
 
 
-class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+class RPNnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
 
     def setUp(self):
-        super(AnchorTargetTest, self).setUp()
+        super(RPNAnchorTargetTest, self).setUp()
         # Setup anchors
         self.anchor_scales = np.array([8, 16, 32])
         self.anchor_ratios = np.array([0.5, 1, 2])
@@ -19,7 +19,7 @@ class AnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
             ratios=self.anchor_ratios, scales=self.anchor_scales)
 
     def testBasic(self):
-        model = AnchorTarget(self.anchors)
+        model = RPNAnchorTarget(self.anchors)
         rpn_cls_score_shape = (1, 32, 32, model._num_anchors * 2)
         gt_boxes_shape = (1, 4)  # 1 ground truth boxes.
         im_info_shape = (2,)

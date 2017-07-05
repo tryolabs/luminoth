@@ -6,9 +6,9 @@ from .utils.bbox import bbox_overlaps
 from .utils.bbox_transform import bbox_transform, unmap
 
 
-class AnchorTarget(snt.AbstractModule):
+class RPNAnchorTarget(snt.AbstractModule):
     """
-    AnchorTarget
+    RPNAnchorTarget
 
     TODO: (copied) Assign anchors to ground-truth targets. Produces anchor
     classification labels and bounding-box regression targets.
@@ -40,7 +40,7 @@ class AnchorTarget(snt.AbstractModule):
 
     """
     def __init__(self, num_anchors, feat_stride=[16], name='anchor_target'):
-        super(AnchorTarget, self).__init__(name=name)
+        super(RPNAnchorTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
         self._feat_stride = feat_stride
 

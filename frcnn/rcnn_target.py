@@ -9,8 +9,6 @@ from .utils.bbox import bbox_overlaps
 class RCNNTarget(snt.AbstractModule):
     """
     Generate RCNN target tensors for both probabilities and bounding boxes.
-
-    TODO: We should unify this module with AnchorTarget.
     """
     def __init__(self, num_classes, name='rcnn_proposal'):
         super(RCNNTarget, self).__init__(name=name)

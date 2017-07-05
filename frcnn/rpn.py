@@ -7,7 +7,7 @@ import tensorflow.contrib.slim as slim
 
 from sonnet.python.modules.conv import Conv2D
 
-from .anchor_target import AnchorTarget
+from .rpn_anchor_target import RPNAnchorTarget
 from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
 from .utils.losses import smooth_l1_loss
@@ -63,7 +63,7 @@ class RPN(snt.AbstractModule):
 
 
             self._proposal = RPNProposal(self._num_anchors)
-            self._anchor_target = AnchorTarget(self._num_anchors)
+            self._anchor_target = RPNAnchorTarget(self._num_anchors)
 
     def _build(self, pretrained_feature_map, gt_boxes, image_shape, all_anchors,
                is_training=True):
@@ -188,7 +188,7 @@ class RPN(snt.AbstractModule):
 
                 # Finally, we need to calculate the regression loss over
                 # `rpn_bbox_target` and `rpn_bbox_pred`.
-                # Since `rpn_bbox_target` is obtained from AnchorTargetLayer then we
+                # Since `rpn_bbox_target` is obtained from RPNAnchorTarget then we
                 # just need to apply SmoothL1Loss.
                 rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
                 rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])
