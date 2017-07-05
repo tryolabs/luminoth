@@ -17,8 +17,8 @@ class RCNNTarget(snt.AbstractModule):
         self._num_classes = num_classes
         self._foreground_fraction = 0.25
         self._batch_size = 64
-        self._foreground_threshold = 0.7
-        self._background_threshold_high = 0.4
+        self._foreground_threshold = 0.5
+        self._background_threshold_high = 0.5
         self._background_threshold_low = 0.1
 
     def _build(self, proposals, scores, gt_boxes, im_shape):
@@ -68,6 +68,7 @@ class RCNNTarget(snt.AbstractModule):
         # proposal P and ground truth box G in overlaps[P, G]
 
         # We are going to label each proposal based on the IoU with `gt_boxes`.
+        # Start by filling the labels with -1, marking them as ignored.
         proposals_label = np.empty((proposals.shape[0], ), dtype=np.float32)
         proposals_label.fill(-1)
 
@@ -78,10 +79,10 @@ class RCNNTarget(snt.AbstractModule):
         max_overlaps = overlaps.max(axis=1)
 
         # Label background
-        proposals_label[(max_overlaps > 0.1) & (max_overlaps <= 0.5)] = 0
+        proposals_label[(max_overlaps > self._background_threshold_low) & (max_overlaps < self._background_threshold_high)] = 0
 
         # Filter proposal that have labels
-        overlaps_with_label = max_overlaps > 0.5
+        overlaps_with_label = max_overlaps >= self._foreground_threshold
         # Get label for proposal with labels
         overlaps_best_label = overlaps.argmax(axis=1)
         # Having the index of the gt bbox with the best label we need to get the label for
