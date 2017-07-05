@@ -7,6 +7,7 @@ import PIL.ImageFont as ImageFont
 import tensorflow as tf
 
 from .bbox_transform import bbox_transform_inv
+from .bbox import bbox_overlaps
 from base64 import b64encode
 from sys import stdout
 
@@ -170,7 +171,7 @@ def draw_top_proposals(pred_dict):
     imgcat_pil(image_pil)
 
 
-def draw_batch_proposals(pred_dict, print_foreground=True, print_background=True):
+def draw_batch_proposals(pred_dict):
     print('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
     print('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
     scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
@@ -557,5 +558,31 @@ def draw_object_prediction(pred_dict, topn=50):
 
         if num_object >= topn:
             break
+
+    imgcat_pil(image_pil)
+
+
+def draw_rcnn_input_proposals(pred_dict):
+    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
+    gt_boxes = pred_dict['gt_boxes'][:,:4]
+
+    overlaps = bbox_overlaps(
+        np.ascontiguousarray(proposals, dtype=np.float),
+        np.ascontiguousarray(gt_boxes, dtype=np.float)
+    )
+
+    top_overlap = overlaps.max(axis=1)
+
+    top_overlap_idx = top_overlap >= 0.5
+
+    proposals = proposals[top_overlap_idx]
+    top_overlap = top_overlap[top_overlap_idx]
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for proposal, overlap in zip(proposals, top_overlap):
+        proposal = list(proposal)
+        draw.rectangle(proposal, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+        draw.text(tuple([proposal[0], proposal[1]]), text='{:.2f}'.format(overlap)[1:], font=font, fill=(0, 0, 0, 255))
 
     imgcat_pil(image_pil)
