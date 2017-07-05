@@ -7,12 +7,7 @@ import click
 from .network import FasterRCNN
 from .config import Config
 from .dataset import TFRecordDataset
-from .utils.image_vis import (
-    draw_top_nms_proposals, draw_batch_proposals, draw_rpn_cls_loss,
-    draw_rpn_bbox_pred, draw_rpn_bbox_pred_with_target, draw_positive_anchors,
-    draw_anchors, draw_object_prediction, draw_rcnn_cls_batch, draw_rcnn_cls_batch_errors,
-    draw_rcnn_reg_batch_errors
-)
+from .utils.image_vis import *  # debug
 
 
 @click.command()
@@ -28,9 +23,10 @@ from .utils.image_vis import (
 @click.option('--run-name', default='train')
 @click.option('--with-rcnn', default=True, type=bool)
 @click.option('--no-log', is_flag=True)
+@click.option('--display-every', default=1, type=int)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           checkpoint_file, ignore_scope, log_dir, save_every, debug, run_name,
-          with_rcnn, no_log):
+          with_rcnn, no_log, display_every):
 
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -158,21 +154,22 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     prediction_dict, train_filename, train_scale_factor, metric_ops
                 ], run_metadata=run_metadata)
 
-                print('Scaled image with {}'.format(scale_factor))
-                print('Image size: {}'.format(pred_dict['image_shape']))
-                draw_anchors(pred_dict)
-                draw_positive_anchors(pred_dict)
-                draw_top_nms_proposals(pred_dict, 0.9)
-                draw_batch_proposals(pred_dict)
-                draw_rpn_cls_loss(pred_dict)
-                draw_rpn_bbox_pred(pred_dict)
-                draw_rpn_bbox_pred_with_target(pred_dict)
-                draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
-                draw_object_prediction(pred_dict)
-                draw_rcnn_cls_batch(pred_dict)
-                draw_rcnn_cls_batch_errors(pred_dict)
-                draw_rcnn_cls_batch_errors(pred_dict, worst=False)
-                draw_rcnn_reg_batch_errors(pred_dict)
+                if step % display_every == 0:
+                    print('Scaled image with {}'.format(scale_factor))
+                    print('Image size: {}'.format(pred_dict['image_shape']))
+                    draw_anchors(pred_dict)
+                    draw_positive_anchors(pred_dict)
+                    draw_top_nms_proposals(pred_dict, 0.9)
+                    draw_batch_proposals(pred_dict)
+                    draw_rpn_cls_loss(pred_dict)
+                    draw_rpn_bbox_pred(pred_dict)
+                    draw_rpn_bbox_pred_with_target(pred_dict)
+                    draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
+                    draw_object_prediction(pred_dict)
+                    draw_rcnn_cls_batch(pred_dict)
+                    draw_rcnn_input_proposals(pred_dict)
+                    draw_rcnn_cls_batch_errors(pred_dict, worst=False)
+                    draw_rcnn_reg_batch_errors(pred_dict)
 
                 count_images += 1
 
