@@ -78,7 +78,7 @@ class RCNN(snt.AbstractModule):
         bbox_offsets = self._bbox_layer(net)
 
         proposals_target, bbox_target = self._rcnn_target(
-            proposals, prob, gt_boxes, im_shape)
+            proposals, gt_boxes)
 
         objects, objects_labels, objects_labels_prob = self._rcnn_proposal(
             proposals, bbox_offsets, prob)
