@@ -26,7 +26,7 @@ class FasterRCNN(snt.AbstractModule):
         self._anchor_base_size = self._cfg.ANCHOR_BASE_SIZE
         self._anchor_scales = np.array(self._cfg.ANCHOR_SCALES)
         self._anchor_ratios = np.array(self._cfg.ANCHOR_RATIOS)
-        self._anchor_stride = self._cfg.ANCHOR_STRIDE
+        self._anchor_stride = self._cfg.ANCHOR_STRIDE  # TODO: Value depends on use of VGG vs Resnet (?)
 
         self._anchor_reference = generate_anchors_reference(
             self._anchor_base_size, self._anchor_ratios, self._anchor_scales
@@ -96,10 +96,10 @@ class FasterRCNN(snt.AbstractModule):
 
         # rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
 
-        tf.summary.image('image', image, max_outputs=20)
-        tf.summary.image('top_1_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20)
-        tf.summary.image('top_10_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 10), max_outputs=20)
-        tf.summary.image('top_20_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 20), max_outputs=20)
+        # tf.summary.image('image', image, max_outputs=20)
+        # tf.summary.image('top_1_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20)
+        # tf.summary.image('top_10_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 10), max_outputs=20)
+        # tf.summary.image('top_20_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 20), max_outputs=20)
 
         return prediction_dict
 
