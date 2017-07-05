@@ -19,7 +19,6 @@ class RPNProposal(snt.AbstractModule):
         self._feat_stride = feat_stride
 
         # Filtering config  TODO: Use external configuration
-        self._pre_nms_top_n = 12000  # TODO: Not used in TF version
         self._post_nms_top_n = 1500
         self._nms_threshold = 0.6
         self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
@@ -40,7 +39,7 @@ class RPNProposal(snt.AbstractModule):
 
         x_min_anchor, y_min_anchor, x_max_anchor, y_max_anchor = tf.split(all_anchors, 4, axis=1)
 
-        # Filter anchors that are partially outside the image.
+        # Filter anchors that are partially outside the image. TODO: Revisar
         anchor_filter = tf.logical_and(
             tf.logical_and(
                 tf.greater_equal(x_min_anchor, 0),
@@ -67,23 +66,23 @@ class RPNProposal(snt.AbstractModule):
 
         # Clip boxes
         image_shape = tf.cast(im_shape, tf.float32)
-        x_min_clipped = tf.maximum(tf.minimum(x_min, image_shape[1] - 1), 0.)
-        y_min_clipped = tf.maximum(tf.minimum(y_min, image_shape[0] - 1), 0.)
-        x_max_clipped = tf.maximum(tf.minimum(x_max, image_shape[1] - 1), 0.)
-        y_max_clipped = tf.maximum(tf.minimum(y_max, image_shape[0] - 1), 0.)
+        x_min = tf.maximum(tf.minimum(x_min, image_shape[1] - 1), 0.)
+        y_min = tf.maximum(tf.minimum(y_min, image_shape[0] - 1), 0.)
+        x_max = tf.maximum(tf.minimum(x_max, image_shape[1] - 1), 0.)
+        y_max = tf.maximum(tf.minimum(y_max, image_shape[0] - 1), 0.)
 
-        # Filter proposals with negative area. TODO: Optional, is not done in paper.
-        proposal_filter = tf.greater_equal((x_max_clipped - x_min_clipped) * (y_max_clipped - y_min_clipped), 0)
+        proposals = tf.concat([x_min, y_min, x_max, y_max], axis=1)
+
+        # Filter proposals with negative area. TODO: Optional, is not done in paper, can it happen (given log of width ratio?)
+        proposal_filter = tf.greater_equal((x_max - x_min) * (y_max - y_min), 0)
         proposal_filter = tf.reshape(proposal_filter, [-1])
 
         # Filter proposals and scores.
         proposals = tf.boolean_mask(proposals, proposal_filter)
         scores = tf.boolean_mask(scores, proposal_filter)
 
-        # We split again se we can rearrange in the TF way.
-        x_min, y_min, x_max, y_max = tf.split(value=proposals, num_or_size_splits=4, axis=1)
-
         # We reorder the proposals for non_max_supression compatibility.
+        x_min, y_min, x_max, y_max = tf.split(value=proposals, num_or_size_splits=4, axis=1)
         proposals_tf_order = tf.concat([y_min, x_min, y_max, x_max], axis=1)
 
         # We cut the pre_nms filter in pure TF version and go straight into NMS.
