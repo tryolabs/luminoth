@@ -1,9 +1,13 @@
 import click
+import json
 import os
 import random
 import tensorflow as tf
 
 from lxml import etree
+
+
+DEFAULT_TOTAL_CLASSES = 20
 
 
 def read_classes(root):
@@ -167,7 +171,7 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('ignore_splits', '--ignore-split', multiple=True)
 @click.option('--only-filename', help='Create dataset with a single example.')
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')
-@click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')
+@click.option('--limit-classes', type=int, default=DEFAULT_TOTAL_CLASSES, help='Limit dataset with `N` random classes.')
 @click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')
 def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
         limit_examples, limit_classes, seed):
@@ -181,12 +185,23 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
 
     classes = read_classes(data_dir)
 
-    if limit_classes:
+    if limit_classes < DEFAULT_TOTAL_CLASSES:
         random.seed(seed)
         classes = random.sample(classes, limit_classes)
         print('Limiting to {} classes: {}'.format(
             limit_classes, classes
         ))
+
+    if only_filename:
+        classes_filename = 'classes-{}.json'.format(only_filename)
+    elif limit_examples:
+        classes_filename = 'classes-top{}-{}classes.json'.format(limit_examples, limit_classes)
+    else:
+        classes_filename = 'classes.json'
+
+    classes_file = os.path.join(output_dir, classes_filename)
+
+    json.dump(classes, open(classes_file, 'w'))
 
     splits = [s for s in splits if s not in set(ignore_splits)]
     print('Generating outputs for splits = {}'.format(", ".join(splits)))
