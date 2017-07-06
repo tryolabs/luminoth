@@ -99,10 +99,12 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         trainable=False,
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
 
-    optimizer = tf.train.AdamOptimizer()  # TODO: parameter tunning
-
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)  # TODO: parameter tunning
+    grads_and_vars = optimizer.compute_gradients(total_loss)
+    grads_and_vars = [(tf.clip_by_norm(gv[0], 10.), gv[1]) for gv in grads_and_vars]
+    train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     # TODO: We should define `var_list`
-    train_op = optimizer.minimize(total_loss, global_step=global_step)
+    # train_op = optimizer.minimize(total_loss, global_step=global_step)
 
     # Create initializer for variables. Queue-related variables need a special
     # initializer.
