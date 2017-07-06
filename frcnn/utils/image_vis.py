@@ -478,7 +478,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
 
 
 def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
-    print('Show the {} regression errors in batch used for training classifier.'.format('worst' if worst else 'best'))
+    print('Show errors in batch used for training classifier.')
     print('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
@@ -486,12 +486,21 @@ def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
     bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
     bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
 
-    batch_idx = np.where(cls_targets > 0)[0]
+    batch_idx = np.where(cls_targets >= 0)[0]
 
     proposals = proposals[batch_idx]
     cls_targets = cls_targets[batch_idx]
     bbox_offsets_targets = bbox_offsets_targets[batch_idx]
     bbox_offsets = bbox_offsets[batch_idx]
+    cross_entropy_per_proposal = pred_dict['classification_prediction']['cross_entropy_per_proposal']
+
+    foreground_batch_idx = np.where(cls_targets > 0)[0]
+
+    proposals = proposals[foreground_batch_idx]
+    cls_targets = cls_targets[foreground_batch_idx]
+    bbox_offsets_targets = bbox_offsets_targets[foreground_batch_idx]
+    bbox_offsets = bbox_offsets[foreground_batch_idx]
+    cross_entropy_per_proposal = cross_entropy_per_proposal[foreground_batch_idx]
     reg_loss_per_proposal = pred_dict['classification_prediction']['reg_loss_per_proposal']
 
     cls_targets = cls_targets - 1
@@ -503,7 +512,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    for proposal, bbox, cls_target, error in zip(proposals, bboxes, cls_targets, reg_loss_per_proposal):
+    for proposal, bbox, cls_target, reg_error, cls_error in zip(proposals, bboxes, cls_targets, reg_loss_per_proposal, cross_entropy_per_proposal):
         bbox = list(bbox.astype(int))
         proposal = list(proposal.astype(int))
 
@@ -520,7 +529,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
 
         draw.rectangle(bbox, fill=fill, outline=outline)
         draw.rectangle(proposal, fill=proposal_fill, outline=proposal_outline)
-        draw.text(tuple(bbox[:2]), text='{:.3f}'.format(error), font=font, fill=fill)
+        draw.text(tuple(bbox[:2]), text='r{:.3f} - c{:.2f}'.format(reg_error, cls_error), font=font, fill=(0, 0, 0, 150))
 
         draw.line([(proposal[0], proposal[1]), (bbox[0], bbox[1])], fill=(0,0,0,170), width=1)
         draw.line([(proposal[2], proposal[1]), (bbox[2], bbox[1])], fill=(0,0,0,170), width=1)
@@ -581,7 +590,7 @@ def draw_object_prediction(pred_dict, topn=50):
 
 
 def draw_rcnn_input_proposals(pred_dict):
-    print('Display RPN proposals used in training classification. top IoU with GT is displayed.')
+    print('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     gt_boxes = pred_dict['gt_boxes'][:,:4]
 
