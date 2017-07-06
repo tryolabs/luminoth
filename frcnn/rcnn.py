@@ -80,8 +80,8 @@ class RCNN(snt.AbstractModule):
         proposals_target, bbox_target = self._rcnn_target(
             proposals, gt_boxes)
 
-        objects, objects_labels, objects_labels_prob = self._rcnn_proposal(
-            proposals, bbox_offsets, prob)
+        proposal_prediction = self._rcnn_proposal(
+            proposals, bbox_offsets, prob, im_shape)
 
         variable_summaries(prob, 'prob', ['RCNN'])
         variable_summaries(bbox_offsets, 'bbox_offsets', ['RCNN'])
@@ -91,9 +91,10 @@ class RCNN(snt.AbstractModule):
         prediction_dict['bbox_offsets'] = bbox_offsets
         prediction_dict['cls_target'] = proposals_target
         prediction_dict['bbox_offsets_target'] = bbox_target
-        prediction_dict['objects'] = objects
-        prediction_dict['objects_labels'] = objects_labels
-        prediction_dict['objects_labels_prob'] = objects_labels_prob
+        prediction_dict['proposal_prediction'] = proposal_prediction
+        prediction_dict['objects'] = proposal_prediction['objects']
+        prediction_dict['objects_labels'] = proposal_prediction['proposal_label']
+        prediction_dict['objects_labels_prob'] = proposal_prediction['proposal_label_prob']
 
         return prediction_dict
 
