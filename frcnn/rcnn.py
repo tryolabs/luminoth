@@ -25,21 +25,28 @@ class RCNN(snt.AbstractModule):
     def _instantiate_layers(self):
         with self._enter_variable_scope():
 
+            fc_initializer = tf.contrib.layers.variance_scaling_initializer(
+                factor=1., uniform=True, mode='FAN_AVG'
+            )
+
             self._layers = [
                 snt.Linear(
                     layer_size,
                     name="fc_{}".format(i),
+                    initializers={'w': fc_initializer}
                 )
                 for i, layer_size in enumerate(self._layer_sizes)
             ]
 
             self._classifier_layer = snt.Linear(
-                self._num_classes + 1, name="fc_classifier"
+                self._num_classes + 1, name="fc_classifier",
+                initializers={'w': fc_initializer}
             )
 
             # TODO: Not random initializer
             self._bbox_layer = snt.Linear(
-                self._num_classes * 4, name="fc_bbox"
+                self._num_classes * 4, name="fc_bbox",
+                initializers={'w': fc_initializer},
             )
 
             self._rcnn_target = RCNNTarget(self._num_classes)
