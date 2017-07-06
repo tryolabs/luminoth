@@ -534,6 +534,27 @@ def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
     imgcat_pil(image_pil)
 
 
+def recalculate_objects(pred_dict):
+    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
+    proposals_prob = pred_dict['classification_prediction']['cls_prob']
+    proposals_target = proposals_prob.argmax(axis=1) - 1
+    bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
+    objects = pred_dict['classification_prediction']['objects']
+
+    bbox_offsets = bbox_offsets[proposals_target >= 0]
+    proposals = proposals[proposals_target >= 0]
+    proposals_target = proposals_target[proposals_target >= 0]
+
+    import ipdb; ipdb.set_trace()
+
+    bbox_offsets_idx_pairs = np.stack(np.array([proposals_target * 4, proposals_target * 4 + 1, proposals_target * 4 + 2, proposals_target * 4 + 3]), axis=1)
+    bbox_offsets = np.take(bbox_offsets, bbox_offsets_idx_pairs.astype(np.int))
+
+    bboxes = bbox_transform_inv(proposals, bbox_offsets)
+
+    return bboxes, proposals_target
+
+
 def draw_object_prediction(pred_dict, topn=50):
     print('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
@@ -543,12 +564,6 @@ def draw_object_prediction(pred_dict, topn=50):
     if len(objects_labels) == 0:
         tf.logging.warning('No objects detected. Probably all classified as background.')
 
-    sorted_idx = objects_labels_prob.argsort()
-
-    objects = objects[sorted_idx]
-    objects_labels = objects_labels[sorted_idx]
-    objects_labels_prob = objects_labels_prob[sorted_idx]
-
     image_pil, draw = get_image_draw(pred_dict)
 
     for num_object, (object_, label, prob) in enumerate(zip(objects, objects_labels, objects_labels_prob)):
@@ -556,13 +571,17 @@ def draw_object_prediction(pred_dict, topn=50):
         draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
         draw.text(tuple([bbox[0], bbox[1]]), text='{} - {:.2f}'.format(label, prob), font=font, fill=(0, 0, 0, 255))
 
-        if num_object >= topn:
-            break
+    # bboxes, classes = recalculate_objects(pred_dict)
+    # for bbox, label in zip(bboxes, classes):
+    #     bbox = list(bbox)
+    #     draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+    #     draw.text(tuple([bbox[0], bbox[1]]), text='{}'.format(label), font=font, fill=(0, 0, 0, 255))
 
     imgcat_pil(image_pil)
 
 
 def draw_rcnn_input_proposals(pred_dict):
+    print('Display RPN proposals used in training classification. top IoU with GT is displayed.')
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     gt_boxes = pred_dict['gt_boxes'][:,:4]
 
