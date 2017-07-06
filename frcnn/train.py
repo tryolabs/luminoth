@@ -24,9 +24,10 @@ from .utils.image_vis import *  # debug
 @click.option('--with-rcnn', default=True, type=bool)
 @click.option('--no-log', is_flag=True)
 @click.option('--display-every', default=1, type=int)
+@click.option('--random-shuffle', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           checkpoint_file, ignore_scope, log_dir, save_every, debug, run_name,
-          with_rcnn, no_log, display_every):
+          with_rcnn, no_log, display_every, random_shuffle):
 
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -34,7 +35,9 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = FasterRCNN(Config, num_classes=num_classes, with_rcnn=with_rcnn)
-    dataset = TFRecordDataset(Config, num_classes=num_classes)
+    dataset = TFRecordDataset(
+        Config, num_classes=num_classes, random_shuffle=random_shuffle
+    )
     train_dataset = dataset()
 
     train_image = train_dataset['image']
