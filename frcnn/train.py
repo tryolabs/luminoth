@@ -19,6 +19,7 @@ from .utils.image_vis import *  # debug
 @click.option('--ignore-scope')
 @click.option('--log-dir', default='/tmp/frcnn/')
 @click.option('--save-every', default=10)
+@click.option('--tf-debug', is_flag=True)
 @click.option('--debug', is_flag=True)
 @click.option('--run-name', default='train')
 @click.option('--with-rcnn', default=True, type=bool)
@@ -26,15 +27,15 @@ from .utils.image_vis import *  # debug
 @click.option('--display-every', default=1, type=int)
 @click.option('--random-shuffle', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
-          checkpoint_file, ignore_scope, log_dir, save_every, debug, run_name,
-          with_rcnn, no_log, display_every, random_shuffle):
+          checkpoint_file, ignore_scope, log_dir, save_every, tf_debug, debug,
+          run_name, with_rcnn, no_log, display_every, random_shuffle):
 
-    if debug:
+    if debug or tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    model = FasterRCNN(Config, num_classes=num_classes, with_rcnn=with_rcnn)
+    model = FasterRCNN(Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn)
     dataset = TFRecordDataset(
         Config, num_classes=num_classes, random_shuffle=random_shuffle
     )
@@ -143,7 +144,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         count_images = 0
 
-        if debug:
+        if tf_debug:
             from tensorflow.python import debug as tf_debug
             sess = tf_debug.LocalCLIDebugWrapperSession(sess)
             sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
@@ -157,7 +158,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     prediction_dict, train_filename, train_scale_factor, metric_ops
                 ], run_metadata=run_metadata)
 
-                if step % display_every == 0:
+                if debug and step % display_every == 0:
                     print('Scaled image with {}'.format(scale_factor))
                     print('Image size: {}'.format(pred_dict['image_shape']))
                     draw_anchors(pred_dict)
@@ -184,7 +185,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         # We don't support partial saver.
                         saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
-                    if not debug:
+                    if not tf_debug:
                         values = sess.run(metrics)
                         writer.add_summary(summary, step)
                         writer.add_run_metadata(run_metadata, 'step{}'.format(step))

@@ -17,7 +17,7 @@ from .utils.vars import variable_summaries
 
 class RPN(snt.AbstractModule):
 
-    def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3], name='rpn'):
+    def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3], debug=False, name='rpn'):
         """RPN - Region Proposal Network
 
         This module works almost independently from the Faster RCNN module.
@@ -29,6 +29,9 @@ class RPN(snt.AbstractModule):
         self._num_anchors = num_anchors
         self._num_channels = num_channels
         self._kernel_shape = kernel_shape
+
+        # TODO: Remove debug mode?
+        self._debug = debug
 
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.01"
@@ -106,21 +109,22 @@ class RPN(snt.AbstractModule):
 
         # TODO: Remove unnecesary variables from prediction dictionary.
         prediction_dict = {
-            # 'rpn_feature': rpn_feature,
-            'rpn_cls_prob': rpn_cls_prob,
-            'rpn_cls_score': rpn_cls_score,
-            # 'rpn_cls_score_original': rpn_cls_score_original,
-            'rpn_bbox_pred': rpn_bbox_pred,
-            # 'rpn_bbox_pred_original': rpn_bbox_pred_original,
             'proposals': proposal_prediction['nms_proposals'],
             'scores': proposal_prediction['nms_proposals_scores'],
-            'proposal_prediction': proposal_prediction,
         }
 
+        if self._debug:
+            prediction_dict['proposal_prediction'] = proposal_prediction
+
         if is_training:
+            prediction_dict['rpn_cls_prob'] = rpn_cls_prob
+            prediction_dict['rpn_cls_score'] = rpn_cls_score
+            prediction_dict['rpn_bbox_pred'] = rpn_bbox_pred
             prediction_dict['rpn_cls_target'] = rpn_cls_target
             prediction_dict['rpn_bbox_target'] = rpn_bbox_target
-            prediction_dict['rpn_max_overlap'] = rpn_max_overlap
+
+            if self._debug:
+                prediction_dict['rpn_max_overlap'] = rpn_max_overlap
 
         return prediction_dict
 

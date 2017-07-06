@@ -11,12 +11,15 @@ from .utils.vars import variable_summaries
 class RCNN(snt.AbstractModule):
     """RCNN """
 
-    def __init__(self, num_classes, layer_sizes=[4096, 4096], name='rcnn'):
+    def __init__(self, num_classes, layer_sizes=[4096, 4096], debug=False, name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
         self._layer_sizes = layer_sizes
         self._activation = tf.nn.relu
         self._dropout_keep_prob = 0.6
+
+        self._debug = debug
+
         self._instantiate_layers()
 
     def _instantiate_layers(self):
@@ -91,10 +94,12 @@ class RCNN(snt.AbstractModule):
         prediction_dict['bbox_offsets'] = bbox_offsets
         prediction_dict['cls_target'] = proposals_target
         prediction_dict['bbox_offsets_target'] = bbox_target
-        prediction_dict['proposal_prediction'] = proposal_prediction
         prediction_dict['objects'] = proposal_prediction['objects']
         prediction_dict['objects_labels'] = proposal_prediction['proposal_label']
         prediction_dict['objects_labels_prob'] = proposal_prediction['proposal_label_prob']
+
+        if self._debug:
+            prediction_dict['proposal_prediction'] = proposal_prediction
 
         return prediction_dict
 

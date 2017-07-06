@@ -16,12 +16,13 @@ from .utils.image import draw_bboxes, normalize_bboxes
 class FasterRCNN(snt.AbstractModule):
     """Faster RCNN Network"""
 
-    def __init__(self, config, with_rcnn=True, num_classes=None, name='fasterrcnn'):
+    def __init__(self, config, debug=False, with_rcnn=True, num_classes=None, name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
         self._cfg = config
         self._num_classes = num_classes
         self._with_rcnn = with_rcnn
+        self._debug = debug
 
         self._anchor_base_size = self._cfg.ANCHOR_BASE_SIZE
         self._anchor_scales = np.array(self._cfg.ANCHOR_SCALES)
@@ -41,10 +42,10 @@ class FasterRCNN(snt.AbstractModule):
 
         with self._enter_variable_scope():
             self._pretrained = VGG(trainable=self._cfg.PRETRAINED_TRAINABLE)
-            self._rpn = RPN(self._num_anchors)
+            self._rpn = RPN(self._num_anchors, debug=self._debug)
             if self._with_rcnn:
                 self._roi_pool = ROIPoolingLayer()
-                self._rcnn = RCNN(self._num_classes)
+                self._rcnn = RCNN(self._num_classes, debug=self._debug)
 
     def _build(self, image, gt_boxes, is_training=True):
         """
@@ -74,13 +75,14 @@ class FasterRCNN(snt.AbstractModule):
         )
 
         prediction_dict = {
-            'image': image,
-            'image_shape': image_shape,
-            'all_anchors': all_anchors,
-            'gt_boxes': gt_boxes,
-            # 'pretrained_feature_map': pretrained_feature_map,
             'rpn_prediction': rpn_prediction,
         }
+
+        if self._debug:
+            prediction_dict['image'] = image
+            prediction_dict['image_shape'] = image_shape
+            prediction_dict['all_anchors'] = all_anchors
+            prediction_dict['gt_boxes'] = gt_boxes
 
         if self._with_rcnn:
             roi_pool = self._roi_pool(rpn_prediction['proposals'], pretrained_feature_map)
