@@ -1,6 +1,9 @@
 import sonnet as snt
 import tensorflow as tf
 
+_R_MEAN = 123.68
+_G_MEAN = 116.78
+_B_MEAN = 103.94
 
 class Pretrained(snt.AbstractModule):
     def __init__(self, name='pretrained'):
@@ -46,3 +49,10 @@ class Pretrained(snt.AbstractModule):
         load_op = tf.group(*load_variables)
 
         return load_op
+
+    def _substract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
+        num_channels = len(means)
+        channels = tf.split(axis=3, num_or_size_splits=num_channels, value=inputs)
+        for i in range(num_channels):
+            channels[i] -= means[i]
+        return tf.concat(axis=3, values=channels)
