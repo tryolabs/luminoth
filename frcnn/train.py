@@ -76,7 +76,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         # TODO: Calling _pretrained _load_weights sucks. We need better abstraction
         # Maybe handle it inside the model?
         # TODO: Prefixes should be known by the model?
-        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='vgg_16/', new_prefix='fasterrcnn/vgg/')
+        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_101/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_101/')
     else:
         load_op = tf.no_op(name='not_loading_pretrained')
 
