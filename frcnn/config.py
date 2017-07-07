@@ -16,4 +16,4 @@ class Config:
     IMAGE_MAX_SIZE = 1024
 
     # Pretrained
-    PRETRAINED_TRAINABLE = False
+    PRETRAINED_TRAINABLE = True
