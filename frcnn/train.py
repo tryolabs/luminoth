@@ -101,7 +101,8 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)  # TODO: parameter tunning
     grads_and_vars = optimizer.compute_gradients(total_loss)
-    grads_and_vars = [(tf.clip_by_norm(gv[0], 10.), gv[1]) for gv in grads_and_vars]
+    # Clip by norm. Grad can be null when not training some modules.
+    grads_and_vars = [(tf.clip_by_norm(gv[0], 10.), gv[1]) if gv[0] is not None else gv for gv in grads_and_vars]
     train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     # TODO: We should define `var_list`
     # train_op = optimizer.minimize(total_loss, global_step=global_step)
@@ -171,11 +172,11 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     draw_rpn_bbox_pred(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
-                    draw_object_prediction(pred_dict)
                     draw_rcnn_cls_batch(pred_dict)
                     draw_rcnn_input_proposals(pred_dict)
                     draw_rcnn_cls_batch_errors(pred_dict, worst=False)
                     draw_rcnn_reg_batch_errors(pred_dict)
+                    draw_object_prediction(pred_dict)
 
                 count_images += 1
 
@@ -191,6 +192,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         values = sess.run(metrics)
                         writer.add_summary(summary, step)
                         writer.add_run_metadata(run_metadata, 'step{}'.format(step))
+
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(step, train_loss))
