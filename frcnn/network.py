@@ -3,7 +3,7 @@ import sonnet as snt
 import tensorflow as tf
 
 from .dataset import TFRecordDataset
-from .pretrained import VGG
+from .pretrained import VGG, ResNetV2
 from .rcnn import RCNN
 from .roi_pool import ROIPoolingLayer
 from .rpn import RPN
@@ -41,10 +41,10 @@ class FasterRCNN(snt.AbstractModule):
         self._rcnn_reg_loss_weight = 2.0
 
         with self._enter_variable_scope():
-            self._pretrained = VGG(trainable=self._cfg.PRETRAINED_TRAINABLE)
+            self._pretrained = ResNetV2(trainable=self._cfg.PRETRAINED_TRAINABLE)
             self._rpn = RPN(self._num_anchors, debug=self._debug)
             if self._with_rcnn:
-                self._roi_pool = ROIPoolingLayer()
+                self._roi_pool = ROIPoolingLayer(debug=self._debug)
                 self._rcnn = RCNN(self._num_classes, debug=self._debug)
 
     def _build(self, image, gt_boxes, is_training=True):
@@ -67,7 +67,8 @@ class FasterRCNN(snt.AbstractModule):
                 we have (x1, y1, x2, y2)
         """
         image_shape = tf.shape(image)[1:3]
-        pretrained_feature_map = self._pretrained(image)
+        pretrained_dict = self._pretrained(image, is_training=is_training)
+        pretrained_feature_map = pretrained_dict['net']
         all_anchors = self._generate_anchors(pretrained_feature_map)
         rpn_prediction = self._rpn(
             pretrained_feature_map, gt_boxes, image_shape, all_anchors,
@@ -83,17 +84,19 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['image_shape'] = image_shape
             prediction_dict['all_anchors'] = all_anchors
             prediction_dict['gt_boxes'] = gt_boxes
+            prediction_dict['pretrained_dict'] = pretrained_dict
 
         if self._with_rcnn:
-            roi_pool = self._roi_pool(rpn_prediction['proposals'], pretrained_feature_map)
+            roi_prediction = self._roi_pool(rpn_prediction['proposals'], pretrained_feature_map, image_shape)
 
             # TODO: Missing mapping classification_bbox to real coordinates.
             # (and trimming, and NMS?)
             classification_prediction = self._rcnn(
-                roi_pool, rpn_prediction['proposals'], gt_boxes, image_shape)
+                roi_prediction['roi_pool'], rpn_prediction['proposals'], gt_boxes, image_shape)
 
             prediction_dict['classification_prediction'] = classification_prediction
-            # prediction_dict['roi_pool'] = roi_pool
+            if self._debug:
+                prediction_dict['roi_prediction'] = roi_prediction
 
 
         # rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
