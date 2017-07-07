@@ -103,7 +103,7 @@ class RCNNProposal(snt.AbstractModule):
             class_prob = tf.boolean_mask(proposal_label_prob, class_filter)
 
             class_selected_idx = tf.image.non_max_suppression(
-                class_objects_tf, class_prob, 10, iou_threshold=0.6
+                class_objects_tf, class_prob, 100, iou_threshold=0.6
             )
 
             class_objects_tf = tf.gather(class_objects_tf, class_selected_idx)

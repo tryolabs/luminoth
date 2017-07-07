@@ -15,7 +15,7 @@ class RCNN(snt.AbstractModule):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
         self._layer_sizes = layer_sizes
-        self._activation = tf.nn.relu
+        self._activation = tf.nn.relu6
         self._dropout_keep_prob = 0.6
 
         self._debug = debug
