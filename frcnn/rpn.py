@@ -97,8 +97,9 @@ class RPN(snt.AbstractModule):
         if is_training:
             # When training we use a separate module to calculate the target
             # values we want to output.
-            rpn_cls_target, rpn_bbox_target, rpn_max_overlap = self._anchor_target(
-                tf.shape(pretrained_feature_map), gt_boxes, image_shape, all_anchors)
+            with tf.device('/cpu:0'):
+                rpn_cls_target, rpn_bbox_target, rpn_max_overlap = self._anchor_target(
+                    tf.shape(pretrained_feature_map), gt_boxes, image_shape, all_anchors)
 
         # TODO: Better way to log variable summaries.
         variable_summaries(self._rpn.w, 'rpn_conv_W', ['RPN'])

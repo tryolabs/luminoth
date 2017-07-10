@@ -73,7 +73,9 @@ class RCNN(snt.AbstractModule):
         flatten_net = tf.contrib.layers.flatten(pooled_layer)
         net = tf.identity(flatten_net)
 
-        prediction_dict['flatten_net'] = net  # TODO: debug tmp
+        if self._debug:
+            prediction_dict['flatten_net'] = net  # TODO: debug tmp
+
         # After flattening we are lef with a (num_proposals, pool_height * pool_width * 512) tensor.
         # The first dimension works as batch size when applied to snt.Linear.
         for i, layer in enumerate(self._layers):
@@ -87,8 +89,9 @@ class RCNN(snt.AbstractModule):
         prob = tf.nn.softmax(cls_score, dim=1)
         bbox_offsets = self._bbox_layer(net)
 
-        proposals_target, bbox_target = self._rcnn_target(
-            proposals, gt_boxes)
+        with tf.device('cpu:0'):
+            proposals_target, bbox_target = self._rcnn_target(
+                proposals, gt_boxes)
 
         proposal_prediction = self._rcnn_proposal(
             proposals, bbox_offsets, prob, im_shape)
@@ -168,7 +171,8 @@ class RCNN(snt.AbstractModule):
                     labels=cls_target_one_hot, logits=cls_score_labeled
                 )
 
-                prediction_dict['cross_entropy_per_proposal'] = cross_entropy_per_proposal
+                if self._debug:
+                    prediction_dict['cross_entropy_per_proposal'] = cross_entropy_per_proposal
 
                 # Second we need to calculate the smooth l1 loss between
                 # `bbox_offsets` and `bbox_offsets_target`.
@@ -207,7 +211,8 @@ class RCNN(snt.AbstractModule):
                 reg_loss_per_proposal = smooth_l1_loss(
                     bbox_offset_cleaned, bbox_offsets_target_labeled)
 
-                prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+                if self._debug:
+                    prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
 
                 # Hack to avoid having nan loss.
                 # reg_loss = tf.cond(tf.is_nan(reg_loss), lambda: tf.constant(0.0, dtype=tf.float32), lambda: reg_loss)
