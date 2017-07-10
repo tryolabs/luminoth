@@ -69,11 +69,12 @@ class FasterRCNN(snt.AbstractModule):
         image_shape = tf.shape(image)[1:3]
         pretrained_dict = self._pretrained(image, is_training=is_training)
         pretrained_feature_map = pretrained_dict['net']
-        all_anchors = self._generate_anchors(pretrained_feature_map)
-        rpn_prediction = self._rpn(
-            pretrained_feature_map, gt_boxes, image_shape, all_anchors,
-            is_training=is_training
-        )
+        with tf.device('/cpu:0'):
+            all_anchors = self._generate_anchors(pretrained_feature_map)
+            rpn_prediction = self._rpn(
+                pretrained_feature_map, gt_boxes, image_shape, all_anchors,
+                is_training=is_training
+            )
 
         prediction_dict = {
             'rpn_prediction': rpn_prediction,
@@ -91,8 +92,9 @@ class FasterRCNN(snt.AbstractModule):
 
             # TODO: Missing mapping classification_bbox to real coordinates.
             # (and trimming, and NMS?)
-            classification_prediction = self._rcnn(
-                roi_prediction['roi_pool'], rpn_prediction['proposals'], gt_boxes, image_shape)
+            with tf.device('/cpu:0'):
+                classification_prediction = self._rcnn(
+                    roi_prediction['roi_pool'], rpn_prediction['proposals'], gt_boxes, image_shape)
 
             prediction_dict['classification_prediction'] = classification_prediction
             if self._debug:

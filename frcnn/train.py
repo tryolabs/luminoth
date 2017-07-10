@@ -76,7 +76,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         # TODO: Calling _pretrained _load_weights sucks. We need better abstraction
         # Maybe handle it inside the model?
         # TODO: Prefixes should be known by the model?
-        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_101/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_101/')
+        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_50/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_50/')
     else:
         load_op = tf.no_op(name='not_loading_pretrained')
 
@@ -101,8 +101,15 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)  # TODO: parameter tunning
     grads_and_vars = optimizer.compute_gradients(total_loss)
+
     # Clip by norm. Grad can be null when not training some modules.
-    grads_and_vars = [(tf.clip_by_norm(gv[0], 10.), gv[1]) if gv[0] is not None else gv for gv in grads_and_vars]
+    with tf.name_scope('clip_gradients_by_norm'):
+        grads_and_vars = [
+            (tf.clip_by_norm(gv[0], 10.), gv[1])
+            if gv[0] is not None else gv
+            for gv in grads_and_vars
+        ]
+
     train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
     # TODO: We should define `var_list`
     # train_op = optimizer.minimize(total_loss, global_step=global_step)
@@ -155,11 +162,14 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         try:
             while not coord.should_stop():
                 run_metadata = tf.RunMetadata()
+                run_options = tf.RunOptions(
+                    trace_level=tf.RunOptions.FULL_TRACE
+                )
 
                 _, summary, train_loss, step, pred_dict, filename, scale_factor, *_ = sess.run([
                     train_op, summarizer, total_loss, global_step,
                     prediction_dict, train_filename, train_scale_factor, metric_ops
-                ], run_metadata=run_metadata)
+                ], run_metadata=run_metadata, options=run_options)
 
                 if debug and step % display_every == 0:
                     print('Scaled image with {}'.format(scale_factor))
@@ -189,7 +199,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
 
                     if not tf_debug:
-                        values = sess.run(metrics)
+                        values = sess.run(metrics, run_metadata=run_metadata, options=run_options)
                         writer.add_summary(summary, step)
                         writer.add_run_metadata(run_metadata, 'step{}'.format(step))
 
