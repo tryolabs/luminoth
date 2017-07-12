@@ -89,9 +89,8 @@ class RCNN(snt.AbstractModule):
         prob = tf.nn.softmax(cls_score, dim=1)
         bbox_offsets = self._bbox_layer(net)
 
-        with tf.device('cpu:0'):
-            proposals_target, bbox_target = self._rcnn_target(
-                proposals, gt_boxes)
+        proposals_target, bbox_target = self._rcnn_target(
+            proposals, gt_boxes)
 
         proposal_prediction = self._rcnn_proposal(
             proposals, bbox_offsets, prob, im_shape)

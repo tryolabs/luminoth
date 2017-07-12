@@ -36,7 +36,9 @@ class RPN(snt.AbstractModule):
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.01"
         # we use the truncated version (redraws when more than 2 std from mean.)
-        self._initializer = tf.truncated_normal_initializer(mean=0.0, stddev=0.01)
+        self._initializer = tf.contrib.layers.variance_scaling_initializer(
+            factor=1., uniform=True, mode='FAN_AVG'
+        )
 
         # We could use normal relu without any problems.
         self._rpn_activation = tf.nn.relu6
@@ -97,17 +99,19 @@ class RPN(snt.AbstractModule):
         if is_training:
             # When training we use a separate module to calculate the target
             # values we want to output.
-            with tf.device('/cpu:0'):
-                rpn_cls_target, rpn_bbox_target, rpn_max_overlap = self._anchor_target(
-                    tf.shape(pretrained_feature_map), gt_boxes, image_shape, all_anchors)
+            rpn_cls_target, rpn_bbox_target, rpn_max_overlap = self._anchor_target(
+                tf.shape(pretrained_feature_map), gt_boxes, image_shape, all_anchors)
 
         # TODO: Better way to log variable summaries.
-        variable_summaries(self._rpn.w, 'rpn_conv_W', ['RPN'])
-        variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['RPN'])
-        variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['RPN'])
+        # variable_summaries(self._rpn.w, 'rpn_conv_W', ['RPN'])
+        # variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['RPN'])
+        # variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['RPN'])
 
         variable_summaries(proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['RPN'])
         variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['RPN'])
+        variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['RPN'])
+        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['RPN'])
+        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['RPN'])
 
         # TODO: Remove unnecesary variables from prediction dictionary.
         prediction_dict = {
@@ -167,7 +171,7 @@ class RPN(snt.AbstractModule):
         # - then we can use `tf.losses.log_loss` which returns a tensor.
 
         with self._enter_variable_scope():
-            with tf.name_scope('RPNLoss'):
+            with tf.variable_scope('RPNLoss'):
                 # Flatten already flat Tensor for usage as boolean mask filter.
                 rpn_cls_target = tf.cast(tf.reshape(
                     rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')

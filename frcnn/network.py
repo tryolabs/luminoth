@@ -11,6 +11,7 @@ from .rpn import RPN
 from .utils.generate_anchors import generate_anchors as generate_anchors_reference
 from .utils.ops import meshgrid
 from .utils.image import draw_bboxes, normalize_bboxes
+from .utils.vars import variable_summaries
 
 
 class FasterRCNN(snt.AbstractModule):
@@ -69,8 +70,10 @@ class FasterRCNN(snt.AbstractModule):
         image_shape = tf.shape(image)[1:3]
         pretrained_dict = self._pretrained(image, is_training=is_training)
         pretrained_feature_map = pretrained_dict['net']
-        with tf.device('/cpu:0'):
-            all_anchors = self._generate_anchors(pretrained_feature_map)
+
+        variable_summaries(pretrained_feature_map, 'pretrained_feature_map', ['RPN'])
+
+        all_anchors = self._generate_anchors(pretrained_feature_map)
         rpn_prediction = self._rpn(
             pretrained_feature_map, gt_boxes, image_shape, all_anchors,
             is_training=is_training
@@ -146,7 +149,7 @@ class FasterRCNN(snt.AbstractModule):
 
     def _generate_anchors(self, feature_map):
         with self._enter_variable_scope():
-            with tf.name_scope('generate_anchors'):
+            with tf.variable_scope('generate_anchors'):
                 feature_map_shape = tf.shape(feature_map)[1:3]
                 grid_width = feature_map_shape[1]
                 grid_height = feature_map_shape[0]
