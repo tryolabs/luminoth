@@ -7,7 +7,10 @@ import click
 from .network import FasterRCNN
 from .config import Config
 from .dataset import TFRecordDataset
-from .utils.image_vis import *  # debug
+
+# debug
+from tensorflow.python.client import timeline
+from .utils.image_vis import *
 
 
 @click.command()
@@ -76,7 +79,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         # TODO: Calling _pretrained _load_weights sucks. We need better abstraction
         # Maybe handle it inside the model?
         # TODO: Prefixes should be known by the model?
-        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_50/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_50/')
+        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_101/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_101/')
     else:
         load_op = tf.no_op(name='not_loading_pretrained')
 
@@ -84,23 +87,21 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     initial_learning_rate = 0.0001
 
-    learning_rate = tf.get_variable(
-        "learning_rate",
-        shape=[],
-        dtype=tf.float32,
+    learning_rate = tf.get_variable("learning_rate",
+        shape=[], dtype=tf.float32,
         initializer=tf.constant_initializer(initial_learning_rate),
-        trainable=False)
+        trainable=False
+    )
 
-    global_step = tf.get_variable(
-        name="global_step",
-        shape=[],
-        dtype=tf.int64,
-        initializer=tf.zeros_initializer(),
-        trainable=False,
-        collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
+    global_step = tf.get_variable(name="global_step",
+        shape=[],dtype=tf.int64,
+        initializer=tf.zeros_initializer(), trainable=False,
+        collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
+    )
 
     optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)  # TODO: parameter tunning
-    grads_and_vars = optimizer.compute_gradients(total_loss)
+    trainable_vars = [v for v in snt.get_variables_in_scope(model) if 'resnet' not in v.name]
+    grads_and_vars = optimizer.compute_gradients(total_loss, trainable_vars)
 
     # Clip by norm. Grad can be null when not training some modules.
     with tf.name_scope('clip_gradients_by_norm'):
@@ -171,6 +172,9 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     prediction_dict, train_filename, train_scale_factor, metric_ops
                 ], run_metadata=run_metadata, options=run_options)
 
+                writer.add_summary(summary, step)
+                writer.add_run_metadata(run_metadata, 'step{}'.format(step))
+
                 if debug and step % display_every == 0:
                     print('Scaled image with {}'.format(scale_factor))
                     print('Image size: {}'.format(pred_dict['image_shape']))
@@ -188,6 +192,11 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     draw_rcnn_reg_batch_errors(pred_dict)
                     draw_object_prediction(pred_dict)
 
+                    fetched_timeline = timeline.Timeline(run_metadata.step_stats)
+                    chrome_trace = fetched_timeline.generate_chrome_trace_format()
+                    with open('timeline_{}.json'.format(step), 'w') as f:
+                        f.write(chrome_trace)
+
                 count_images += 1
 
                 tf.logging.info('train_loss: {}'.format(train_loss))
@@ -197,12 +206,6 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     if step % save_every == 0:
                         # We don't support partial saver.
                         saver.save(sess, os.path.join(model_dir, model.scope_name), global_step=step)
-
-                    if not tf_debug:
-                        values = sess.run(metrics, run_metadata=run_metadata, options=run_options)
-                        writer.add_summary(summary, step)
-                        writer.add_run_metadata(run_metadata, 'step{}'.format(step))
-
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(step, train_loss))
