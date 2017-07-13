@@ -20,35 +20,37 @@ class ROIPoolingLayer(snt.AbstractModule):
 
     def _get_bboxes(self, roi_proposals, im_shape):
         """
-        Get normalized coordinates for RoIs (betweetn 0 and 1 for easy cropping)
+        Get normalized coordinates for RoIs (between 0 and 1 for easy cropping)
         in TF order (y1, x1, y2, x2)
         """
         im_shape = tf.cast(im_shape, tf.float32)
 
-        _, x1, y1, x2, y2 = tf.split(value=roi_proposals, num_or_size_splits=5, axis=1)
+        _, x1, y1, x2, y2 = tf.unstack(value=roi_proposals, num_or_size_splits=5, axis=1)
 
         x1 = x1 / im_shape[1]
         y1 = y1 / im_shape[0]
         x2 = x2 / im_shape[1]
         y2 = y2 / im_shape[0]
 
-        # Won't be backpropagated to rois anyway, but to save time TODO: Remove?
+        # Won't be backpropagated to rois anyway, but to save time TODO: Remove
         bboxes = tf.concat([y1, x1, y2, x2], axis=1)
 
         return bboxes
 
     def _roi_crop(self, roi_proposals, pretrained, im_shape):
         bboxes = self._get_bboxes(roi_proposals, im_shape)
-        # TODO: Why?!!?
-        # batch_ids = tf.squeeze(tf.slice(roi_proposals, [0, 0], [-1, 1], name="batch_id"), [1])
         bboxes_shape = tf.shape(bboxes)
         batch_ids = tf.zeros((bboxes_shape[0], ), dtype=tf.int32)
         crops = tf.image.crop_and_resize(
-            pretrained, bboxes, batch_ids, [self._pooled_width * 2, self._pooled_height * 2], name="crops"
+            pretrained, bboxes, batch_ids,
+            [self._pooled_width * 2, self._pooled_height * 2], name="crops"
         )
 
         prediction_dict = {
-            'roi_pool': slim.max_pool2d(crops, [2, 2], stride=2)
+            'roi_pool': tf.nn.max_pool(
+                crops, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                padding='VALID'
+            ),
         }
 
         if self._debug:
@@ -68,4 +70,5 @@ class ROIPoolingLayer(snt.AbstractModule):
         elif self._pooling_mode == ROI_POOLING:
             return self._roi_pooling(roi_proposals, pretrained, im_shape)
         else:
-            raise NotImplemented('Pooling mode {} does not exist.'.format(self._pooling_mode))
+            raise NotImplemented(
+                'Pooling mode {} does not exist.'.format(self._pooling_mode))

@@ -68,7 +68,7 @@ class RCNN(snt.AbstractModule):
 
         prediction_dict = {}
 
-        # We treat num proposals as batch number so that when flattening we actually
+        # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
         flatten_net = tf.contrib.layers.flatten(pooled_layer)
         net = tf.identity(flatten_net)
@@ -76,14 +76,15 @@ class RCNN(snt.AbstractModule):
         if self._debug:
             prediction_dict['flatten_net'] = net  # TODO: debug tmp
 
-        # After flattening we are lef with a (num_proposals, pool_height * pool_width * 512) tensor.
+        # After flattening we are lef with a
+        # (num_proposals, pool_height * pool_width * 512) tensor.
         # The first dimension works as batch size when applied to snt.Linear.
         for i, layer in enumerate(self._layers):
             net = layer(net)
             prediction_dict['layer_{}_out'.format(i)] = net  # TODO: debug tmp
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
-            variable_summaries(layer.w, 'layer_{}_W'.format(i), ['RCNN'])
+            # TODO: megadebug, low performance: variable_summaries(layer.w, 'layer_{}_W'.format(i), ['RCNN'])
 
         cls_score = self._classifier_layer(net)
         prob = tf.nn.softmax(cls_score, dim=1)
@@ -132,8 +133,8 @@ class RCNN(snt.AbstractModule):
 
                 bbox_offsets: shape (num_proposals, num_classes * 4)
                     Has the offset for each proposal for each class.
-                    We have to compare only the proposals labeled with the offsets
-                    for that label.
+                    We have to compare only the proposals labeled with the
+                    offsets for that label.
 
                 bbox_offsets_target: shape (num_proposals, 4)
                     Has the true offset of each proposal for the true label.

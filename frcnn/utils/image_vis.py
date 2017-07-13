@@ -193,10 +193,20 @@ def draw_batch_proposals(pred_dict):
 
         if target == 1:
             fill = (0, 0, 255, 10)
-            outline_fill = (0, 0, 255, 50)
         else:
             fill = (255, 0, 0, 5)
-            outline_fill = (255, 0, 0, 30)
+
+        if score > 0.5:
+            font_fill = (0, 255, 0, 255)
+            outline_fill = (0, 255, 0, 50)
+        else:
+            font_fill = (255, 0, 0, 255)
+            outline_fill = (255, 0, 0, 50)
+
+        if np.isclose(score, 1.0) or score > 1.0:
+            font_txt = '1'
+        else:
+            font_txt = '{:.2f}'.format(score)[1:]
 
         draw.rectangle(list(proposal), fill=fill, outline=outline_fill)
         x, y = list(proposal)[:2]
@@ -204,16 +214,6 @@ def draw_batch_proposals(pred_dict):
         y = max(y, 0)
 
         score = float(score)
-        if score > 0.5:
-            font_fill = (0, 255, 0, 255)
-        else:
-            font_fill = (255, 0, 0, 255)
-
-        if np.isclose(score, 1.0) or score > 1.0:
-            font_txt = '1'
-        else:
-            font_txt = '{:.2f}'.format(score)[1:]
-
         draw.text(tuple([x, y]), text=font_txt, font=font, fill=font_fill)
 
     gt_boxes = pred_dict['gt_boxes']
@@ -222,12 +222,13 @@ def draw_batch_proposals(pred_dict):
 
     imgcat_pil(image_pil)
 
+
 def draw_top_nms_proposals(pred_dict, min_score=0.8):
     print('Top NMS proposals')
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
     # Remove batch id
-    proposals = proposals[:,1:]
+    proposals = proposals[:, 1:]
     top_scores_mask = scores > min_score
     scores = scores[top_scores_mask]
     proposals = proposals[top_scores_mask]
@@ -477,9 +478,9 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
     imgcat_pil(image_pil)
 
 
-def draw_rcnn_reg_batch_errors(pred_dict, worst=True):
-    print('Show errors in batch used for training classifier.')
-    print('blue => GT, green => foreground, red => background')
+def draw_rcnn_reg_batch_errors(pred_dict):
+    print('Show errors in batch used for training classifier regressor.')
+    print('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['cls_target']
