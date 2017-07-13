@@ -159,8 +159,14 @@ class FasterRCNN(snt.AbstractModule):
                 tf.summary.scalar(loss_name, loss_tensor, collections=['Losses'])
                 tf.losses.add_loss(loss_tensor)
 
+            regularization_loss = tf.losses.get_regularization_loss()
+            no_reg_loss = tf.losses.get_total_loss(add_regularization_losses=False)
             total_loss = tf.losses.get_total_loss()
+
             tf.summary.scalar('total_loss', total_loss, collections=['Losses'])
+            tf.summary.scalar('no_reg_loss', no_reg_loss, collections=['Losses'])
+            tf.summary.scalar('regularization_loss', regularization_loss, collections=['Losses'])
+
             return total_loss
 
     def _generate_anchors(self, feature_map):
