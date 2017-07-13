@@ -34,11 +34,8 @@ class RPN(snt.AbstractModule):
         self._debug = debug
 
         # According to Faster RCNN paper we need to initialize layers with
-        # "from a zero-mean Gaussian distribution with standard deviation 0.01"
-        # we use the truncated version (redraws when more than 2 std from mean.)
-        self._initializer = tf.contrib.layers.variance_scaling_initializer(
-            factor=1., uniform=True, mode='FAN_AVG'
-        )
+        # "from a zero-mean Gaussian distribution with standard deviation 0.0
+        self._initializer = tf.random_normal_initializer(mean=0.0, stddev=0.01)
 
         # We could use normal relu without any problems.
         self._rpn_activation = tf.nn.relu6
