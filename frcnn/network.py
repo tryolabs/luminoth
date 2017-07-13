@@ -121,10 +121,21 @@ class FasterRCNN(snt.AbstractModule):
 
         # rpn_prediction['proposals_normalized'] = normalize_bboxes(image, rpn_prediction['proposals'])
 
-        # tf.summary.image('image', image, max_outputs=20)
-        # tf.summary.image('top_1_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20)
-        # tf.summary.image('top_10_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 10), max_outputs=20)
-        # tf.summary.image('top_20_rpn_boxes', draw_bboxes(image, rpn_prediction['proposals'], 20), max_outputs=20)
+        tf.summary.image('image', image, max_outputs=20)
+        tf.summary.image(
+            'top_1_rpn_boxes',
+            draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20
+        )
+        tf.summary.image(
+            'top_10_rpn_boxes',
+            draw_bboxes(image, rpn_prediction['proposals'], 10),
+            max_outputs=20
+        )
+        tf.summary.image(
+            'top_20_rpn_boxes',
+            draw_bboxes(image, rpn_prediction['proposals'], 20),
+            max_outputs=20
+        )
 
         return prediction_dict
 
@@ -170,36 +181,40 @@ class FasterRCNN(snt.AbstractModule):
             return total_loss
 
     def _generate_anchors(self, feature_map):
-        with self._enter_variable_scope():
-            with tf.variable_scope('generate_anchors'):
-                feature_map_shape = tf.shape(feature_map)[1:3]
-                grid_width = feature_map_shape[1]
-                grid_height = feature_map_shape[0]
-                shift_x = tf.range(grid_width) * self._anchor_stride
-                shift_y = tf.range(grid_height) * self._anchor_stride
-                shift_x, shift_y = meshgrid(shift_x, shift_y)
+        with tf.variable_scope('generate_anchors'):
+            feature_map_shape = tf.shape(feature_map)[1:3]
+            grid_width = feature_map_shape[1]
+            grid_height = feature_map_shape[0]
+            shift_x = tf.range(grid_width) * self._anchor_stride
+            shift_y = tf.range(grid_height) * self._anchor_stride
+            shift_x, shift_y = meshgrid(shift_x, shift_y)
 
-                shift_x = tf.reshape(shift_x, [-1])
-                shift_y = tf.reshape(shift_y, [-1])
+            shift_x = tf.reshape(shift_x, [-1])
+            shift_y = tf.reshape(shift_y, [-1])
 
-                shifts = tf.stack(
-                    [shift_x, shift_y, shift_x, shift_y],
-                    axis=0
+            shifts = tf.stack(
+                [shift_x, shift_y, shift_x, shift_y],
+                axis=0
+            )
+
+            shifts = tf.transpose(shifts)
+            # Shifts now is a (H x W, 4) Tensor
+
+            num_anchors = self._anchor_reference.shape[0]
+            num_anchor_points = tf.shape(shifts)[0]
+
+            all_anchors = (
+                self._anchor_reference.reshape((1, num_anchors, 4)) +
+                tf.transpose(
+                    tf.reshape(shifts, (1, num_anchor_points, 4)),
+                    (1, 0, 2)
                 )
+            )
 
-                shifts = tf.transpose(shifts)
-                # Shifts now is a (H x W, 4) Tensor
-
-                num_anchors = self._anchor_reference.shape[0]
-                num_anchor_points = tf.shape(shifts)[0]
-
-                all_anchors = (
-                    self._anchor_reference.reshape((1, num_anchors, 4)) +
-                    tf.transpose(tf.reshape(shifts, (1, num_anchor_points, 4)), (1, 0, 2))
-                )
-
-                all_anchors = tf.reshape(all_anchors, (num_anchors * num_anchor_points, 4))
-                return all_anchors
+            all_anchors = tf.reshape(
+                all_anchors, (num_anchors * num_anchor_points, 4)
+            )
+            return all_anchors
 
     @property
     def summary(self):
