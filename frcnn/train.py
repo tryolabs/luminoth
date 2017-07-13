@@ -1,4 +1,3 @@
-import numpy as np
 import os
 import sonnet as snt
 import tensorflow as tf
@@ -38,7 +37,9 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    model = FasterRCNN(Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn)
+    model = FasterRCNN(
+        Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn
+    )
     dataset = TFRecordDataset(
         Config, num_classes=num_classes, random_shuffle=random_shuffle
     )
@@ -56,12 +57,14 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     # We add fake batch dimension to train data. TODO: DEFINITELY NOT THE BEST
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
-    # Bbox doesn't need a dimension for batch TODO: Necesitamos standarizar esto!
+    # Bbox doesn't need a dimension for batch TODO: Necesitamos standarizarlo!
     # train_bboxes = tf.expand_dims(train_bboxes, 0)
 
     prediction_dict = model(train_image, train_bboxes)
 
-    model_variables = snt.get_normalized_variable_map(model, tf.GraphKeys.GLOBAL_VARIABLES)
+    model_variables = snt.get_normalized_variable_map(
+        model, tf.GraphKeys.GLOBAL_VARIABLES
+    )
     if ignore_scope:
         total_model_variables = len(model_variables)
         model_variables = {
@@ -76,10 +79,10 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     saver = snt.get_saver(model)
 
     if pretrained_weights:
-        # TODO: Calling _pretrained _load_weights sucks. We need better abstraction
-        # Maybe handle it inside the model?
-        # TODO: Prefixes should be known by the model?
-        load_op = model._pretrained._load_weights(checkpoint_file=pretrained_weights, old_prefix='resnet_v2_101/', new_prefix='fasterrcnn/resnet_v2/resnet_v2_101/')
+        # TODO: Sucks to call _pretrained from here.
+        load_op = model._pretrained.load_weights(
+            checkpoint_file=pretrained_weights
+        )
     else:
         load_op = tf.no_op(name='not_loading_pretrained')
 
@@ -87,20 +90,33 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     initial_learning_rate = 0.0001
 
-    learning_rate = tf.get_variable("learning_rate",
-        shape=[], dtype=tf.float32,
+    learning_rate = tf.get_variable(
+        "learning_rate", shape=[], dtype=tf.float32,
         initializer=tf.constant_initializer(initial_learning_rate),
         trainable=False
     )
 
-    global_step = tf.get_variable(name="global_step",
-        shape=[],dtype=tf.int64,
+    global_step = tf.get_variable(
+        name="global_step", shape=[], dtype=tf.int64,
         initializer=tf.zeros_initializer(), trainable=False,
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
     )
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)  # TODO: parameter tunning
-    trainable_vars = [v for v in snt.get_variables_in_scope(model) if 'resnet' not in v.name]
+    optimizer = tf.train.MomentumOptimizer(
+        learning_rate=learning_rate, momentum=0.9
+    )  # TODO: parameter tunning
+    trainable_vars = snt.get_variables_in_scope(model)
+    if not Config.PRETRAINED_TRAINABLE:
+        before_length = len(trainable_vars)
+        trainable_vars = [
+            v for v in trainable_vars
+            if model._pretrained.module_name not in v.name
+        ]
+        tf.logging.info(
+            'Not training {} variables from pretrained module'.format(
+                before_length - len(trainable_vars)
+            ))
+
     grads_and_vars = optimizer.compute_gradients(total_loss, trainable_vars)
 
     # Clip by norm. Grad can be null when not training some modules.
@@ -111,9 +127,9 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
             for gv in grads_and_vars
         ]
 
-    train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
-    # TODO: We should define `var_list`
-    # train_op = optimizer.minimize(total_loss, global_step=global_step)
+    train_op = optimizer.apply_gradients(
+        grads_and_vars, global_step=global_step
+    )
 
     # Create initializer for variables. Queue-related variables need a special
     # initializer.
@@ -167,13 +183,19 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     trace_level=tf.RunOptions.FULL_TRACE
                 )
 
-                _, summary, train_loss, step, pred_dict, filename, scale_factor, *_ = sess.run([
+                (_, summary, train_loss, step, pred_dict, filename,
+                 scale_factor, *_) = sess.run([
                     train_op, summarizer, total_loss, global_step,
-                    prediction_dict, train_filename, train_scale_factor, metric_ops
-                ], run_metadata=run_metadata, options=run_options)
+                    prediction_dict, train_filename, train_scale_factor,
+                    metric_ops
+                    ], run_metadata=run_metadata, options=run_options
+                )
 
-                writer.add_summary(summary, step)
-                writer.add_run_metadata(run_metadata, 'step{}'.format(step))
+                if not no_log:
+                    writer.add_summary(summary, step)
+                    writer.add_run_metadata(
+                        run_metadata, 'step{}'.format(step)
+                    )
 
                 if debug and step % display_every == 0:
                     print('Scaled image with {}'.format(scale_factor))
@@ -186,11 +208,12 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     draw_rpn_bbox_pred(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
-                    draw_rcnn_cls_batch(pred_dict)
-                    draw_rcnn_input_proposals(pred_dict)
-                    draw_rcnn_cls_batch_errors(pred_dict, worst=False)
-                    draw_rcnn_reg_batch_errors(pred_dict)
-                    draw_object_prediction(pred_dict)
+                    if with_rcnn:
+                        draw_rcnn_cls_batch(pred_dict)
+                        draw_rcnn_input_proposals(pred_dict)
+                        draw_rcnn_cls_batch_errors(pred_dict, worst=False)
+                        draw_rcnn_reg_batch_errors(pred_dict)
+                        draw_object_prediction(pred_dict)
 
                     fetched_timeline = timeline.Timeline(run_metadata.step_stats)
                     chrome_trace = fetched_timeline.generate_chrome_trace_format()
