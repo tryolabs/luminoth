@@ -14,10 +14,17 @@ from .utils.image import draw_bboxes, normalize_bboxes
 from .utils.vars import variable_summaries
 
 
+PRETRAINED_MODULES = {
+    'vgg': VGG,
+    'resnet': ResNetV2,
+    'resnetv2': ResNetV2,
+}
+
+
 class FasterRCNN(snt.AbstractModule):
     """Faster RCNN Network"""
 
-    def __init__(self, config, debug=False, with_rcnn=True, num_classes=None, name='fasterrcnn'):
+    def __init__(self, config, debug=False, with_rcnn=True, num_classes=None, pretrained_type='vgg', name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
         self._cfg = config
@@ -41,8 +48,16 @@ class FasterRCNN(snt.AbstractModule):
         self._rcnn_cls_loss_weight = 1.0
         self._rcnn_reg_loss_weight = 2.0
 
+        if pretrained_type not in PRETRAINED_MODULES:
+            raise ValueError(
+                'Invalid type for pretrained module: "{}", should be one of: {}'.format(
+                    pretrained_type, PRETRAINED_MODULES
+                )
+            )
+        self._pretrained_class = PRETRAINED_MODULES[pretrained_type]
+
         with self._enter_variable_scope():
-            self._pretrained = ResNetV2(trainable=self._cfg.PRETRAINED_TRAINABLE)
+            self._pretrained = self._pretrained_class(trainable=self._cfg.PRETRAINED_TRAINABLE)
             self._rpn = RPN(self._num_anchors, debug=self._debug)
             if self._with_rcnn:
                 self._roi_pool = ROIPoolingLayer(debug=self._debug)
@@ -67,6 +82,7 @@ class FasterRCNN(snt.AbstractModule):
                 It's shape should be: (num_bboxes, 4). For each of the bboxes
                 we have (x1, y1, x2, y2)
         """
+
         image_shape = tf.shape(image)[1:3]
         pretrained_dict = self._pretrained(image, is_training=is_training)
         pretrained_feature_map = pretrained_dict['net']
