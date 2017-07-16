@@ -17,7 +17,8 @@ from .utils.vars import variable_summaries
 
 class RPN(snt.AbstractModule):
 
-    def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3], debug=False, name='rpn'):
+    def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3],
+                 debug=False, name='rpn'):
         """RPN - Region Proposal Network
 
         This module works almost independently from the Faster RCNN module.
@@ -36,6 +37,7 @@ class RPN(snt.AbstractModule):
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.0
         self._initializer = tf.random_normal_initializer(mean=0.0, stddev=0.01)
+        self._regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
 
         # We could use normal relu without any problems.
         self._rpn_activation = tf.nn.relu6
@@ -45,20 +47,24 @@ class RPN(snt.AbstractModule):
         self._rpn = Conv2D(
             output_channels=self._num_channels,
             kernel_shape=self._kernel_shape,
-            initializers={'w': self._initializer}, name='conv'
+            initializers={'w': self._initializer},
+            regularizers={'w': self._regularizer},
+            name='conv'
         )
 
         self._rpn_cls = Conv2D(
             output_channels=self._num_anchors * 2, kernel_shape=[1, 1],
-            initializers={'w': self._initializer}, padding='VALID',
-            name='cls_conv'
+            initializers={'w': self._initializer},
+            regularizers={'w': self._regularizer},
+            padding='VALID', name='cls_conv'
         )
 
         # BBox prediction is 4 values * number of anchors.
         self._rpn_bbox = Conv2D(
             output_channels=self._num_anchors * 4, kernel_shape=[1, 1],
-            initializers={'w': self._initializer}, padding='VALID',
-            name='bbox_conv'
+            initializers={'w': self._initializer},
+            regularizers={'w': self._regularizer},
+            padding='VALID', name='bbox_conv'
         )
 
     def _build(self, pretrained_feature_map, gt_boxes, image_shape,
