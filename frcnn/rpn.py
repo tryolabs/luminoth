@@ -40,37 +40,33 @@ class RPN(snt.AbstractModule):
         # We could use normal relu without any problems.
         self._rpn_activation = tf.nn.relu6
 
-        self._instantiate_layers()
-
     def _instantiate_layers(self):
         """Instantiates all convolutional modules used in the RPN."""
-        with self._enter_variable_scope():
-            self._rpn = Conv2D(
-                output_channels=self._num_channels,
-                kernel_shape=self._kernel_shape,
-                initializers={'w': self._initializer}, name='conv'
-            )
+        self._rpn = Conv2D(
+            output_channels=self._num_channels,
+            kernel_shape=self._kernel_shape,
+            initializers={'w': self._initializer}, name='conv'
+        )
 
-            self._rpn_cls = Conv2D(
-                output_channels=self._num_anchors * 2, kernel_shape=[1, 1],
-                initializers={'w': self._initializer}, padding='VALID',
-                name='cls_conv'
-            )
+        self._rpn_cls = Conv2D(
+            output_channels=self._num_anchors * 2, kernel_shape=[1, 1],
+            initializers={'w': self._initializer}, padding='VALID',
+            name='cls_conv'
+        )
 
-            # BBox prediction is 4 values * number of anchors.
-            self._rpn_bbox = Conv2D(
-                output_channels=self._num_anchors * 4, kernel_shape=[1, 1],
-                initializers={'w': self._initializer}, padding='VALID',
-                name='bbox_conv'
-            )
+        # BBox prediction is 4 values * number of anchors.
+        self._rpn_bbox = Conv2D(
+            output_channels=self._num_anchors * 4, kernel_shape=[1, 1],
+            initializers={'w': self._initializer}, padding='VALID',
+            name='bbox_conv'
+        )
 
-
-            self._proposal = RPNProposal(self._num_anchors)
-            self._anchor_target = RPNAnchorTarget(self._num_anchors)
-
-    def _build(self, pretrained_feature_map, gt_boxes, image_shape, all_anchors,
-               is_training=True):
+    def _build(self, pretrained_feature_map, gt_boxes, image_shape,
+               all_anchors, is_training=True):
         # We start with a common conv layer applied to the feature map.
+        self._instantiate_layers()
+        self._proposal = RPNProposal(self._num_anchors)
+        self._anchor_target = RPNAnchorTarget(self._num_anchors)
         rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
 
         # Then we apply separate conv layers for classification and regression.
@@ -100,15 +96,15 @@ class RPN(snt.AbstractModule):
                 tf.shape(pretrained_feature_map), gt_boxes, image_shape, all_anchors)
 
         # TODO: Better way to log variable summaries.
-        # variable_summaries(self._rpn.w, 'rpn_conv_W', ['RPN'])
-        # variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['RPN'])
-        # variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['RPN'])
+        # variable_summaries(self._rpn.w, 'rpn_conv_W', ['rpn'])
+        # variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['rpn'])
+        # variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['rpn'])
 
-        variable_summaries(proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['RPN'])
-        variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['RPN'])
-        variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['RPN'])
-        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['RPN'])
-        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['RPN'])
+        variable_summaries(proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['rpn'])
+        variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
+        variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
+        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
 
         # TODO: Remove unnecesary variables from prediction dictionary.
         prediction_dict = {
@@ -167,51 +163,50 @@ class RPN(snt.AbstractModule):
         # - transform positive and negative `rpn_cls_target` to same shape as `rpn_cls_prob`.
         # - then we can use `tf.losses.log_loss` which returns a tensor.
 
-        with self._enter_variable_scope():
-            with tf.variable_scope('RPNLoss'):
-                # Flatten already flat Tensor for usage as boolean mask filter.
-                rpn_cls_target = tf.cast(tf.reshape(
-                    rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
-                # Transform to boolean tensor with True only when != -1 (else
-                # == -1 -> False)
-                labels_not_ignored = tf.not_equal(
-                    rpn_cls_target, -1, name='labels_not_ignored')
+        with tf.variable_scope('RPNLoss'):
+            # Flatten already flat Tensor for usage as boolean mask filter.
+            rpn_cls_target = tf.cast(tf.reshape(
+                rpn_cls_target, [-1]), tf.int32, name='rpn_cls_target')
+            # Transform to boolean tensor with True only when != -1 (else
+            # == -1 -> False)
+            labels_not_ignored = tf.not_equal(
+                rpn_cls_target, -1, name='labels_not_ignored')
 
-                # Now we only have the labels we are going to compare with the
-                # cls probability.
-                labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored)
-                cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
-                cls_score = tf.boolean_mask(rpn_cls_score, labels_not_ignored)
+            # Now we only have the labels we are going to compare with the
+            # cls probability.
+            labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored)
+            cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
+            cls_score = tf.boolean_mask(rpn_cls_score, labels_not_ignored)
 
-                # We need to transform `labels` to `cls_prob` shape.
-                # convert [1, 0] to [[0, 1], [1, 0]]
-                cls_target = tf.one_hot(labels, depth=2)
+            # We need to transform `labels` to `cls_prob` shape.
+            # convert [1, 0] to [[0, 1], [1, 0]]
+            cls_target = tf.one_hot(labels, depth=2)
 
-                cross_entropy_per_anchor = tf.nn.softmax_cross_entropy_with_logits(
-                    labels=cls_target, logits=cls_score
-                )
+            cross_entropy_per_anchor = tf.nn.softmax_cross_entropy_with_logits(
+                labels=cls_target, logits=cls_score
+            )
 
-                prediction_dict['cross_entropy_per_anchor'] = cross_entropy_per_anchor
+            prediction_dict['cross_entropy_per_anchor'] = cross_entropy_per_anchor
 
-                # Finally, we need to calculate the regression loss over
-                # `rpn_bbox_target` and `rpn_bbox_pred`.
-                # Since `rpn_bbox_target` is obtained from RPNAnchorTarget then we
-                # just need to apply SmoothL1Loss.
-                rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
-                rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])
+            # Finally, we need to calculate the regression loss over
+            # `rpn_bbox_target` and `rpn_bbox_pred`.
+            # Since `rpn_bbox_target` is obtained from RPNAnchorTarget then we
+            # just need to apply SmoothL1Loss.
+            rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
+            rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])
 
-                # We only care for positive labels (we ignore backgrounds since
-                # we don't have any bounding box information for it).
-                positive_labels = tf.equal(rpn_cls_target, 1)
-                rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
-                rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
+            # We only care for positive labels (we ignore backgrounds since
+            # we don't have any bounding box information for it).
+            positive_labels = tf.equal(rpn_cls_target, 1)
+            rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
+            rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
 
-                # We apply smooth l1 loss as described by the Fast R-CNN paper.
-                reg_loss_per_anchor = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
+            # We apply smooth l1 loss as described by the Fast R-CNN paper.
+            reg_loss_per_anchor = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
 
-                prediction_dict['reg_loss_per_anchor'] = reg_loss_per_anchor
+            prediction_dict['reg_loss_per_anchor'] = reg_loss_per_anchor
 
-                return {
-                    'rpn_cls_loss': tf.reduce_mean(cross_entropy_per_anchor),
-                    'rpn_reg_loss': tf.reduce_mean(reg_loss_per_anchor),
-                }
+            return {
+                'rpn_cls_loss': tf.reduce_mean(cross_entropy_per_anchor),
+                'rpn_reg_loss': tf.reduce_mean(reg_loss_per_anchor),
+            }
