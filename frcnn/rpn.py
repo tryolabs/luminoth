@@ -1,17 +1,11 @@
-import collections
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-
 
 from sonnet.python.modules.conv import Conv2D
 
 from .rpn_anchor_target import RPNAnchorTarget
 from .rpn_proposal import RPNProposal
-from .utils.generate_anchors import generate_anchors
 from .utils.losses import smooth_l1_loss
-from .utils.ops import spatial_softmax, spatial_reshape_layer
 from .utils.vars import variable_summaries
 
 

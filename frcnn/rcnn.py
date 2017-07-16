@@ -25,24 +25,29 @@ class RCNN(snt.AbstractModule):
             factor=1., uniform=True, mode='FAN_AVG'
         )
 
+        regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
+
         self._layers = [
             snt.Linear(
                 layer_size,
                 name="fc_{}".format(i),
-                initializers={'w': fc_initializer}
+                initializers={'w': fc_initializer},
+                regularizers={'w': regularizer},
             )
             for i, layer_size in enumerate(self._layer_sizes)
         ]
 
         self._classifier_layer = snt.Linear(
             self._num_classes + 1, name="fc_classifier",
-            initializers={'w': fc_initializer}
+            initializers={'w': fc_initializer},
+            regularizers={'w': regularizer},
         )
 
         # TODO: Not random initializer
         self._bbox_layer = snt.Linear(
             self._num_classes * 4, name="fc_bbox",
             initializers={'w': fc_initializer},
+            regularizers={'w': regularizer}
         )
 
         self._rcnn_target = RCNNTarget(self._num_classes)

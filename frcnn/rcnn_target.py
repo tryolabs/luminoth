@@ -114,8 +114,9 @@ class RCNNTarget(snt.AbstractModule):
         if len(fg_inds) < num_fg:
             tf.logging.warning(
                 'We\'ve got only {} foreground samples instead of {}.'.format(
-                len(fg_inds), num_fg
-            ))
+                    len(fg_inds), num_fg
+                )
+            )
 
         # subsample negative labels
         num_bg = self._batch_size - np.sum(proposals_label >= 1)

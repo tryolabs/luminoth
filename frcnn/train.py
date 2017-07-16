@@ -55,7 +55,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     pretrained = PRETRAINED_MODULES[pretrained_net](trainable=False)
     model = FasterRCNN(
-        Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn
+        Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn,
     )
     dataset = TFRecordDataset(
         Config, num_classes=num_classes, random_shuffle=random_shuffle
