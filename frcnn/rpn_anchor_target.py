@@ -95,13 +95,14 @@ class RPNAnchorTarget(snt.AbstractModule):
         ) = tf.py_func(
             self._anchor_target_layer_np,
             [pretrained_shape, gt_boxes, im_info, all_anchors],
-            [tf.float32, tf.float32, tf.float32]
+            [tf.float32, tf.float32, tf.float32],
+            stateful=False,
+            name='anchor_target_layer_np'
 
         )
 
         # TODO: missing bbox_inside_weights, bbox_outside_weights
         return labels, bbox_targets, max_overlaps
-
 
     def _anchor_target_layer(self, pretrained_shape, gt_boxes, im_info, all_anchors):
         """
@@ -109,7 +110,6 @@ class RPNAnchorTarget(snt.AbstractModule):
         computing in the Tensorflow graph.
         """
         raise NotImplemented()
-
 
     def _anchor_target_layer_np(self, pretrained_shape, gt_boxes, im_info, all_anchors):
 
