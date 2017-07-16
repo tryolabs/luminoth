@@ -1,8 +1,5 @@
 import sonnet as snt
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-import numpy as np
-
 
 CROP = 'crop'
 ROI_POOLING = 'roi_pooling'
@@ -25,7 +22,9 @@ class ROIPoolingLayer(snt.AbstractModule):
         """
         im_shape = tf.cast(im_shape, tf.float32)
 
-        _, x1, y1, x2, y2 = tf.unstack(value=roi_proposals, num_or_size_splits=5, axis=1)
+        _, x1, y1, x2, y2 = tf.split(
+            value=roi_proposals, num_or_size_splits=5, axis=1
+        )
 
         x1 = x1 / im_shape[1]
         y1 = y1 / im_shape[0]
