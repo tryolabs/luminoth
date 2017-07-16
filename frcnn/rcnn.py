@@ -219,6 +219,11 @@ class RCNN(snt.AbstractModule):
                 reg_loss_per_proposal = smooth_l1_loss(
                     bbox_offset_cleaned, bbox_offsets_target_labeled)
 
+                tf.summary.scalar(
+                    'rcnn_foreground_samples',
+                    tf.shape(bbox_offset_cleaned)[0], ['rcnn']
+                )
+
                 if self._debug:
                     prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
 

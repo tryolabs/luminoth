@@ -105,6 +105,9 @@ class RPN(snt.AbstractModule):
         variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
         variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
         variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+        variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
+        variable_summaries(rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])
+        variable_summaries(rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
 
         # TODO: Remove unnecesary variables from prediction dictionary.
         prediction_dict = {
@@ -200,6 +203,11 @@ class RPN(snt.AbstractModule):
             positive_labels = tf.equal(rpn_cls_target, 1)
             rpn_bbox_target = tf.boolean_mask(rpn_bbox_target, positive_labels)
             rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
+
+            tf.summary.scalar(
+                'rpn_foreground_samples',
+                tf.shape(rpn_bbox_target)[0], ['rpn']
+            )
 
             # We apply smooth l1 loss as described by the Fast R-CNN paper.
             reg_loss_per_anchor = smooth_l1_loss(rpn_bbox_pred, rpn_bbox_target)
