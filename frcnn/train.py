@@ -39,10 +39,13 @@ PRETRAINED_MODULES = {
 @click.option('--display-every', default=1, type=int)
 @click.option('--random-shuffle', is_flag=True)
 @click.option('--save-timeline', is_flag=True)
+@click.option('--summary-every', default=1, type=int)
+@click.option('--full-trace', is_flag=True)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           checkpoint_file, pretrained_checkpoint_file, ignore_scope, log_dir,
           save_every, tf_debug, debug, run_name, with_rcnn, no_log,
-          display_every, random_shuffle, save_timeline):
+          display_every, random_shuffle, save_timeline, summary_every,
+          full_trace):
 
     if debug or tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -184,6 +187,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         count_images = 0
+        step = 0
 
         if tf_debug:
             from tensorflow.python import debug as tf_debug
@@ -192,10 +196,15 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
         try:
             while not coord.should_stop():
-                run_metadata = tf.RunMetadata()
-                run_options = tf.RunOptions(
-                    trace_level=tf.RunOptions.FULL_TRACE
-                )
+                run_metadata = None
+                if (step + 1) % summary_every == 0:
+                    run_metadata = tf.RunMetadata()
+
+                run_options = None
+                if full_trace:
+                    run_options = tf.RunOptions(
+                        trace_level=tf.RunOptions.FULL_TRACE
+                    )
 
                 (_, summary, train_loss, step, pred_dict, filename,
                  scale_factor, *_) = sess.run(
@@ -205,10 +214,10 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         metric_ops
                     ], run_metadata=run_metadata, options=run_options)
 
-                if not no_log:
+                if not no_log and step % summary_every == 0:
                     writer.add_summary(summary, step)
                     writer.add_run_metadata(
-                        run_metadata, 'step{}'.format(step)
+                        run_metadata, str(step)
                     )
 
                 if debug and step % display_every == 0:
