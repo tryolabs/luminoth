@@ -1,6 +1,5 @@
 import sonnet as snt
 import tensorflow as tf
-import numpy as np
 
 from .rcnn_target import RCNNTarget
 from .rcnn_proposal import RCNNProposal
@@ -11,12 +10,13 @@ from .utils.vars import variable_summaries
 class RCNN(snt.AbstractModule):
     """RCNN """
 
-    def __init__(self, num_classes, layer_sizes=[4096, 4096], debug=False, name='rcnn'):
+    def __init__(self, num_classes, layer_sizes=[4096, 4096], debug=False,
+                 name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
         self._layer_sizes = layer_sizes
         self._activation = tf.nn.relu6
-        self._dropout_keep_prob = 0.6
+        self._dropout_keep_prob = 1.
 
         self._debug = debug
 
@@ -81,7 +81,6 @@ class RCNN(snt.AbstractModule):
             prediction_dict['layer_{}_out'.format(i)] = net  # TODO: debug tmp
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
-            # TODO: megadebug, low performance: variable_summaries(layer.w, 'layer_{}_W'.format(i), ['rcnn'])
 
         cls_score = self._classifier_layer(net)
         prob = tf.nn.softmax(cls_score, dim=1)
@@ -161,7 +160,9 @@ class RCNN(snt.AbstractModule):
 
                 # Transform to one-hot vector
                 cls_target_one_hot = tf.one_hot(
-                    cls_target_labeled, depth=self._num_classes + 1, name='cls_target_one_hot')
+                    cls_target_labeled, depth=self._num_classes + 1,
+                    name='cls_target_one_hot'
+                )
 
                 # We get cross entropy loss of each proposal.
                 cross_entropy_per_proposal = tf.nn.softmax_cross_entropy_with_logits(
@@ -181,17 +182,22 @@ class RCNN(snt.AbstractModule):
                 bbox_offsets_labeled = tf.boolean_mask(
                     bbox_offsets, not_ignored, name='bbox_offsets_labeled')
                 bbox_offsets_target_labeled = tf.boolean_mask(
-                    bbox_offsets_target, not_ignored, name='bbox_offsets_target_labeled')
+                    bbox_offsets_target, not_ignored,
+                    name='bbox_offsets_target_labeled'
+                )
 
                 cls_target_labeled = tf.boolean_mask(
                     cls_target, not_ignored, name='cls_target_labeled')
-                # `cls_target_labeled` is based on `cls_target` which has `num_classes` + 1 classes.
+                # `cls_target_labeled` is based on `cls_target` which has
+                # `num_classes` + 1 classes.
                 # for making `one_hot` with depth `num_classes` to work we need
                 # to lower them to make them 0-index.
                 cls_target_labeled = cls_target_labeled - 1
 
                 cls_target_one_hot = tf.one_hot(
-                    cls_target_labeled, depth=self._num_classes, name='cls_target_one_hot')
+                    cls_target_labeled, depth=self._num_classes,
+                    name='cls_target_one_hot'
+                )
 
                 # cls_target now is (num_labeled, num_classes)
                 bbox_flatten = tf.reshape(
@@ -211,10 +217,9 @@ class RCNN(snt.AbstractModule):
                 if self._debug:
                     prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
 
-                # Hack to avoid having nan loss.
-                # reg_loss = tf.cond(tf.is_nan(reg_loss), lambda: tf.constant(0.0, dtype=tf.float32), lambda: reg_loss)
-
                 return {
-                    'rcnn_cls_loss': tf.reduce_mean(cross_entropy_per_proposal),
+                    'rcnn_cls_loss': tf.reduce_mean(
+                        cross_entropy_per_proposal
+                    ),
                     'rcnn_reg_loss': tf.reduce_mean(reg_loss_per_proposal),
                 }
