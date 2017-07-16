@@ -26,6 +26,8 @@ class Pretrained(snt.AbstractModule):
         Returns:
             Load weights operation
         """
+        if checkpoint_file is None:
+            return tf.no_op(name='not_loading_pretrained')
 
         module_variables = snt.get_variables_in_module(
             self, tf.GraphKeys.GLOBAL_VARIABLES
@@ -47,7 +49,7 @@ class Pretrained(snt.AbstractModule):
         tf.logging.debug(
             'Loading {} variables from pretrained checkpoint {}'.format(
                 len(load_variables), checkpoint_file
-        ))
+            ))
 
         load_op = tf.group(*load_variables)
 

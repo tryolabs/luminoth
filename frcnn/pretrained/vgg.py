@@ -18,7 +18,9 @@ class VGG(Pretrained):
             )
             return {
                 # TODO: Fix fasterrcnn_1/vgg scope problem
-                'net': dict(end_points)['fasterrcnn_1/vgg/vgg_16/conv5/conv5_1'],
+                'net': dict(end_points)[
+                    '{}/vgg_16/conv5/conv5_1'.format(self.module_name)
+                ],
             }
 
     def _preprocess(self, inputs):

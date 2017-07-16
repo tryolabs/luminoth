@@ -1,6 +1,6 @@
-from .pretrained import Pretrained
 from tensorflow.contrib.slim import arg_scope
 from tensorflow.contrib.slim.nets import resnet_v2
+from .pretrained import Pretrained
 
 
 class ResNetV2(Pretrained):
@@ -20,7 +20,9 @@ class ResNetV2(Pretrained):
         return {
             # TODO: Fix fasterrcnn_1/resnet_v2 scope problem
             'net': dict(end_points)[
-                'fasterrcnn_1/resnet_v2/resnet_v2_101/block4/unit_3/bottleneck_v2/conv3'
+                '{}/resnet_v2_101/block4/unit_3/bottleneck_v2/conv3'.format(
+                    self.module_name
+                )
             ],
         }
 
