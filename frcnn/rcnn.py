@@ -20,37 +20,33 @@ class RCNN(snt.AbstractModule):
 
         self._debug = debug
 
-        self._instantiate_layers()
-
     def _instantiate_layers(self):
-        with self._enter_variable_scope():
+        fc_initializer = tf.contrib.layers.variance_scaling_initializer(
+            factor=1., uniform=True, mode='FAN_AVG'
+        )
 
-            fc_initializer = tf.contrib.layers.variance_scaling_initializer(
-                factor=1., uniform=True, mode='FAN_AVG'
-            )
-
-            self._layers = [
-                snt.Linear(
-                    layer_size,
-                    name="fc_{}".format(i),
-                    initializers={'w': fc_initializer}
-                )
-                for i, layer_size in enumerate(self._layer_sizes)
-            ]
-
-            self._classifier_layer = snt.Linear(
-                self._num_classes + 1, name="fc_classifier",
+        self._layers = [
+            snt.Linear(
+                layer_size,
+                name="fc_{}".format(i),
                 initializers={'w': fc_initializer}
             )
+            for i, layer_size in enumerate(self._layer_sizes)
+        ]
 
-            # TODO: Not random initializer
-            self._bbox_layer = snt.Linear(
-                self._num_classes * 4, name="fc_bbox",
-                initializers={'w': fc_initializer},
-            )
+        self._classifier_layer = snt.Linear(
+            self._num_classes + 1, name="fc_classifier",
+            initializers={'w': fc_initializer}
+        )
 
-            self._rcnn_target = RCNNTarget(self._num_classes)
-            self._rcnn_proposal = RCNNProposal(self._num_classes)
+        # TODO: Not random initializer
+        self._bbox_layer = snt.Linear(
+            self._num_classes * 4, name="fc_bbox",
+            initializers={'w': fc_initializer},
+        )
+
+        self._rcnn_target = RCNNTarget(self._num_classes)
+        self._rcnn_proposal = RCNNProposal(self._num_classes)
 
     def _build(self, pooled_layer, proposals, gt_boxes, im_shape):
         """
@@ -65,6 +61,7 @@ class RCNN(snt.AbstractModule):
         TODO: El pooled layer es el volumen con todos los ROI o es uno por cada ROI?
         TODO: Donde puedo comparar los resultados con las labels posta?
         """
+        self._instantiate_layers()
 
         prediction_dict = {}
 
@@ -84,7 +81,7 @@ class RCNN(snt.AbstractModule):
             prediction_dict['layer_{}_out'.format(i)] = net  # TODO: debug tmp
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
-            # TODO: megadebug, low performance: variable_summaries(layer.w, 'layer_{}_W'.format(i), ['RCNN'])
+            # TODO: megadebug, low performance: variable_summaries(layer.w, 'layer_{}_W'.format(i), ['rcnn'])
 
         cls_score = self._classifier_layer(net)
         prob = tf.nn.softmax(cls_score, dim=1)
@@ -96,8 +93,8 @@ class RCNN(snt.AbstractModule):
         proposal_prediction = self._rcnn_proposal(
             proposals, bbox_offsets, prob, im_shape)
 
-        variable_summaries(prob, 'prob', ['RCNN'])
-        variable_summaries(bbox_offsets, 'bbox_offsets', ['RCNN'])
+        variable_summaries(prob, 'prob', ['rcnn'])
+        variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
 
         prediction_dict['cls_score'] = cls_score
         prediction_dict['cls_prob'] = prob

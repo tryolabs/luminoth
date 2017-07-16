@@ -28,7 +28,9 @@ class RCNNTarget(snt.AbstractModule):
         (proposals_label, bbox_targets) = tf.py_func(
             self.proposal_target_layer,
             [proposals, gt_boxes],
-            [tf.float32, tf.float32]
+            [tf.float32, tf.float32],
+            stateful=False,
+            name='proposal_target_layer'
          )
 
         return proposals_label, bbox_targets
