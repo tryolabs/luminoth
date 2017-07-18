@@ -39,7 +39,7 @@ class RPNAnchorTarget(snt.AbstractModule):
         bbox_outside_weights: TODO: ??
 
     """
-    def __init__(self, num_anchors, feat_stride=[16], name='anchor_target'):
+    def __init__(self, num_anchors, feat_stride=[16], debug=False, name='anchor_target'):
         super(RPNAnchorTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
         self._feat_stride = feat_stride
@@ -57,6 +57,11 @@ class RPNAnchorTarget(snt.AbstractModule):
         self._batch_size = 256
         # TODO:
         self._bbox_inside_weights = (1.0, 1.0, 1.0, 1.0)
+
+        self._debug = debug
+        if self._debug:
+            tf.logging.warning(
+                'Using RPN Anchor Target in debug mode makes random seed to be fixed at 0.')
 
     def _build(self, pretrained_shape, gt_boxes, im_info, all_anchors):
         """
@@ -113,7 +118,9 @@ class RPNAnchorTarget(snt.AbstractModule):
 
     def _anchor_target_layer_np(self, pretrained_shape, gt_boxes, im_info, all_anchors):
 
-        np.random.seed(0)  # TODO: Remove, just for reproducibility
+        if self._debug:
+            np.random.seed(0)
+
         """
         Function to be executed with tf.py_func
         """

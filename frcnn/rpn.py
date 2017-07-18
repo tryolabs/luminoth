@@ -25,7 +25,6 @@ class RPN(snt.AbstractModule):
         self._num_channels = num_channels
         self._kernel_shape = kernel_shape
 
-        # TODO: Remove debug mode?
         self._debug = debug
 
         # According to Faster RCNN paper we need to initialize layers with
@@ -66,7 +65,9 @@ class RPN(snt.AbstractModule):
         # We start with a common conv layer applied to the feature map.
         self._instantiate_layers()
         self._proposal = RPNProposal(self._num_anchors)
-        self._anchor_target = RPNAnchorTarget(self._num_anchors)
+        self._anchor_target = RPNAnchorTarget(
+            self._num_anchors, debug=self._debug
+        )
         rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
 
         # Then we apply separate conv layers for classification and regression.

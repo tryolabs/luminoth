@@ -50,7 +50,7 @@ class RCNN(snt.AbstractModule):
             regularizers={'w': regularizer}
         )
 
-        self._rcnn_target = RCNNTarget(self._num_classes)
+        self._rcnn_target = RCNNTarget(self._num_classes, debug=self._debug)
         self._rcnn_proposal = RCNNProposal(self._num_classes)
 
     def _build(self, pooled_layer, proposals, gt_boxes, im_shape):

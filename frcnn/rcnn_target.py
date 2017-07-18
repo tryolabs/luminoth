@@ -10,7 +10,7 @@ class RCNNTarget(snt.AbstractModule):
     """
     Generate RCNN target tensors for both probabilities and bounding boxes.
     """
-    def __init__(self, num_classes, name='rcnn_proposal'):
+    def __init__(self, num_classes, debug=False, name='rcnn_proposal'):
         super(RCNNTarget, self).__init__(name=name)
         self._num_classes = num_classes
         self._foreground_fraction = 0.25
@@ -18,6 +18,10 @@ class RCNNTarget(snt.AbstractModule):
         self._foreground_threshold = 0.5
         self._background_threshold_high = 0.5
         self._background_threshold_low = 0.1
+        self._debug = debug
+        if self._debug:
+            tf.logging.warning(
+                'Using RCNN Target in debug mode makes random seed to be fixed at 0.')
 
     def _build(self, proposals, gt_boxes):
         """
@@ -53,7 +57,8 @@ class RCNNTarget(snt.AbstractModule):
                 Shape (num_proposals, 4)
 
         """
-        np.random.seed(0)  # TODO: For reproducibility.
+        if self._debug:
+            np.random.seed(0)  # TODO: For reproducibility.
 
         # Remove batch id from proposals
         proposals = proposals[:,1:]
