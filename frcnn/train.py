@@ -41,12 +41,13 @@ PRETRAINED_MODULES = {
 @click.option('--save-timeline', is_flag=True)
 @click.option('--summary-every', default=1, type=int)
 @click.option('--full-trace', is_flag=True)
+@click.option('--initial-learning-rate', default=0.0001, type=float)
 @click.option('--learning-rate-decay', default=10000, type=int)
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           checkpoint_file, pretrained_checkpoint_file, ignore_scope, log_dir,
           save_every, tf_debug, debug, run_name, with_rcnn, no_log,
           display_every, random_shuffle, save_timeline, summary_every,
-          full_trace, learning_rate_decay):
+          full_trace, initial_learning_rate, learning_rate_decay):
 
     if debug or tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -103,8 +104,6 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     model_saver = snt.get_saver(model, name='fasterrcnn_saver')
     pretrained_saver = snt.get_saver(pretrained, name='pretrained_saver')
 
-    initial_learning_rate = 0.0001
-
     global_step = tf.get_variable(
         name="global_step", shape=[], dtype=tf.int64,
         initializer=tf.zeros_initializer(), trainable=False,
@@ -116,6 +115,8 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         decay_steps=learning_rate_decay, decay_rate=0.96, staircase=True,
         name='learning_rate_with_decay'
     )
+
+    tf.summary.scalar('losses/learning_rate', learning_rate)
 
     optimizer = tf.train.MomentumOptimizer(
         learning_rate=learning_rate, momentum=0.9
