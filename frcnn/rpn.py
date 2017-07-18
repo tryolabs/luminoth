@@ -189,6 +189,24 @@ class RPN(snt.AbstractModule):
                 labels=cls_target, logits=cls_score
             )
 
+            foreground_cls_loss = tf.boolean_mask(
+                cross_entropy_per_anchor, tf.equal(labels, 1)
+            )
+            background_cls_loss = tf.boolean_mask(
+                cross_entropy_per_anchor, tf.equal(labels, 0)
+            )
+
+            tf.summary.scalar(
+                'foreground_cls_loss',
+                tf.reduce_mean(foreground_cls_loss), ['rpn'])
+            tf.summary.histogram(
+                'foreground_cls_loss', foreground_cls_loss, ['rpn'])
+            tf.summary.scalar(
+                'background_cls_loss',
+                tf.reduce_mean(background_cls_loss), ['rpn'])
+            tf.summary.histogram(
+                'background_cls_loss', background_cls_loss, ['rpn'])
+
             prediction_dict['cross_entropy_per_anchor'] = cross_entropy_per_anchor
 
             # Finally, we need to calculate the regression loss over
@@ -205,7 +223,7 @@ class RPN(snt.AbstractModule):
             rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, positive_labels)
 
             tf.summary.scalar(
-                'rpn_foreground_samples',
+                'foreground_samples',
                 tf.shape(rpn_bbox_target)[0], ['rpn']
             )
 
