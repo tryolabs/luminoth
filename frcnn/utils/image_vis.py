@@ -135,6 +135,7 @@ def draw_bbox(image, bbox):
 
     imgcat_pil(image_pil)
 
+
 def draw_top_proposals(pred_dict):
     print('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
     scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
@@ -171,45 +172,66 @@ def draw_top_proposals(pred_dict):
     imgcat_pil(image_pil)
 
 
-def draw_batch_proposals(pred_dict):
+def draw_batch_proposals(pred_dict, display_anchor=True):
     print('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
     print('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
-    scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
-    proposals = pred_dict['rpn_prediction']['proposal_prediction']['proposals']
+    print('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
+    scores = pred_dict['rpn_prediction']['rpn_cls_prob']
+    scores = scores[:, 1]
+    bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
     targets = pred_dict['rpn_prediction']['rpn_cls_target']
-    max_overlap = pred_dict['rpn_prediction']['rpn_max_overlap']
+    max_overlaps = pred_dict['rpn_prediction']['rpn_max_overlap']
     all_anchors = pred_dict['all_anchors']
+
+    batch_idx = targets >= 0
+    scores = scores[batch_idx]
+    bbox_pred = bbox_pred[batch_idx]
+    max_overlaps = max_overlaps[batch_idx]
+    all_anchors = all_anchors[batch_idx]
+    targets = targets[batch_idx]
+
+    bboxes = bbox_transform_inv(all_anchors, bbox_pred)
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    for score, proposal, target, max_overlap, anchor in zip(scores, proposals, targets, max_overlap, all_anchors):
-
-        if target < 0:
-            continue
+    for score, proposal, target, max_overlap, anchor in zip(scores, bboxes, targets, max_overlaps, all_anchors):
 
         if (proposal[2] - proposal[0] <= 0) or (proposal[3] - proposal[1] <= 0):
-            tf.logging.warning('Ignoring proposal for target {} because of negative area => {}'.format(target, proposal))
+            tf.logging.warning(
+                'Ignoring proposal for target {} because of negative area => {}'.format(
+                    target, proposal))
             continue
 
         if target == 1:
-            fill = (0, 0, 255, 10)
+            fill = (0, 0, 255, 30)
+            if score > 0.8:
+                font_fill = (0, 0, 255, 160)
+            else:
+                font_fill = (0, 255, 255, 180)
         else:
             fill = (255, 0, 0, 5)
+            if score > 0.8:
+                font_fill = (255, 0, 255, 160)
+            else:
+                font_fill = (255, 0, 0, 100)
 
         if score > 0.5:
-            font_fill = (0, 255, 0, 255)
-            outline_fill = (0, 255, 0, 50)
+            outline_fill = (0, 0, 255, 50)
         else:
-            font_fill = (255, 0, 0, 255)
             outline_fill = (255, 0, 0, 50)
 
-        if np.isclose(score, 1.0) or score > 1.0:
+        if np.abs(score - 1.) < 0.05:
             font_txt = '1'
         else:
             font_txt = '{:.2f}'.format(score)[1:]
 
-        draw.rectangle(list(proposal), fill=fill, outline=outline_fill)
-        x, y = list(proposal)[:2]
+        if display_anchor:
+            box = list(anchor)
+        else:
+            box = list(proposal)
+
+        draw.rectangle(box, fill=fill, outline=outline_fill)
+        x, y = box[:2]
         x = max(x, 0)
         y = max(y, 0)
 
@@ -218,13 +240,14 @@ def draw_batch_proposals(pred_dict):
 
     gt_boxes = pred_dict['gt_boxes']
     for gt_box in gt_boxes:
-        draw.rectangle(list(gt_box[:4]), fill=(0, 255, 0, 60), outline=(0, 255, 0, 150))
+        box = list(gt_box[:4])
+        draw.rectangle(box, fill=(0, 255, 0, 60), outline=(0, 255, 0, 70))
 
     imgcat_pil(image_pil)
 
 
-def draw_top_nms_proposals(pred_dict, min_score=0.8):
-    print('Top NMS proposals')
+def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
+    print('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
     # Remove batch id
@@ -232,46 +255,89 @@ def draw_top_nms_proposals(pred_dict, min_score=0.8):
     top_scores_mask = scores > min_score
     scores = scores[top_scores_mask]
     proposals = proposals[top_scores_mask]
+
+    sorted_idx = scores.argsort()[::-1]
+    scores = scores[sorted_idx]
+    proposals = proposals[sorted_idx]
+
     image_pil, draw = get_image_draw(pred_dict)
 
-    for score, proposal in zip(scores, proposals):
+    fill_alpha = 70
+
+    for topn, (score, proposal) in enumerate(zip(scores, proposals)):
         bbox = list(proposal)
         if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
             tf.logging.warning('Proposal has negative area: {}'.format(bbox))
             continue
 
-        draw.rectangle(bbox, fill=(255, 0, 0, 14), outline=(0, 0, 0, 40))
-        draw.text(tuple([bbox[0], bbox[1]]), text='{:.2f}'.format(score)[1:], font=font, fill=(0, 255, 0, 150))
+        draw.rectangle(
+            bbox, fill=(0, 255, 0, fill_alpha), outline=(0, 255, 0, 50))
 
-    gt_boxes = pred_dict['gt_boxes']
-    for gt_box in gt_boxes:
-        draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
+        if np.abs(score - 1.0) <= 0.0001:
+            font_txt = '1'
+        else:
+            font_txt = '{:.2f}'.format(score)[1:]
+
+        draw.text(
+            tuple([bbox[0], bbox[1]]), text=font_txt,
+            font=font, fill=(0, 255, 0, 150))
+
+        fill_alpha -= 5
+
+    if draw_gt:
+        gt_boxes = pred_dict['gt_boxes']
+        for gt_box in gt_boxes:
+            draw.rectangle(
+                list(gt_box[:4]), fill=(0, 0, 255, 60),
+                outline=(0, 0, 255, 150))
 
     imgcat_pil(image_pil)
 
 
-def draw_rpn_cls_loss(pred_dict):
+def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     """
     For each bounding box labeled object. We wan't to display the softmax score.
 
     We display the anchors, and not the adjusted bounding boxes.
     """
-    print('RPN classification loss (anchors, with the softmax score) (mean softmax loss: {})'.format(pred_dict['rpn_prediction']['cross_entropy_per_anchor'].mean()))
-    prob = pred_dict['rpn_prediction']['rpn_cls_prob']
-    prob = prob.reshape([-1, 2])[:,1]
     loss = pred_dict['rpn_prediction']['cross_entropy_per_anchor']
+    type_str = 'foreground' if foreground else 'background'
+    print('RPN classification loss (anchors, with the softmax score) (mean softmax loss (all): {})'.format(loss.mean()))
+    print('Showing {} only'.format(type_str))
+    print('{} {} performers'.format('Worst' if worst else 'Best', topn))
+    prob = pred_dict['rpn_prediction']['rpn_cls_prob']
+    prob = prob.reshape([-1, 2])[:, 1]
     target = pred_dict['rpn_prediction']['rpn_cls_target']
-    target = target.reshape([-1, 1])
     anchors = pred_dict['all_anchors']
 
-    # Get anchors with positive label.
-    positive_indices = np.nonzero(np.squeeze(target) > 0)[0]
-    # Get anchors labeled
-    labeled_indices = np.nonzero(target[np.nonzero(np.squeeze(target) >= 0)[0]])[0]
-    loss = loss[labeled_indices]
+    non_ignored_indices = target >= 0
+    target = target[non_ignored_indices]
+    prob = prob[non_ignored_indices]
+    anchors = anchors[non_ignored_indices]
 
+    # Get anchors with positive label.
+    if foreground:
+        positive_indices = np.nonzero(target > 0)[0]
+    else:
+        positive_indices = np.nonzero(target == 0)[0]
+
+    loss = loss[positive_indices]
     prob = prob[positive_indices]
     anchors = anchors[positive_indices]
+
+    print('Mean loss for {}: {}'.format(type_str, loss.mean()))
+
+    sorted_idx = loss.argsort()
+    if worst:
+        sorted_idx = sorted_idx[::-1]
+
+    sorted_idx = sorted_idx[:topn]
+
+    loss = loss[sorted_idx]
+    prob = prob[sorted_idx]
+    anchors = anchors[sorted_idx]
+
+    print('Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
 
     image_pil, draw = get_image_draw(pred_dict)
 
