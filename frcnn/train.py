@@ -132,7 +132,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
     # Clip by norm. Grad can be null when not training some modules.
     with tf.name_scope('clip_gradients_by_norm'):
         grads_and_vars = [
-            (tf.clip_by_norm(gv[0], 10.), gv[1])
+            (tf.check_numerics(tf.clip_by_norm(gv[0], 10.), 'Invalid gradient'), gv[1])
             if gv[0] is not None else gv
             for gv in grads_and_vars
         ]

@@ -19,7 +19,8 @@ class RPNProposal(snt.AbstractModule):
         self._feat_stride = feat_stride
 
         # Filtering config  TODO: Use external configuration
-        self._post_nms_top_n = 1500
+        self._pre_nms_top_n = 12000
+        self._post_nms_top_n = 2000
         self._nms_threshold = 0.6
         self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
 
@@ -62,7 +63,7 @@ class RPNProposal(snt.AbstractModule):
         # Decode boxes
         proposals = bbox_decode(all_anchors, rpn_bbox_pred)
 
-        x_min, y_min, x_max, y_max = tf.split(value=proposals, num_or_size_splits=4, axis=1)
+        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
 
         # Clip boxes
         image_shape = tf.cast(im_shape, tf.float32)
@@ -71,7 +72,7 @@ class RPNProposal(snt.AbstractModule):
         x_max = tf.maximum(tf.minimum(x_max, image_shape[1] - 1), 0.)
         y_max = tf.maximum(tf.minimum(y_max, image_shape[0] - 1), 0.)
 
-        proposals = tf.concat([x_min, y_min, x_max, y_max], axis=1)
+        proposals = tf.stack([x_min, y_min, x_max, y_max], axis=1)
 
         # Filter proposals with negative area. TODO: Optional, is not done in paper, can it happen (given log of width ratio?)
         proposal_filter = tf.greater_equal((x_max - x_min) * (y_max - y_min), 0)
@@ -81,12 +82,21 @@ class RPNProposal(snt.AbstractModule):
         proposals = tf.boolean_mask(proposals, proposal_filter)
         scores = tf.boolean_mask(scores, proposal_filter)
 
+        # Get pre NMS top selections
+        k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])
+        top_k = tf.nn.top_k(scores, k=k)
+        scores = top_k.values
+        proposals = tf.gather(proposals, top_k.indices)
+
         # We reorder the proposals for non_max_supression compatibility.
-        x_min, y_min, x_max, y_max = tf.split(value=proposals, num_or_size_splits=4, axis=1)
-        proposals_tf_order = tf.concat([y_min, x_min, y_max, x_max], axis=1)
+        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
+        proposals_tf_order = tf.stack([y_min, x_min, y_max, x_max], axis=1)
 
         # We cut the pre_nms filter in pure TF version and go straight into NMS.
-        selected_indices = tf.image.non_max_suppression(proposals_tf_order, tf.squeeze(scores), self._post_nms_top_n, iou_threshold=self._nms_threshold)
+        selected_indices = tf.image.non_max_suppression(
+            proposals_tf_order, tf.squeeze(scores), self._post_nms_top_n,
+            iou_threshold=self._nms_threshold
+        )
 
         # Selected_indices is a smaller tensor, we need to extract the
         # proposals and scores using it.
