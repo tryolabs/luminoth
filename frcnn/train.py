@@ -261,12 +261,12 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         # We don't support partial saver.
                         model_saver.save(
                             sess,
-                            os.path.join(model_dir, model.scope_name),
+                            os.path.join(model_dir, run_name, model.scope_name),
                             global_step=step
                         )
                         pretrained_saver.save(
                             sess,
-                            os.path.join(model_dir, pretrained.scope_name),
+                            os.path.join(model_dir, run_name, pretrained.scope_name),
                             global_step=step
                         )
 
