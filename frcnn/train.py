@@ -8,11 +8,6 @@ from .pretrained import VGG, ResNetV2
 from .config import Config
 from .dataset import TFRecordDataset
 
-# debug
-from tensorflow.python.client import timeline
-from .utils.image_vis import *
-
-
 PRETRAINED_MODULES = {
     'vgg': VGG,
     'vgg_16': VGG,
@@ -20,34 +15,42 @@ PRETRAINED_MODULES = {
     'resnetv2': ResNetV2,
 }
 
+OPTIMIZERS = {
+    'adam': tf.train.AdamOptimizer,
+    'momentum': tf.train.MomentumOptimizer,
+}
+
 
 @click.command()
-@click.option('--num-classes', default=20)
-@click.option('--pretrained-net', default='vgg_16', type=click.Choice(PRETRAINED_MODULES.keys()))
-@click.option('--pretrained-weights')
-@click.option('--model-dir', default='models/')
-@click.option('--checkpoint-file')
-@click.option('--pretrained-checkpoint-file')
-@click.option('--ignore-scope')
-@click.option('--log-dir', default='/tmp/frcnn/')
-@click.option('--save-every', default=100)
-@click.option('--tf-debug', is_flag=True)
-@click.option('--debug', is_flag=True)
-@click.option('--run-name', default='train')
-@click.option('--with-rcnn', default=True, type=bool)
-@click.option('--no-log', is_flag=True)
-@click.option('--display-every', default=1, type=int)
-@click.option('--random-shuffle', is_flag=True)
-@click.option('--save-timeline', is_flag=True)
-@click.option('--summary-every', default=1, type=int)
-@click.option('--full-trace', is_flag=True)
-@click.option('--initial-learning-rate', default=0.0001, type=float)
-@click.option('--learning-rate-decay', default=10000, type=int)
+@click.option('--num-classes', default=20, help='Number of classes of the dataset you are training on (only used when training with RCNN).')
+@click.option('--pretrained-net', default='vgg_16', type=click.Choice(PRETRAINED_MODULES.keys()), help='Architecture for the pretrained network.')
+@click.option('--pretrained-weights', help='Checkpoint file with the weights of the pretrained network.')
+@click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
+@click.option('--checkpoint-file', help='File for the weights of RPN and RCNN for resuming training.')
+@click.option('--pretrained-checkpoint-file', help='File for the weights of the pretrained network for resuming training.')
+@click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint (set to "frcnn" when loading RPN and wanting to train complete network)')
+@click.option('--log-dir', default='/tmp/frcnn/', help='Directory for Tensorboard logs.')
+@click.option('--save-every', default=1000, help='Save checkpoint after that many batches.')
+@click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')
+@click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')
+@click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')
+@click.option('--with-rcnn', default=True, type=bool, help='Train RCNN classifier (not only RPN)')
+@click.option('--no-log', is_flag=True, help='Don\'t save summary logs.')
+@click.option('--display-every', default=1, type=int, help='Show image debug information every N batches (debug mode must be activated)')
+@click.option('--random-shuffle', is_flag=True, help='Ingest data from dataset in random order.')
+@click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')
+@click.option('--summary-every', default=1, type=int, help='Save summary logs every N batches.')
+@click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')
+@click.option('--initial-learning-rate', default=0.0001, type=float, help='Initial learning date.')
+@click.option('--learning-rate-decay', default=10000, type=int, help='Decay learning date after N batches.')
+@click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
+@click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           checkpoint_file, pretrained_checkpoint_file, ignore_scope, log_dir,
           save_every, tf_debug, debug, run_name, with_rcnn, no_log,
           display_every, random_shuffle, save_timeline, summary_every,
-          full_trace, initial_learning_rate, learning_rate_decay):
+          full_trace, initial_learning_rate, learning_rate_decay,
+          optimizer_type, momentum):
 
     if debug or tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -118,9 +121,12 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
 
     tf.summary.scalar('losses/learning_rate', learning_rate)
 
-    optimizer = tf.train.MomentumOptimizer(
-        learning_rate=learning_rate, momentum=0.9
-    )
+    optimizer_cls = OPTIMIZERS[optimizer_type]
+    if optimizer_type == 'momentum':
+        optimizer = optimizer_cls(learning_rate, momentum)
+    else:
+        optimizer = optimizer_cls(learning_rate)
+
     trainable_vars = snt.get_variables_in_module(model)
     if Config.PRETRAINED_TRAINABLE:
         trainable_vars += snt.get_variables_in_module(pretrained)
@@ -223,11 +229,20 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     )
 
                 if debug and step % display_every == 0:
+                    from .utils.image_vis import (
+                        draw_anchors, draw_positive_anchors,
+                        draw_top_nms_proposals, draw_batch_proposals,
+                        draw_rpn_cls_loss, draw_rpn_bbox_pred,
+                        draw_rpn_bbox_pred_with_target, draw_rcnn_cls_batch,
+                        draw_rcnn_input_proposals, draw_rcnn_cls_batch_errors,
+                        draw_rcnn_reg_batch_errors, draw_object_prediction
+                    )
                     print('Scaled image with {}'.format(scale_factor))
                     print('Image size: {}'.format(pred_dict['image_shape']))
                     draw_anchors(pred_dict)
                     draw_positive_anchors(pred_dict)
                     draw_top_nms_proposals(pred_dict, 0.9)
+                    draw_top_nms_proposals(pred_dict, 0)
                     draw_batch_proposals(pred_dict, display_anchor=True)
                     draw_batch_proposals(pred_dict, display_anchor=False)
                     draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True)
@@ -245,6 +260,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                         draw_object_prediction(pred_dict)
 
                     if save_timeline:
+                        from tensorflow.python.client import timeline
                         run_tmln = timeline.Timeline(
                             run_metadata.step_stats)
                         chrome_trace = run_tmln.generate_chrome_trace_format()
