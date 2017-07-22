@@ -112,7 +112,9 @@ class RCNNProposal(snt.AbstractModule):
 
             selected_boxes.append(class_objects_tf)
             selected_probs.append(class_prob)
-            selected_labels.append([class_id] * tf.shape(class_selected_idx)[0])
+            selected_labels.append(
+                tf.tile([class_id], [tf.shape(class_selected_idx)[0]])
+            )
 
         objects_tf = tf.concat(selected_boxes, axis=0)
         y_min, x_min, y_max, x_max = tf.unstack(objects_tf, axis=1)
