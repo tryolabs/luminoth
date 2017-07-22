@@ -1,6 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
+from .roi_pool import ROIPoolingLayer
 from .rcnn_target import RCNNTarget
 from .rcnn_proposal import RCNNProposal
 from .utils.losses import smooth_l1_loss
@@ -50,10 +51,11 @@ class RCNN(snt.AbstractModule):
             regularizers={'w': regularizer}
         )
 
+        self._roi_pool = ROIPoolingLayer(debug=self._debug)
         self._rcnn_target = RCNNTarget(self._num_classes, debug=self._debug)
         self._rcnn_proposal = RCNNProposal(self._num_classes)
 
-    def _build(self, pooled_layer, proposals, gt_boxes, im_shape):
+    def _build(self, pretrained_feature_map, proposals, gt_boxes, im_shape):
         """
         Classifies proposals based on the pooled feature map.
 
@@ -70,6 +72,27 @@ class RCNN(snt.AbstractModule):
 
         prediction_dict = {}
 
+        proposals_target, bbox_target = self._rcnn_target(
+            proposals, gt_boxes)
+
+        # We flatten to set shape, but it is already a flat Tensor.
+        in_batch_proposals = tf.reshape(
+            tf.not_equal(proposals_target, -1), [-1]
+        )
+        roi_proposals = tf.boolean_mask(proposals, in_batch_proposals)
+        roi_bbox_target = tf.boolean_mask(bbox_target, in_batch_proposals)
+        roi_proposals_target = tf.boolean_mask(proposals_target, in_batch_proposals)
+
+        roi_prediction = self._roi_pool(
+            roi_proposals, pretrained_feature_map,
+            im_shape
+        )
+
+        if self._debug:
+            prediction_dict['roi_prediction'] = roi_prediction
+
+        pooled_layer = roi_prediction['roi_pool']
+
         # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
         flatten_net = tf.contrib.layers.flatten(pooled_layer)
@@ -77,6 +100,7 @@ class RCNN(snt.AbstractModule):
 
         if self._debug:
             prediction_dict['flatten_net'] = net  # TODO: debug tmp
+            variable_summaries(pooled_layer, 'pooled_layer', ['rcnn'])
 
         # After flattening we are lef with a
         # (num_proposals, pool_height * pool_width * 512) tensor.
@@ -91,11 +115,8 @@ class RCNN(snt.AbstractModule):
         prob = tf.nn.softmax(cls_score, dim=1)
         bbox_offsets = self._bbox_layer(net)
 
-        proposals_target, bbox_target = self._rcnn_target(
-            proposals, gt_boxes)
-
         proposal_prediction = self._rcnn_proposal(
-            proposals, bbox_offsets, prob, im_shape)
+            roi_proposals, bbox_offsets, prob, im_shape)
 
         variable_summaries(prob, 'prob', ['rcnn'])
         variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
@@ -103,8 +124,9 @@ class RCNN(snt.AbstractModule):
         prediction_dict['cls_score'] = cls_score
         prediction_dict['cls_prob'] = prob
         prediction_dict['bbox_offsets'] = bbox_offsets
-        prediction_dict['cls_target'] = proposals_target
-        prediction_dict['bbox_offsets_target'] = bbox_target
+        prediction_dict['cls_target'] = roi_proposals_target
+        prediction_dict['roi_proposals'] = roi_proposals
+        prediction_dict['bbox_offsets_target'] = roi_bbox_target
         prediction_dict['objects'] = proposal_prediction['objects']
         prediction_dict['objects_labels'] = proposal_prediction['proposal_label']
         prediction_dict['objects_labels_prob'] = proposal_prediction['proposal_label_prob']

@@ -3,7 +3,6 @@ import sonnet as snt
 import tensorflow as tf
 
 from .rcnn import RCNN
-from .roi_pool import ROIPoolingLayer
 from .rpn import RPN
 
 from .utils.generate_anchors import generate_anchors as generate_anchors_ref
@@ -64,7 +63,6 @@ class FasterRCNN(snt.AbstractModule):
 
         self._rpn = RPN(self._num_anchors, debug=self._debug)
         if self._with_rcnn:
-            self._roi_pool = ROIPoolingLayer(debug=self._debug)
             self._rcnn = RCNN(self._num_classes, debug=self._debug)
 
         image_shape = tf.shape(image)[1:3]
@@ -89,21 +87,15 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['gt_boxes'] = gt_boxes
 
         if self._with_rcnn:
-            roi_prediction = self._roi_pool(
-                rpn_prediction['proposals'], pretrained_feature_map,
-                image_shape
-            )
 
             # TODO: Missing mapping classification_bbox to real coordinates.
             # (and trimming, and NMS?)
             classification_pred = self._rcnn(
-                roi_prediction['roi_pool'], rpn_prediction['proposals'],
-                gt_boxes, image_shape
+                pretrained_feature_map, rpn_prediction['proposals'], gt_boxes,
+                image_shape
             )
 
             prediction_dict['classification_prediction'] = classification_pred
-            if self._debug:
-                prediction_dict['roi_prediction'] = roi_prediction
 
         if is_training and self._debug:
             tf.summary.image('image', image, max_outputs=20)

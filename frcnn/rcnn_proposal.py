@@ -44,7 +44,8 @@ class RCNNProposal(snt.AbstractModule):
         """
 
         # remove batch_id from proposals (TODO: Multibatch support?, batch_id should be called image_idx?)
-        proposals = tf.slice(proposals, [0, 1], [-1, -1])
+        with tf.control_dependencies([tf.equal(tf.shape(proposals)[-1], 5)]):
+            proposals = tf.slice(proposals, [0, 1], [-1, -1])
 
         # First we want get the most probable label for each proposal
         # We still have the background on idx 0 so we substract 1 to the idxs.
