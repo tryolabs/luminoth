@@ -4,3 +4,4 @@ ipython==5.3.0
 lxml==3.7.3
 Pillow==4.0.0
 tensorflow==1.0.0
+scipy
