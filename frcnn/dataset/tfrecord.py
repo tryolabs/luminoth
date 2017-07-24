@@ -8,9 +8,9 @@ from .dataset import Dataset
 
 class TFRecordDataset(Dataset):
 
-    def __init__(self, name='tfrecord_dataset', **kwargs):
+    def __init__(self, config, name='tfrecord_dataset', **kwargs):
         self._random_shuffle = kwargs.pop('random_shuffle', False)
-        super(TFRecordDataset, self).__init__(name=name, **kwargs)
+        super(TFRecordDataset, self).__init__(config, name=name, **kwargs)
 
         self._context_features = {
             'image_raw': tf.FixedLenFeature([], tf.string),
@@ -32,7 +32,7 @@ class TFRecordDataset(Dataset):
         """Returns a tuple containing image, image metadata and label."""
 
         split_path = os.path.join(
-            self._dataset_dir, f'{self._subset}.tfrecords'
+            self._dataset_dir, '{}.tfrecords'.format(self._subset)
         )
 
         filename_queue = tf.train.string_input_producer(
@@ -55,10 +55,9 @@ class TFRecordDataset(Dataset):
         # Decode and preprocess the example (crop, adjust mean and variance).
         # image_jpeg = tf.decode_raw(example['image_raw'], tf.string)
         image_raw = tf.image.decode_jpeg(context_example['image_raw'])
-        tf.summary.image('image_raw', image_raw, max_outputs=20)
+        # tf.summary.image('image_raw', image_raw, max_outputs=20)
 
         # Do we need per_image_standardization? Do it depend on pretrained?
-        # image = tf.image.per_image_standardization(image_raw)
         image = tf.cast(image_raw, tf.float32)
         height = tf.cast(context_example['height'], tf.int32)
         width = tf.cast(context_example['width'], tf.int32)
@@ -73,25 +72,31 @@ class TFRecordDataset(Dataset):
 
         bboxes = tf.stack([xmin, ymin, xmax, ymax, label], axis=1)
 
+        image, bboxes, scale_factor = self._resize_image(image, bboxes)
+
+        filename = tf.cast(context_example['filename'], tf.string)
+
         if self._random_shuffle:
             queue = tf.RandomShuffleQueue(
                 capacity=100,
                 min_after_dequeue=20,
-                dtypes=[tf.float32, tf.int32],
-                names=['image', 'bboxes'],
+                dtypes=[tf.float32, tf.int32, tf.string, tf.float32],
+                names=['image', 'bboxes', 'filename', 'scale_factor'],
                 name='tfrecord_random_queue'
             )
         else:
             queue = tf.FIFOQueue(
                 capacity=100,
-                dtypes=[tf.float32, tf.int32],
-                names=['image', 'bboxes'],
+                dtypes=[tf.float32, tf.int32, tf.string, tf.float32],
+                names=['image', 'bboxes', 'filename', 'scale_factor'],
                 name='tfrecord_fifo_queue'
             )
 
         enqueue_ops = [queue.enqueue({
             'image': image,
-            'bboxes': bboxes
+            'bboxes': bboxes,
+            'filename': filename,
+            'scale_factor': scale_factor,
         })] * 4
 
         tf.train.add_queue_runner(tf.train.QueueRunner(queue, enqueue_ops))

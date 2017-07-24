@@ -3,3 +3,6 @@ __pycache__
 logs/
 models/
 build/
+.DS_Store
+.cache/
+*.pyc

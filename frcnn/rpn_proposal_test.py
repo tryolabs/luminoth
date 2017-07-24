@@ -4,13 +4,13 @@ import numpy as np
 
 from sonnet.testing.parameterized import parameterized
 
-from .proposal import Proposal
+from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
 
 
-class ProposalTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+class RPNProposalTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
     def setUp(self):
-        super(ProposalTest, self).setUp()
+        super(RPNProposalTest, self).setUp()
         # Setup anchors
         self.anchor_scales = np.array([8, 16, 32])
         self.anchor_ratios = np.array([0.5, 1, 2])
