@@ -20,6 +20,10 @@ OPTIMIZERS = {
     'momentum': tf.train.MomentumOptimizer,
 }
 
+LEARNING_RATE_DECAY_METHODS = set([
+    'piecewise_constant', 'exponential_decay', 'none'
+])
+
 
 @click.command()
 @click.option('--num-classes', default=20, help='Number of classes of the dataset you are training on (only used when training with RCNN).')
@@ -43,6 +47,7 @@ OPTIMIZERS = {
 @click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')
 @click.option('--initial-learning-rate', default=0.0001, type=float, help='Initial learning date.')
 @click.option('--learning-rate-decay', default=10000, type=int, help='Decay learning date after N batches.')
+@click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
 def train(num_classes, pretrained_net, pretrained_weights, model_dir,
@@ -50,7 +55,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
           save_every, tf_debug, debug, run_name, with_rcnn, no_log,
           display_every, random_shuffle, save_timeline, summary_every,
           full_trace, initial_learning_rate, learning_rate_decay,
-          optimizer_type, momentum):
+          learning_rate_decay_method, optimizer_type, momentum):
 
     if debug or tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -113,11 +118,24 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
     )
 
-    learning_rate = tf.train.exponential_decay(
-        learning_rate=initial_learning_rate, global_step=global_step,
-        decay_steps=learning_rate_decay, decay_rate=0.96, staircase=True,
-        name='learning_rate_with_decay'
-    )
+    if not learning_rate_decay_method or learning_rate_decay_method == 'none':
+        learning_rate = initial_learning_rate
+    elif learning_rate_decay_method == 'piecewise_constant':
+        learning_rate = tf.train.piecewise_constant(
+            global_step, boundaries=[tf.cast(learning_rate_decay, tf.int64), ],
+            values=[initial_learning_rate, initial_learning_rate * 0.1],
+            name='learning_rate_piecewise_constant'
+        )
+    elif learning_rate_decay == 'exponential_decay':
+        learning_rate = tf.train.exponential_decay(
+            learning_rate=initial_learning_rate, global_step=global_step,
+            decay_steps=learning_rate_decay, decay_rate=0.96, staircase=True,
+            name='learning_rate_with_decay'
+        )
+    else:
+        raise ValueError(
+            'Invalid learning_rate method "{}"'.format(
+                learning_rate_decay_method))
 
     tf.summary.scalar('losses/learning_rate', learning_rate)
 
