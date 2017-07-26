@@ -75,13 +75,14 @@ class RCNN(snt.AbstractModule):
         proposals_target, bbox_target = self._rcnn_target(
             proposals, gt_boxes)
 
-        # We flatten to set shape, but it is already a flat Tensor.
-        in_batch_proposals = tf.reshape(
-            tf.not_equal(proposals_target, -1), [-1]
-        )
-        roi_proposals = tf.boolean_mask(proposals, in_batch_proposals)
-        roi_bbox_target = tf.boolean_mask(bbox_target, in_batch_proposals)
-        roi_proposals_target = tf.boolean_mask(proposals_target, in_batch_proposals)
+        with tf.name_scope('prepare_batch'):
+            # We flatten to set shape, but it is already a flat Tensor.
+            in_batch_proposals = tf.reshape(
+                tf.not_equal(proposals_target, -1), [-1]
+            )
+            roi_proposals = tf.boolean_mask(proposals, in_batch_proposals)
+            roi_bbox_target = tf.boolean_mask(bbox_target, in_batch_proposals)
+            roi_proposals_target = tf.boolean_mask(proposals_target, in_batch_proposals)
 
         roi_prediction = self._roi_pool(
             roi_proposals, pretrained_feature_map,
