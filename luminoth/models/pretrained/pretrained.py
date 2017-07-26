@@ -7,8 +7,6 @@ _B_MEAN = 103.94
 
 
 class Pretrained(snt.AbstractModule):
-    def __init__(self, name='pretrained'):
-        super(Pretrained, self).__init__(name=name)
 
     def load_weights(self, checkpoint_file):
         """

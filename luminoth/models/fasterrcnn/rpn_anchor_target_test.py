@@ -2,13 +2,11 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from sonnet.testing.parameterized import parameterized
-
 from .rpn_anchor_target import RPNAnchorTarget
 from .utils.generate_anchors import generate_anchors
 
 
-class RPNnchorTargetTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+class RPNAnchorTargetTest(tf.test.TestCase):
 
     def setUp(self):
         super(RPNAnchorTargetTest, self).setUp()

@@ -2,12 +2,10 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from sonnet.testing.parameterized import parameterized
-
 from .rpn import RPN
 
 
-class RPNTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+class RPNTest(tf.test.TestCase):
 
     def setUp(self):
         super(RPNTest, self).setUp()

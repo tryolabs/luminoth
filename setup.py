@@ -14,7 +14,7 @@ ext_modules = [
     Extension(
         "frcnn.utils.bbox",
         ["frcnn/utils/bbox.pyx"],
-        include_dirs = [numpy_include]
+        include_dirs=[numpy_include]
     ),
 ]
 

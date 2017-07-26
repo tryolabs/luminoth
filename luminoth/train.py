@@ -290,6 +290,8 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                 tf.logging.info('train_loss: {}'.format(train_loss))
                 tf.logging.info('step: {}, file: {}'.format(step, filename))
 
+                import ipdb; ipdb.set_trace()
+
                 if not no_log:
                     if step % save_every == 0:
                         # We don't support partial saver.

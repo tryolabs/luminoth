@@ -1,14 +1,11 @@
-import sonnet as snt
 import tensorflow as tf
 import numpy as np
-
-from sonnet.testing.parameterized import parameterized
 
 from .rpn_proposal import RPNProposal
 from .utils.generate_anchors import generate_anchors
 
 
-class RPNProposalTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
+class RPNProposalTest(tf.test.TestCase):
     def setUp(self):
         super(RPNProposalTest, self).setUp()
         # Setup anchors
@@ -17,7 +14,7 @@ class RPNProposalTest(parameterized.ParameterizedTestCase, tf.test.TestCase):
         self.anchors = generate_anchors(ratios=self.anchor_ratios, scales=self.anchor_scales)
 
     def testBasic(self):
-        model = Proposal(self.anchors)
+        model = RPNProposal(self.anchors)
         rpn_cls_prob_shape = (1, 32, 32, model._num_anchors * 2)
         rpn_bbox_pred_shape = (1, 32, 32, model._num_anchors * 4)
 

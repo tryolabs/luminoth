@@ -79,7 +79,7 @@ class TFRecordDataset(Dataset):
         if self._random_shuffle:
             queue = tf.RandomShuffleQueue(
                 capacity=100,
-                min_after_dequeue=20,
+                min_after_dequeue=0,
                 dtypes=[tf.float32, tf.int32, tf.string, tf.float32],
                 names=['image', 'bboxes', 'filename', 'scale_factor'],
                 name='tfrecord_random_queue'
@@ -97,7 +97,7 @@ class TFRecordDataset(Dataset):
             'bboxes': bboxes,
             'filename': filename,
             'scale_factor': scale_factor,
-        })] * 4
+        })] * 20
 
         tf.train.add_queue_runner(tf.train.QueueRunner(queue, enqueue_ops))
 

@@ -56,9 +56,9 @@ class RPNProposal(snt.AbstractModule):
         anchor_filter = tf.reshape(anchor_filter, [-1])
 
         # Filter anchors, predictions and scores.
-        all_anchors = tf.boolean_mask(all_anchors, anchor_filter)
-        rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, anchor_filter)
-        scores = tf.boolean_mask(scores, anchor_filter)
+        all_anchors = tf.boolean_mask(all_anchors, anchor_filter, name='filter_anchors')
+        scores = tf.boolean_mask(scores, anchor_filter, name='filter_scores')
+        rpn_bbox_pred = tf.boolean_mask(tf.cast(rpn_bbox_pred, tf.float32), anchor_filter, name='filter_rpn_bbox_pred')
 
         # Decode boxes
         proposals = bbox_decode(all_anchors, rpn_bbox_pred)
@@ -79,17 +79,24 @@ class RPNProposal(snt.AbstractModule):
         proposal_filter = tf.reshape(proposal_filter, [-1])
 
         # Filter proposals and scores.
-        proposals = tf.boolean_mask(proposals, proposal_filter)
-        scores = tf.boolean_mask(scores, proposal_filter)
+        scores = tf.boolean_mask(scores, proposal_filter, name='filter_invalid_scores')
+        proposals = tf.boolean_mask(proposals, proposal_filter, name='filter_invalid_proposals')
 
         # Get pre NMS top selections
         k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])
         top_k = tf.nn.top_k(scores, k=k)
         scores = top_k.values
-        proposals = tf.gather(proposals, top_k.indices)
+
+        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
+        x_min = tf.gather(x_min, top_k.indices, name='gather_topk_x_min')
+        y_min = tf.gather(y_min, top_k.indices, name='gather_topk_y_min')
+        x_max = tf.gather(x_max, top_k.indices, name='gather_topk_x_max')
+        y_max = tf.gather(y_max, top_k.indices, name='gather_topk_x_max')
+
+        # proposals = tf.gather(proposals, top_k.indices, name='gather_topk_proposals')
 
         # We reorder the proposals for non_max_supression compatibility.
-        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
+
         proposals_tf_order = tf.stack([y_min, x_min, y_max, x_max], axis=1)
 
         # We cut the pre_nms filter in pure TF version and go straight into NMS.
@@ -100,8 +107,8 @@ class RPNProposal(snt.AbstractModule):
 
         # Selected_indices is a smaller tensor, we need to extract the
         # proposals and scores using it.
-        nms_proposals = tf.gather(proposals_tf_order, selected_indices)
-        nms_proposals_scores = tf.gather(scores, selected_indices)
+        nms_proposals = tf.gather(proposals_tf_order, selected_indices, name='gather_nms_proposals')
+        nms_proposals_scores = tf.gather(scores, selected_indices, name='gather_nms_proposals_scores')
 
         # We switch back again to the regular bbox encoding.
         y_min, x_min, y_max, x_max = tf.split(value=nms_proposals, num_or_size_splits=4, axis=1)
