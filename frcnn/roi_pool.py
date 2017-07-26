@@ -20,21 +20,22 @@ class ROIPoolingLayer(snt.AbstractModule):
         Get normalized coordinates for RoIs (between 0 and 1 for easy cropping)
         in TF order (y1, x1, y2, x2)
         """
-        im_shape = tf.cast(im_shape, tf.float32)
+        with tf.name_scope('get_bboxes'):
+            im_shape = tf.cast(im_shape, tf.float32)
 
-        _, x1, y1, x2, y2 = tf.split(
-            value=roi_proposals, num_or_size_splits=5, axis=1
-        )
+            _, x1, y1, x2, y2 = tf.split(
+                value=roi_proposals, num_or_size_splits=5, axis=1
+            )
 
-        x1 = x1 / im_shape[1]
-        y1 = y1 / im_shape[0]
-        x2 = x2 / im_shape[1]
-        y2 = y2 / im_shape[0]
+            x1 = x1 / im_shape[1]
+            y1 = y1 / im_shape[0]
+            x2 = x2 / im_shape[1]
+            y2 = y2 / im_shape[0]
 
-        # Won't be backpropagated to rois anyway, but to save time TODO: Remove
-        bboxes = tf.concat([y1, x1, y2, x2], axis=1)
+            # Won't be backpropagated to rois anyway, but to save time TODO: Remove
+            bboxes = tf.concat([y1, x1, y2, x2], axis=1)
 
-        return bboxes
+            return bboxes
 
     def _roi_crop(self, roi_proposals, pretrained, im_shape):
         bboxes = self._get_bboxes(roi_proposals, im_shape)

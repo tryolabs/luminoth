@@ -98,21 +98,22 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['classification_prediction'] = classification_pred
 
         if is_training and self._debug:
-            tf.summary.image('image', image, max_outputs=20)
-            tf.summary.image(
-                'top_1_rpn_boxes',
-                draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20
-            )
-            tf.summary.image(
-                'top_10_rpn_boxes',
-                draw_bboxes(image, rpn_prediction['proposals'], 10),
-                max_outputs=20
-            )
-            tf.summary.image(
-                'top_20_rpn_boxes',
-                draw_bboxes(image, rpn_prediction['proposals'], 20),
-                max_outputs=20
-            )
+            with tf.name_scope('draw_bboxes'):
+                tf.summary.image('image', image, max_outputs=20)
+                tf.summary.image(
+                    'top_1_rpn_boxes',
+                    draw_bboxes(image, rpn_prediction['proposals'], 1), max_outputs=20
+                )
+                tf.summary.image(
+                    'top_10_rpn_boxes',
+                    draw_bboxes(image, rpn_prediction['proposals'], 10),
+                    max_outputs=20
+                )
+                tf.summary.image(
+                    'top_20_rpn_boxes',
+                    draw_bboxes(image, rpn_prediction['proposals'], 20),
+                    max_outputs=20
+                )
 
         return prediction_dict
 
