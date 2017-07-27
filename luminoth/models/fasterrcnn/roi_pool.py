@@ -23,8 +23,8 @@ class ROIPoolingLayer(snt.AbstractModule):
         with tf.name_scope('get_bboxes'):
             im_shape = tf.cast(im_shape, tf.float32)
 
-            _, x1, y1, x2, y2 = tf.split(
-                value=roi_proposals, num_or_size_splits=5, axis=1
+            _, x1, y1, x2, y2 = tf.unstack(
+                roi_proposals, axis=1
             )
 
             x1 = x1 / im_shape[1]
@@ -33,7 +33,7 @@ class ROIPoolingLayer(snt.AbstractModule):
             y2 = y2 / im_shape[0]
 
             # Won't be backpropagated to rois anyway, but to save time TODO: Remove
-            bboxes = tf.concat([y1, x1, y2, x2], axis=1)
+            bboxes = tf.stack([y1, x1, y2, x2], axis=1)
 
             return bboxes
 

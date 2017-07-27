@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from .rpn_anchor_target import RPNAnchorTarget
-from .utils.generate_anchors import generate_anchors
+from luminoth.utils.generate_anchors import generate_anchors
 
 
 class RPNAnchorTargetTest(tf.test.TestCase):

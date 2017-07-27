@@ -10,7 +10,7 @@ class Config:
     DATASET_DIR = 'datasets/voc/tf'
     NUM_EPOCHS = 10000
     BATCH_SIZE = 1
-    TRAIN_SUBSET = 'train-top20-1classes'
+    TRAIN_SUBSET = 'train'
 
     IMAGE_MIN_SIZE = 600
     IMAGE_MAX_SIZE = 1024

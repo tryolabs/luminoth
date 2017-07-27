@@ -5,19 +5,23 @@ import tensorflow as tf
 from .rcnn import RCNN
 from .rpn import RPN
 
-from .utils.generate_anchors import generate_anchors as generate_anchors_ref
-from .utils.ops import meshgrid
-from .utils.image import draw_bboxes
-from .utils.vars import variable_summaries
+from luminoth.utils.generate_anchors import generate_anchors as generate_anchors_ref
+from luminoth.utils.ops import meshgrid
+from luminoth.utils.image import draw_bboxes
+from luminoth.utils.vars import variable_summaries
+from luminoth.utils.config import get_base_config
 
 
 class FasterRCNN(snt.AbstractModule):
     """Faster RCNN Network"""
 
+    base_config = get_base_config(__file__)
+
     def __init__(self, config, debug=False, with_rcnn=True, num_classes=None,
                  name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
+        import ipdb; ipdb.set_trace()
         self._cfg = config
         self._num_classes = num_classes
         self._with_rcnn = with_rcnn

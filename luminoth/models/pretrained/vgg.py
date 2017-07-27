@@ -3,7 +3,7 @@ from tensorflow.contrib.slim.nets import vgg
 
 from .pretrained import Pretrained
 
-DEFAULT_ENDPOINT = 'resnet_v2_101/block4/unit_3/bottleneck_v2/conv3'
+DEFAULT_ENDPOINT = 'vgg_16/conv5/conv5_1'
 
 
 class VGG(Pretrained):

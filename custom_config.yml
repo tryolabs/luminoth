@@ -1,0 +1,67 @@
+debug: False
+num_classes: 1
+
+anchors:
+  base_size: 256
+  scales: [0.5, 1, 2]
+  ratios: [0.5, 1, 2]
+  stride: 16
+
+image_preprocessing:
+  min_size: 600
+  max_size: 1024
+
+rpn:
+  num_channels: 512
+  kernel_shape: [3, 3]
+  initializer:
+    type: truncated_normal_initializer
+    mean: 0.0
+    stddev: 0.01
+  l2_regulalization_scale: 0.0005  # disable using 0
+  activation_function: relu6
+
+  proposals:
+    pre_nms_top_n: 12000
+    post_nms_top_n: 20000
+    nms_threshold: 0.6
+    min_size: 0  # disable using 0
+
+  target:
+    allowed_border: 0
+    clobber_positives: False
+    foreground_threshold: 0.7
+    background_threshold_high: 0.3
+    background_threshold_low: 0.
+    foreground_fraction: 0.5
+    minibatch_size: 256
+    random_seed:  # only to be used for debugging
+
+rcnn:
+  enabled: True  # if disabled, then the rest of the config values will not be used.
+  layer_sizes: [4096, 4096]
+  activation_function: relu6
+  initializer:
+    type: variance_scaling_initializer
+    factor: 1.0
+    uniform: True
+    mode: FAN_AVG
+  l2_regulalization_scale: 0.0005
+
+  roi:
+    pooling_mode: CROP
+    pooled_with: 7
+    pooled_height: 7
+    padding: VALID
+
+  proposals:
+    class_max_detections: 100
+    class_nms_threshold: 0.6
+    total_max_detections: 300
+
+  target:
+    foreground_fraction: 0.25
+    minibatch_size: 64
+    foreground_threshold: 0.5
+    background_threshold_high: 0.5
+    background_threshold_low: 0.1

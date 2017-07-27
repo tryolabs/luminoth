@@ -2,8 +2,8 @@ import tensorflow as tf
 import sonnet as snt
 import numpy as np
 
-from .utils.bbox_transform import bbox_transform, unmap
-from .utils.bbox import bbox_overlaps
+from luminoth.utils.bbox_transform import bbox_transform, unmap
+from luminoth.utils.bbox import bbox_overlaps
 
 
 class RCNNTarget(snt.AbstractModule):
@@ -14,7 +14,7 @@ class RCNNTarget(snt.AbstractModule):
         super(RCNNTarget, self).__init__(name=name)
         self._num_classes = num_classes
         self._foreground_fraction = 0.25
-        self._batch_size = 64
+        self._minibatch_size = 64
         self._foreground_threshold = 0.5
         self._background_threshold_high = 0.5
         self._background_threshold_low = 0.1
@@ -106,7 +106,7 @@ class RCNNTarget(snt.AbstractModule):
 
         # Now we subsample labels and mark them as -1 in order to ignore them.
         # Our batch of N should be: F% foreground (label > 0)
-        num_fg = int(self._foreground_fraction * self._batch_size)
+        num_fg = int(self._foreground_fraction * self._minibatch_size)
         fg_inds = np.where(proposals_label >= 1)[0]
         if len(fg_inds) > num_fg:
             disable_inds = np.random.choice(
@@ -124,7 +124,7 @@ class RCNNTarget(snt.AbstractModule):
             )
 
         # subsample negative labels
-        num_bg = self._batch_size - np.sum(proposals_label >= 1)
+        num_bg = self._minibatch_size - np.sum(proposals_label >= 1)
         bg_inds = np.where(proposals_label == 0)[0]
         if len(bg_inds) > num_bg:
             disable_inds = np.random.choice(

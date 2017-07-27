@@ -5,8 +5,8 @@ from sonnet.python.modules.conv import Conv2D
 
 from .rpn_anchor_target import RPNAnchorTarget
 from .rpn_proposal import RPNProposal
-from .utils.losses import smooth_l1_loss
-from .utils.vars import variable_summaries
+from luminoth.utils.losses import smooth_l1_loss
+from luminoth.utils.vars import variable_summaries
 
 
 class RPN(snt.AbstractModule):

@@ -2,8 +2,8 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from .utils.bbox import bbox_overlaps
-from .utils.bbox_transform import bbox_transform, unmap
+from luminoth.utils.bbox import bbox_overlaps
+from luminoth.utils.bbox_transform import bbox_transform, unmap
 
 
 class RPNAnchorTarget(snt.AbstractModule):
@@ -39,10 +39,9 @@ class RPNAnchorTarget(snt.AbstractModule):
         bbox_outside_weights: TODO: ??
 
     """
-    def __init__(self, num_anchors, feat_stride=[16], debug=False, name='anchor_target'):
+    def __init__(self, num_anchors, debug=False, name='anchor_target'):
         super(RPNAnchorTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
-        self._feat_stride = feat_stride
 
         self._allowed_border = 0
         # We set clobber positive to False to make sure that there is always at
@@ -54,7 +53,7 @@ class RPNAnchorTarget(snt.AbstractModule):
         self._negative_overlap = 0.3
         # Fraction of the batch to be foreground labeled anchors.
         self._foreground_fraction = 0.5
-        self._batch_size = 256
+        self._minibatch_size = 256
         # TODO:
         self._bbox_inside_weights = (1.0, 1.0, 1.0, 1.0)
 
@@ -184,7 +183,7 @@ class RPNAnchorTarget(snt.AbstractModule):
             labels[max_overlaps < self._negative_overlap] = 0
 
         # subsample positive labels if we have too many
-        num_fg = int(self._foreground_fraction * self._batch_size)
+        num_fg = int(self._foreground_fraction * self._minibatch_size)
         fg_inds = np.where(labels == 1)[0]
         if len(fg_inds) > num_fg:
             disable_inds = np.random.choice(
@@ -192,7 +191,7 @@ class RPNAnchorTarget(snt.AbstractModule):
             labels[disable_inds] = -1
 
         # subsample negative labels if we have too many
-        num_bg = self._batch_size - np.sum(labels == 1)
+        num_bg = self._minibatch_size - np.sum(labels == 1)
         bg_inds = np.where(labels == 0)[0]
         if len(bg_inds) > num_bg:
             disable_inds = np.random.choice(

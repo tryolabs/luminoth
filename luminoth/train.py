@@ -3,10 +3,16 @@ import sonnet as snt
 import tensorflow as tf
 import click
 
-from .network import FasterRCNN
-from .pretrained import VGG, ResNetV2
+from .models.fasterrcnn import FasterRCNN
+from .models.pretrained import VGG, ResNetV2
 from .config import Config
 from .dataset import TFRecordDataset
+from .utils.config import load_config, merge_into
+
+MODELS = {
+    'FasterRCNN': FasterRCNN,
+}
+
 
 PRETRAINED_MODULES = {
     'vgg': VGG,
@@ -25,7 +31,9 @@ LEARNING_RATE_DECAY_METHODS = set([
 ])
 
 
-@click.command()
+@click.command(help='Train models')
+@click.argument('model_type', type=click.Choice(MODELS.keys()))
+@click.option('config_file', '--config', type=click.File('r'), help='Config to use.')
 @click.option('--num-classes', default=20, help='Number of classes of the dataset you are training on (only used when training with RCNN).')
 @click.option('--pretrained-net', default='vgg_16', type=click.Choice(PRETRAINED_MODULES.keys()), help='Architecture for the pretrained network.')
 @click.option('--pretrained-weights', help='Checkpoint file with the weights of the pretrained network.')
@@ -50,22 +58,25 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
-def train(num_classes, pretrained_net, pretrained_weights, model_dir,
-          checkpoint_file, pretrained_checkpoint_file, ignore_scope, log_dir,
-          save_every, tf_debug, debug, run_name, with_rcnn, no_log,
-          display_every, random_shuffle, save_timeline, summary_every,
-          full_trace, initial_learning_rate, learning_rate_decay,
-          learning_rate_decay_method, optimizer_type, momentum):
+def train(model_type, config_file, num_classes, **kwargs):
 
-    if debug or tf_debug:
+    model_class = MODELS[model_type]
+    model_config = model_class.base_config
+
+    if config_file:
+        config = load_config(config_file)
+        config = merge_into(config, model_config)
+
+    config = merge_into({'train': kwargs}, config)
+    train = config.train
+
+    if train.debug or train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
+    model = model_class(config)
     pretrained = PRETRAINED_MODULES[pretrained_net](trainable=False)
-    model = FasterRCNN(
-        Config, debug=debug, num_classes=num_classes, with_rcnn=with_rcnn,
-    )
     dataset = TFRecordDataset(
         Config, num_classes=num_classes, random_shuffle=random_shuffle
     )
@@ -247,7 +258,7 @@ def train(num_classes, pretrained_net, pretrained_weights, model_dir,
                     )
 
                 if debug and step % display_every == 0:
-                    from .utils.image_vis import (
+                    from luminoth.utils.image_vis import (
                         draw_anchors, draw_positive_anchors,
                         draw_top_nms_proposals, draw_batch_proposals,
                         draw_rpn_cls_loss, draw_rpn_bbox_pred,

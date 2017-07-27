@@ -1,7 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
-from .utils.bbox_transform_tf import bbox_decode
+from luminoth.utils.bbox_transform_tf import bbox_decode
 
 
 class RCNNProposal(snt.AbstractModule):

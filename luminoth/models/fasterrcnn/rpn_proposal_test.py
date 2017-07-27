@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from .rpn_proposal import RPNProposal
-from .utils.generate_anchors import generate_anchors
+from luminoth.utils.generate_anchors import generate_anchors
 
 
 class RPNProposalTest(tf.test.TestCase):

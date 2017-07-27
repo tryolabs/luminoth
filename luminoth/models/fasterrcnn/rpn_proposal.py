@@ -1,7 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
-from .utils.bbox_transform_tf import bbox_decode
+from luminoth.utils.bbox_transform_tf import bbox_decode
 
 
 class RPNProposal(snt.AbstractModule):
@@ -13,10 +13,9 @@ class RPNProposal(snt.AbstractModule):
 
     TODO: Better documentation.
     """
-    def __init__(self, num_anchors, feat_stride=[16], name='proposal_layer'):
+    def __init__(self, num_anchors, name='proposal_layer'):
         super(RPNProposal, self).__init__(name=name)
         self._num_anchors = num_anchors
-        self._feat_stride = feat_stride
 
         # Filtering config  TODO: Use external configuration
         self._pre_nms_top_n = 12000
@@ -25,10 +24,6 @@ class RPNProposal(snt.AbstractModule):
         self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
-        """
-        TODO: Comments (for review you can find an old version in the logs when it was called proposal.py)
-        """
-        rpn_cls_prob = tf.identity(rpn_cls_prob, name='score_before_slice')
         scores = tf.slice(rpn_cls_prob, [0, 1], [-1, -1])
         scores = tf.identity(scores, name='scores_after_slice')
         scores = tf.reshape(scores, [-1])
@@ -38,7 +33,8 @@ class RPNProposal(snt.AbstractModule):
         height = im_shape[0]
         width = im_shape[1]
 
-        x_min_anchor, y_min_anchor, x_max_anchor, y_max_anchor = tf.split(all_anchors, 4, axis=1)
+        (x_min_anchor, y_min_anchor,
+         x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
 
         # Filter anchors that are partially outside the image. TODO: Revisar
         anchor_filter = tf.logical_and(
@@ -56,9 +52,13 @@ class RPNProposal(snt.AbstractModule):
         anchor_filter = tf.reshape(anchor_filter, [-1])
 
         # Filter anchors, predictions and scores.
-        all_anchors = tf.boolean_mask(all_anchors, anchor_filter, name='filter_anchors')
+        all_anchors = tf.boolean_mask(
+            all_anchors, anchor_filter, name='filter_anchors')
         scores = tf.boolean_mask(scores, anchor_filter, name='filter_scores')
-        rpn_bbox_pred = tf.boolean_mask(tf.cast(rpn_bbox_pred, tf.float32), anchor_filter, name='filter_rpn_bbox_pred')
+        rpn_bbox_pred = tf.boolean_mask(
+            tf.cast(rpn_bbox_pred, tf.float32), anchor_filter,
+            name='filter_rpn_bbox_pred'
+        )
 
         # Decode boxes
         proposals = bbox_decode(all_anchors, rpn_bbox_pred)
@@ -75,12 +75,15 @@ class RPNProposal(snt.AbstractModule):
         proposals = tf.stack([x_min, y_min, x_max, y_max], axis=1)
 
         # Filter proposals with negative area. TODO: Optional, is not done in paper, can it happen (given log of width ratio?)
-        proposal_filter = tf.greater_equal((x_max - x_min) * (y_max - y_min), 0)
+        proposal_filter = tf.greater_equal(
+            (x_max - x_min) * (y_max - y_min), 0)
         proposal_filter = tf.reshape(proposal_filter, [-1])
 
         # Filter proposals and scores.
-        scores = tf.boolean_mask(scores, proposal_filter, name='filter_invalid_scores')
-        proposals = tf.boolean_mask(proposals, proposal_filter, name='filter_invalid_proposals')
+        scores = tf.boolean_mask(
+            scores, proposal_filter, name='filter_invalid_scores')
+        proposals = tf.boolean_mask(
+            proposals, proposal_filter, name='filter_invalid_proposals')
 
         # Get pre NMS top selections
         k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])

@@ -1,11 +1,11 @@
 import sonnet as snt
 import tensorflow as tf
 
+from luminoth.utils.losses import smooth_l1_loss
+from luminoth.utils.vars import variable_summaries
 from .roi_pool import ROIPoolingLayer
 from .rcnn_target import RCNNTarget
 from .rcnn_proposal import RCNNProposal
-from .utils.losses import smooth_l1_loss
-from .utils.vars import variable_summaries
 
 
 class RCNN(snt.AbstractModule):

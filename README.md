@@ -1,32 +1,47 @@
-Detector
+Luminoth
 ========
 
-Download [Pascal VOC2007](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/)'s data, both [train/val](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar) and [test](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar) datasets, and extract them; they will merge into single folder named `VOCdevkit`. Then copy the contents of `VOCdevkit/VOC2007` into `datasets/voc`.
+> The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
+>
+> -- [Dark Visor - Wikitroid](http://metroid.wikia.com/wiki/Dark_Visor)
 
 
-Prepare the dataset by running the following line. This will transform the data into three `.tfrecords` files (train, validation, and training) and place them in `datasets/voc/tf/`.
+# What is Luminoth?
+
+Luminoth is a computer vision toolkit made with Tensorflow and Sonnet. Our objective is to create tools to train and use deep learning models while at the same time writing code that is both easy to read (even for a Machine Learning novice) and easy to mantain and extend.
+
+
+# Installation
+
+We currently only support Python 3 (tested on 3.6). Before installing Luminoth you need to manually install [Sonnet](https://github.com/deepmind/sonnet) which does not currently have binary builds for easy installation with `pip`.
+
+After installing Sonnet you can proceed by running:
 
 ```
-$ python -m detector voc
+$ python setup.py install
 ```
 
-Run the training with:
+This should install all required dependencies.
+
+# Usage
+
+There one main command line interface which you can use with the `lumi` command.
+
+## Datasets management
+
+Convert the [Pascal VOC2007](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/) data to Tensorflow's *tfrecords*.
 
 ```
-$ python -m detector train
+lumi dataset voc --data-dir ~/dataset/voc/ --output-dir ~/dataset/voc/tf/
 ```
 
-Run the evaluator (separate process) with:
+## Train
 
 ```
-$ python -m detector evaluate --split=val
+lumi train fasterrcnn --config fasterrcnn-pascal.yml
 ```
 
+## Evaluate
 
-FRCNN
-=====
 
-To build Cython extensions:
-```
-$ python setup.py build_ext --inplace
-```
+Download [pascal voc2007](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/)'s data, both [train/val](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/voctrainval_06-nov-2007.tar) and [test](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/voctest_06-nov-2007.tar) datasets, and extract them; they will merge into single folder named `vocdevkit`. then copy the contents of `vocdevkit/voc2007` into `datasets/voc`.
