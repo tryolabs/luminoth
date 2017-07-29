@@ -44,4 +44,4 @@ lumi train fasterrcnn --config fasterrcnn-pascal.yml
 ## Evaluate
 
 
-Download [pascal voc2007](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/)'s data, both [train/val](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/voctrainval_06-nov-2007.tar) and [test](http://host.robots.ox.ac.uk:8080/pascal/voc/voc2007/voctest_06-nov-2007.tar) datasets, and extract them; they will merge into single folder named `vocdevkit`. then copy the contents of `vocdevkit/voc2007` into `datasets/voc`.
+Download [Pascal VOC2007](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/)'s data, both [train/val](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar) and [test](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar) datasets, and extract them; they will merge into single folder named `vocdevkit`. then copy the contents of `vocdevkit/voc2007` into `datasets/voc`.
