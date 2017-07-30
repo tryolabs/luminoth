@@ -13,15 +13,16 @@ class RPNProposal(snt.AbstractModule):
 
     TODO: Better documentation.
     """
-    def __init__(self, num_anchors, name='proposal_layer'):
+    def __init__(self, num_anchors, config, name='proposal_layer'):
         super(RPNProposal, self).__init__(name=name)
         self._num_anchors = num_anchors
 
-        # Filtering config  TODO: Use external configuration
-        self._pre_nms_top_n = 12000
-        self._post_nms_top_n = 2000
-        self._nms_threshold = 0.6
-        self._min_size = 0  # TF CMU paper suggests removing min size limit -> not used
+        # Filtering config
+        self._pre_nms_top_n = config.pre_nms_top_n
+        self._post_nms_top_n = config.post_nms_top_n
+        self._nms_threshold = config.nms_threshold
+        # TF CMU paper suggests removing min size limit -> not used
+        self._min_size = config.min_size
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
         scores = tf.slice(rpn_cls_prob, [0, 1], [-1, -1])

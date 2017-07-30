@@ -10,15 +10,16 @@ class RCNNTarget(snt.AbstractModule):
     """
     Generate RCNN target tensors for both probabilities and bounding boxes.
     """
-    def __init__(self, num_classes, debug=False, name='rcnn_proposal'):
+    def __init__(self, num_classes, config, debug=False, name='rcnn_proposal'):
         super(RCNNTarget, self).__init__(name=name)
         self._num_classes = num_classes
-        self._foreground_fraction = 0.25
-        self._minibatch_size = 64
-        self._foreground_threshold = 0.5
-        self._background_threshold_high = 0.5
-        self._background_threshold_low = 0.1
+        self._foreground_fraction = config.foreground_fraction
+        self._minibatch_size = config.minibatch_size
+        self._foreground_threshold = config.foreground_threshold
+        self._background_threshold_high = config.background_threshold_high
+        self._background_threshold_low = config.background_threshold_low
         self._debug = debug
+
         if self._debug:
             tf.logging.warning(
                 'Using RCNN Target in debug mode makes random seed to be fixed at 0.')
@@ -61,7 +62,7 @@ class RCNNTarget(snt.AbstractModule):
             np.random.seed(0)  # TODO: For reproducibility.
 
         # Remove batch id from proposals
-        proposals = proposals[:,1:]
+        proposals = proposals[:, 1:]
 
         overlaps = bbox_overlaps(
             # We need to use float and ascontiguousarray because of Cython

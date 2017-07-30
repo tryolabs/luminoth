@@ -39,23 +39,21 @@ class RPNAnchorTarget(snt.AbstractModule):
         bbox_outside_weights: TODO: ??
 
     """
-    def __init__(self, num_anchors, debug=False, name='anchor_target'):
+    def __init__(self, num_anchors, config, debug=False, name='anchor_target'):
         super(RPNAnchorTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
 
-        self._allowed_border = 0
+        self._allowed_border = config.allowed_border
         # We set clobber positive to False to make sure that there is always at
         # least one positive anchor per GT box.
-        self._clobber_positives = False
+        self._clobber_positives = config.clobber_positives
         # We set anchors as positive when the IoU is greater than `positive_overlap`.
-        self._positive_overlap = 0.7
+        self._positive_overlap = config.foreground_threshold
         # We set anchors as negative when the IoU is less than `negative_overlap`.
-        self._negative_overlap = 0.3
+        self._negative_overlap = config.background_threshold_high
         # Fraction of the batch to be foreground labeled anchors.
-        self._foreground_fraction = 0.5
-        self._minibatch_size = 256
-        # TODO:
-        self._bbox_inside_weights = (1.0, 1.0, 1.0, 1.0)
+        self._foreground_fraction = config.foreground_fraction
+        self._minibatch_size = config.minibatch_size
 
         self._debug = debug
         if self._debug:
@@ -105,7 +103,6 @@ class RPNAnchorTarget(snt.AbstractModule):
 
         )
 
-        # TODO: missing bbox_inside_weights, bbox_outside_weights
         return labels, bbox_targets, max_overlaps
 
     def _anchor_target_layer(self, pretrained_shape, gt_boxes, im_info, all_anchors):

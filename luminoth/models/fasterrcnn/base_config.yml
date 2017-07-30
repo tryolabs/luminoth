@@ -1,20 +1,13 @@
-debug: False
-num_classes: 20
-
 train:
+  debug: False
   batch_size: 1
-  pretrained-net: vgg_16
-  pretrained_weights:
   model_dir: models/
   checkpoint_file:
-  pretrained_checkpoint_file: 
   ignore_scope:
-  log_dir: /tmp/fasterrcnn/
+  log_dir: /tmp/luminoth/
   save_every: 1000
   tf_debug: False
-  debug: False
   run_name:
-  with_rcnn: True
   no_log: False
   display_every: 1
   random_shuffle: True
@@ -26,16 +19,35 @@ train:
   learning_rate_decay_method: piecewise_constant
   optimizer_type: momentum
   momentum: 0.9
+  num_epochs: 10000
+
+dataset:
+  dir: 'datasets/voc/tf'
+  subset: train
+  image_preprocessing:
+    min_size: 600
+    max_size: 1024
+  data_augmentation:
+    flip_y: True
+
+network:
+  num_classes: 20
+  with_rcnn: True
+  pretrained_net: vgg_16
+  pretrained_trainable: False
+  pretrained_weights:
+
+loss:
+  rpn_cls_loss_weight: 1.0
+  rpn_reg_loss_weights: 2.0
+  rcnn_cls_loss_weight: 1.0
+  rcnn_reg_loss_weights: 2.0
 
 anchors:
   base_size: 256
   scales: [0.5, 1, 2]
   ratios: [0.5, 1, 2]
   stride: 16
-
-image_preprocessing:
-  min_size: 600
-  max_size: 1024
 
 rpn:
   num_channels: 512
@@ -66,6 +78,7 @@ rpn:
 rcnn:
   enabled: True  # if disabled, then the rest of the config values will not be used.
   layer_sizes: [4096, 4096]
+  dropout_keep_prop: 1.0
   activation_function: relu6
   initializer:
     type: variance_scaling_initializer

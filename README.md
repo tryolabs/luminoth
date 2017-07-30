@@ -37,8 +37,10 @@ lumi dataset voc --data-dir ~/dataset/voc/ --output-dir ~/dataset/voc/tf/
 
 ## Train
 
+Copy FasterRCNN's base_config.yml and modify parameters.
+
 ```
-lumi train fasterrcnn --config fasterrcnn-pascal.yml
+lumi train fasterrcnn --config fasterrcnn-custom.yml
 ```
 
 ## Evaluate

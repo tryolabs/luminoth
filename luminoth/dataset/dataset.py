@@ -4,16 +4,14 @@ import tensorflow as tf
 
 class Dataset(snt.AbstractModule):
     def __init__(self, config, **kwargs):
-        self._cfg = config
-        self._num_classes = kwargs.pop('num_classes', self._cfg.NUM_CLASSES)
-        self._dataset_dir = kwargs.pop('dataset_dir', self._cfg.DATASET_DIR)
-        self._num_epochs = kwargs.pop('num_epochs', self._cfg.NUM_EPOCHS)
-        self._batch_size = kwargs.pop('batch_size', self._cfg.BATCH_SIZE)
-        self._subset = kwargs.pop('subset', self._cfg.TRAIN_SUBSET)
-        self._image_min_size = kwargs.pop('image_min_size', self._cfg.IMAGE_MIN_SIZE)
-        self._image_max_size = kwargs.pop('image_max_size', self._cfg.IMAGE_MAX_SIZE)
-
         super(Dataset, self).__init__(**kwargs)
+        self._dataset_dir = config.dataset.dir
+        self._num_epochs = config.train.num_epochs
+        self._batch_size = config.train.batch_size
+        self._subset = config.dataset.subset
+        self._image_min_size = config.dataset.image_preprocessing.min_size
+        self._image_max_size = config.dataset.image_preprocessing.max_size
+        self._random_shuffle = config.train.random_shuffle
 
     def _resize_image(self, image, bboxes):
         """

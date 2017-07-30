@@ -12,6 +12,14 @@ def get_base_config(path, base_config_filename='base_config.yml'):
     return easydict.EasyDict(yaml.load(open(config_path)))
 
 
+def kwargs_to_config(kwargs):
+    return easydict.EasyDict(dict(
+        (key, val)
+        for key, val in kwargs.items()
+        if val is not None
+    ))
+
+
 def merge_into(new_config, base_config):
     if type(new_config) is not easydict.EasyDict:
         return
@@ -22,7 +30,8 @@ def merge_into(new_config, base_config):
             raise KeyError('Key "{}" is not valid.'.format(key))
 
         # Since we already have the values of base_config we check against them
-        if type(base_config[key]) is not type(value):
+        if (base_config[key] is not None and
+           type(base_config[key]) is not type(value)):
             raise ValueError(
                 'Incorrect type "{}" for key "{}". Must be "{}"'.format(
                     type(value), key, type(base_config[key])))

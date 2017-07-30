@@ -6,13 +6,12 @@ from sonnet.python.modules.conv import Conv2D
 from .rpn_anchor_target import RPNAnchorTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
-from luminoth.utils.vars import variable_summaries
+from luminoth.utils.vars import variable_summaries, get_initializer
 
 
 class RPN(snt.AbstractModule):
 
-    def __init__(self, num_anchors, num_channels=512, kernel_shape=[3, 3],
-                 debug=False, name='rpn'):
+    def __init__(self, num_anchors, config, debug=False, name='rpn'):
         """RPN - Region Proposal Network
 
         This module works almost independently from the Faster RCNN module.
@@ -22,20 +21,22 @@ class RPN(snt.AbstractModule):
         """
         super(RPN, self).__init__(name=name)
         self._num_anchors = num_anchors
-        self._num_channels = num_channels
-        self._kernel_shape = kernel_shape
+        self._num_channels = config.num_channels
+        self._kernel_shape = config.kernel_shape
 
         self._debug = debug
 
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.0
-        self._initializer = tf.truncated_normal_initializer(
-            mean=0.0, stddev=0.01
+        self._initializer = get_initializer(config.initializer)
+        self._regularizer = tf.contrib.layers.l2_regularizer(
+            scale=config.l2_regulalization_scale
         )
-        self._regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
 
         # We could use normal relu without any problems.
         self._rpn_activation = tf.nn.relu6
+
+        self._config = config
 
     def _instantiate_layers(self):
         """Instantiates all convolutional modules used in the RPN."""
@@ -66,9 +67,9 @@ class RPN(snt.AbstractModule):
                all_anchors, is_training=True):
         # We start with a common conv layer applied to the feature map.
         self._instantiate_layers()
-        self._proposal = RPNProposal(self._num_anchors)
+        self._proposal = RPNProposal(self._num_anchors, self._config.proposals)
         self._anchor_target = RPNAnchorTarget(
-            self._num_anchors, debug=self._debug
+            self._num_anchors, self._config.target, debug=self._debug
         )
         rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
 

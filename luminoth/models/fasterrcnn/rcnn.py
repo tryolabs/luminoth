@@ -2,7 +2,7 @@ import sonnet as snt
 import tensorflow as tf
 
 from luminoth.utils.losses import smooth_l1_loss
-from luminoth.utils.vars import variable_summaries
+from luminoth.utils.vars import variable_summaries, get_initializer
 from .roi_pool import ROIPoolingLayer
 from .rcnn_target import RCNNTarget
 from .rcnn_proposal import RCNNProposal
@@ -11,49 +11,51 @@ from .rcnn_proposal import RCNNProposal
 class RCNN(snt.AbstractModule):
     """RCNN """
 
-    def __init__(self, num_classes, layer_sizes=[4096, 4096], debug=False,
-                 name='rcnn'):
+    def __init__(self, num_classes, config, debug=False, name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
-        self._layer_sizes = layer_sizes
+        self._layer_sizes = config.layer_sizes
         self._activation = tf.nn.relu6
-        self._dropout_keep_prob = 1.
+        self._dropout_keep_prob = config.dropout_keep_prop
+
+        self.initializer = get_initializer(config.initializer)
+        self.regularizer = tf.contrib.layers.l2_regularizer(
+            scale=config.l2_regulalization_scale)
 
         self._debug = debug
+        self._config = config
 
     def _instantiate_layers(self):
-        fc_initializer = tf.contrib.layers.variance_scaling_initializer(
-            factor=1., uniform=True, mode='FAN_AVG'
-        )
-
-        regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
-
         self._layers = [
             snt.Linear(
                 layer_size,
                 name="fc_{}".format(i),
-                initializers={'w': fc_initializer},
-                regularizers={'w': regularizer},
+                initializers={'w': self.initializer},
+                regularizers={'w': self.regularizer},
             )
             for i, layer_size in enumerate(self._layer_sizes)
         ]
 
         self._classifier_layer = snt.Linear(
             self._num_classes + 1, name="fc_classifier",
-            initializers={'w': fc_initializer},
-            regularizers={'w': regularizer},
+            initializers={'w': self.initializer},
+            regularizers={'w': self.regularizer},
         )
 
         # TODO: Not random initializer
         self._bbox_layer = snt.Linear(
             self._num_classes * 4, name="fc_bbox",
-            initializers={'w': fc_initializer},
-            regularizers={'w': regularizer}
+            initializers={'w': self.initializer},
+            regularizers={'w': self.regularizer}
         )
 
-        self._roi_pool = ROIPoolingLayer(debug=self._debug)
-        self._rcnn_target = RCNNTarget(self._num_classes, debug=self._debug)
-        self._rcnn_proposal = RCNNProposal(self._num_classes)
+        self._roi_pool = ROIPoolingLayer(self._config.roi, debug=self._debug)
+        self._rcnn_target = RCNNTarget(
+            self._num_classes, self._config.target, debug=self._debug
+        )
+        self._rcnn_proposal = RCNNProposal(
+            self._num_classes, self._config.proposals
+        )
 
     def _build(self, pretrained_feature_map, proposals, gt_boxes, im_shape):
         """

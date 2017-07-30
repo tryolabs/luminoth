@@ -5,14 +5,14 @@ import click
 
 from .models.fasterrcnn import FasterRCNN
 from .models.pretrained import VGG, ResNetV2
-from .config import Config
 from .dataset import TFRecordDataset
-from .utils.config import load_config, merge_into
+from .utils.config import load_config, merge_into, kwargs_to_config
+from .utils.vars import get_saver
+
 
 MODELS = {
-    'FasterRCNN': FasterRCNN,
+    'fasterrcnn': FasterRCNN,
 }
-
 
 PRETRAINED_MODULES = {
     'vgg': VGG,
@@ -34,19 +34,14 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.command(help='Train models')
 @click.argument('model_type', type=click.Choice(MODELS.keys()))
 @click.option('config_file', '--config', type=click.File('r'), help='Config to use.')
-@click.option('--num-classes', default=20, help='Number of classes of the dataset you are training on (only used when training with RCNN).')
-@click.option('--pretrained-net', default='vgg_16', type=click.Choice(PRETRAINED_MODULES.keys()), help='Architecture for the pretrained network.')
-@click.option('--pretrained-weights', help='Checkpoint file with the weights of the pretrained network.')
 @click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
 @click.option('--checkpoint-file', help='File for the weights of RPN and RCNN for resuming training.')
-@click.option('--pretrained-checkpoint-file', help='File for the weights of the pretrained network for resuming training.')
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint (set to "frcnn" when loading RPN and wanting to train complete network)')
 @click.option('--log-dir', default='/tmp/frcnn/', help='Directory for Tensorboard logs.')
 @click.option('--save-every', default=1000, help='Save checkpoint after that many batches.')
 @click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')
 @click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')
 @click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')
-@click.option('--with-rcnn', default=True, type=bool, help='Train RCNN classifier (not only RPN)')
 @click.option('--no-log', is_flag=True, help='Don\'t save summary logs.')
 @click.option('--display-every', default=1, type=int, help='Show image debug information every N batches (debug mode must be activated)')
 @click.option('--random-shuffle', is_flag=True, help='Ingest data from dataset in random order.')
@@ -58,28 +53,30 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
-def train(model_type, config_file, num_classes, **kwargs):
+def train(model_type, config_file, **kwargs):
 
-    model_class = MODELS[model_type]
+    model_class = MODELS[model_type.lower()]
     model_config = model_class.base_config
 
     if config_file:
+        # If we have a custom config file overwritting default settings
+        # then we merge those values to the base_config.
         config = load_config(config_file)
         config = merge_into(config, model_config)
 
-    config = merge_into({'train': kwargs}, config)
-    train = config.train
+    # Load train extra options
+    config.train = merge_into(kwargs_to_config(kwargs), config.train)
 
-    if train.debug or train.tf_debug:
+    if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = model_class(config)
-    pretrained = PRETRAINED_MODULES[pretrained_net](trainable=False)
-    dataset = TFRecordDataset(
-        Config, num_classes=num_classes, random_shuffle=random_shuffle
+    pretrained = PRETRAINED_MODULES[config.network.pretrained_net](
+        trainable=config.network.pretrained_trainable
     )
+    dataset = TFRecordDataset(config)
     train_dataset = dataset()
 
     train_image = train_dataset['image']
@@ -94,34 +91,22 @@ def train(model_type, config_file, num_classes, **kwargs):
     # We add fake batch dimension to train data. TODO: DEFINITELY NOT THE BEST
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
-    # Bbox doesn't need a dimension for batch TODO: Necesitamos standarizarlo!
-    # train_bboxes = tf.expand_dims(train_bboxes, 0)
 
     pretrained_dict = pretrained(train_image)
     prediction_dict = model(train_image, pretrained_dict['net'], train_bboxes)
 
-    model_variables = snt.get_normalized_variable_map(
-        model, tf.GraphKeys.GLOBAL_VARIABLES
-    )
-    if ignore_scope:
-        total_model_variables = len(model_variables)
-        model_variables = {
-            k: v for k, v in model_variables.items() if ignore_scope not in k
-        }
-        new_total_model_variables = len(model_variables)
-        tf.logging.info('Not loading/saving {} variables with scope "{}"'.format(
-            total_model_variables - new_total_model_variables, ignore_scope))
-
-        partial_saver = tf.train.Saver(var_list=model_variables)
-
-    load_op = pretrained.load_weights(
-        checkpoint_file=pretrained_weights
-    )
-
     total_loss = model.loss(prediction_dict)
 
-    model_saver = snt.get_saver(model, name='fasterrcnn_saver')
-    pretrained_saver = snt.get_saver(pretrained, name='pretrained_saver')
+    # load_weights returns no_op when empty checkpoint_file.
+    load_op = pretrained.load_weights(
+        checkpoint_file=config.network.pretrained_weights
+    )
+
+    saver = get_saver((model, pretrained, ))
+    if config.train.ignore_scope:
+        partial_loader = get_saver(
+            (model, pretrained, ), ignore_scope=config.train.ignore_scope
+        )
 
     global_step = tf.get_variable(
         name="global_step", shape=[], dtype=tf.int64,
@@ -129,19 +114,24 @@ def train(model_type, config_file, num_classes, **kwargs):
         collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
     )
 
+    learning_rate_decay_method = config.train.learning_rate_decay_method
     if not learning_rate_decay_method or learning_rate_decay_method == 'none':
-        learning_rate = initial_learning_rate
+        learning_rate = config.train.initial_learning_rate
     elif learning_rate_decay_method == 'piecewise_constant':
         learning_rate = tf.train.piecewise_constant(
-            global_step, boundaries=[tf.cast(learning_rate_decay, tf.int64), ],
-            values=[initial_learning_rate, initial_learning_rate * 0.1],
-            name='learning_rate_piecewise_constant'
+            global_step, boundaries=[
+                tf.cast(config.train.learning_rate_decay, tf.int64), ],
+            values=[
+                config.train.initial_learning_rate,
+                config.train.initial_learning_rate * 0.1
+            ], name='learning_rate_piecewise_constant'
         )
-    elif learning_rate_decay == 'exponential_decay':
+    elif learning_rate_decay_method == 'exponential_decay':
         learning_rate = tf.train.exponential_decay(
-            learning_rate=initial_learning_rate, global_step=global_step,
-            decay_steps=learning_rate_decay, decay_rate=0.96, staircase=True,
-            name='learning_rate_with_decay'
+            learning_rate=config.initial_learning_rate,
+            global_step=global_step,
+            decay_steps=config.train.learning_rate_decay, decay_rate=0.96,
+            staircase=True, name='learning_rate_with_decay'
         )
     else:
         raise ValueError(
@@ -150,14 +140,14 @@ def train(model_type, config_file, num_classes, **kwargs):
 
     tf.summary.scalar('losses/learning_rate', learning_rate)
 
-    optimizer_cls = OPTIMIZERS[optimizer_type]
-    if optimizer_type == 'momentum':
-        optimizer = optimizer_cls(learning_rate, momentum)
+    optimizer_cls = OPTIMIZERS[config.train.optimizer_type]
+    if config.train.optimizer_type == 'momentum':
+        optimizer = optimizer_cls(learning_rate, config.train.momentum)
     else:
         optimizer = optimizer_cls(learning_rate)
 
     trainable_vars = snt.get_variables_in_module(model)
-    if Config.PRETRAINED_TRAINABLE:
+    if config.network.pretrained_trainable:
         trainable_vars += snt.get_variables_in_module(pretrained)
     else:
         tf.logging.info('Not training variables from pretrained module')
@@ -195,30 +185,21 @@ def train(model_type, config_file, num_classes, **kwargs):
 
     with tf.Session() as sess:
 
-        if tf_debug:
-            from tensorflow.python import debug as tf_debug
-            sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-            sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
-
         sess.run(init_op)  # initialized variables
         sess.run(load_op)  # load pretrained weights
 
         # Restore all variables from checkpoint file
-        if checkpoint_file:
-            # TODO: We are WAY better than this.
-
+        if config.train.checkpoint_file:
             # If ignore_scope is set, we don't load those variables from checkpoint.
-            if ignore_scope:
-                partial_saver.restore(sess, checkpoint_file)
+            if config.train.ignore_scope:
+                partial_loader.restore(sess, config.train.checkpoint_file)
             else:
-                model_saver.restore(sess, checkpoint_file)
+                saver.restore(sess, config.train.checkpoint_file)
 
-        if pretrained_checkpoint_file:
-            pretrained_saver.restore(sess, pretrained_checkpoint_file)
-
-        if not no_log:
+        if not config.train.no_log:
             writer = tf.summary.FileWriter(
-                os.path.join(log_dir, run_name), sess.graph
+                os.path.join(config.train.log_dir, config.train.run_name),
+                sess.graph
             )
 
         coord = tf.train.Coordinator()
@@ -226,38 +207,45 @@ def train(model_type, config_file, num_classes, **kwargs):
         count_images = 0
         step = 0
 
-        if tf_debug:
-            from tensorflow.python import debug as tf_debug
-            sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-            sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
+        if config.train.tf_debug:
+            from tensorflow.python import debug as tensorflow_debug
+            sess = tensorflow_debug.LocalCLIDebugWrapperSession(sess)
+            sess.add_tensor_filter(
+                'has_inf_or_nan', tensorflow_debug.has_inf_or_nan
+            )
 
         try:
             while not coord.should_stop():
                 run_metadata = None
-                if (step + 1) % summary_every == 0:
+                if (step + 1) % config.train.summary_every == 0:
                     run_metadata = tf.RunMetadata()
 
                 run_options = None
-                if full_trace:
+                if config.train.full_trace:
                     run_options = tf.RunOptions(
                         trace_level=tf.RunOptions.FULL_TRACE
                     )
 
-                (_, summary, train_loss, step, pred_dict, filename,
-                 scale_factor, *_) = sess.run(
-                    [
-                        train_op, summarizer, total_loss, global_step,
-                        prediction_dict, train_filename, train_scale_factor,
-                        metric_ops
-                    ], run_metadata=run_metadata, options=run_options)
+                (
+                    _, summary, train_loss, step, pred_dict, filename,
+                    scale_factor, *_
+                ) = sess.run([
+                    train_op, summarizer, total_loss, global_step,
+                    prediction_dict, train_filename, train_scale_factor,
+                    metric_ops
+                ], run_metadata=run_metadata, options=run_options)
 
-                if not no_log and step % summary_every == 0:
+                write_summary = (
+                    not config.train.no_log and
+                    step % config.train.summary_every == 0
+                )
+                if write_summary:
                     writer.add_summary(summary, step)
                     writer.add_run_metadata(
                         run_metadata, str(step)
                     )
 
-                if debug and step % display_every == 0:
+                if config.train.debug and step % config.train.display_every == 0:
                     from luminoth.utils.image_vis import (
                         draw_anchors, draw_positive_anchors,
                         draw_top_nms_proposals, draw_batch_proposals,
@@ -281,14 +269,14 @@ def train(model_type, config_file, num_classes, **kwargs):
                     draw_rpn_bbox_pred(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict)
                     draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
-                    if with_rcnn:
+                    if config.network.with_rcnn:
                         draw_rcnn_cls_batch(pred_dict)
                         draw_rcnn_input_proposals(pred_dict)
                         draw_rcnn_cls_batch_errors(pred_dict, worst=False)
                         draw_rcnn_reg_batch_errors(pred_dict)
                         draw_object_prediction(pred_dict)
 
-                    if save_timeline:
+                    if config.train.save_timeline:
                         from tensorflow.python.client import timeline
                         run_tmln = timeline.Timeline(
                             run_metadata.step_stats)
@@ -301,20 +289,15 @@ def train(model_type, config_file, num_classes, **kwargs):
                 tf.logging.info('train_loss: {}'.format(train_loss))
                 tf.logging.info('step: {}, file: {}'.format(step, filename))
 
-                import ipdb; ipdb.set_trace()
-
-                if not no_log:
-                    if step % save_every == 0:
+                if not config.train.no_log:
+                    if step % config.train.save_every == 0:
                         # We don't support partial saver.
-                        model_saver.save(
+                        saver.save(
                             sess,
-                            os.path.join(model_dir, run_name, model.scope_name),
-                            global_step=step
-                        )
-                        pretrained_saver.save(
-                            sess,
-                            os.path.join(model_dir, run_name, pretrained.scope_name),
-                            global_step=step
+                            os.path.join(
+                                config.train.model_dir, config.train.run_name,
+                                model.scope_name
+                            ), global_step=step
                         )
 
         except tf.errors.OutOfRangeError:

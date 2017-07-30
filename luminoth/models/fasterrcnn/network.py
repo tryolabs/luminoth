@@ -21,28 +21,26 @@ class FasterRCNN(snt.AbstractModule):
                  name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
-        import ipdb; ipdb.set_trace()
-        self._cfg = config
-        self._num_classes = num_classes
-        self._with_rcnn = with_rcnn
-        self._debug = debug
+        self._config = config
+        self._num_classes = config.network.num_classes
+        self._with_rcnn = config.network.with_rcnn
+        self._debug = config.train.debug
 
-        self._anchor_base_size = self._cfg.ANCHOR_BASE_SIZE
-        self._anchor_scales = np.array(self._cfg.ANCHOR_SCALES)
-        self._anchor_ratios = np.array(self._cfg.ANCHOR_RATIOS)
-        # TODO: Value depends on use of VGG vs Resnet (?)
-        self._anchor_stride = self._cfg.ANCHOR_STRIDE
+        self._anchor_base_size = config.anchors.base_size
+        self._anchor_scales = np.array(config.anchors.scales)
+        self._anchor_ratios = np.array(config.anchors.ratios)
+        self._anchor_stride = config.anchors.stride
 
         self._anchor_reference = generate_anchors_ref(
             self._anchor_base_size, self._anchor_ratios, self._anchor_scales
         )
         self._num_anchors = self._anchor_reference.shape[0]
 
-        self._rpn_cls_loss_weight = 1.0
-        self._rpn_reg_loss_weight = 2.0
+        self._rpn_cls_loss_weight = config.loss.rpn_cls_loss_weight
+        self._rpn_reg_loss_weight = config.loss.rpn_reg_loss_weights
 
-        self._rcnn_cls_loss_weight = 1.0
-        self._rcnn_reg_loss_weight = 2.0
+        self._rcnn_cls_loss_weight = config.loss.rcnn_cls_loss_weight
+        self._rcnn_reg_loss_weight = config.loss.rcnn_reg_loss_weights
         self._losses_collections = ['fastercnn_losses']
 
     def _build(self, image, pretrained_feature_map, gt_boxes, is_training=True):
@@ -65,9 +63,11 @@ class FasterRCNN(snt.AbstractModule):
                 we have (x1, y1, x2, y2)
         """
 
-        self._rpn = RPN(self._num_anchors, debug=self._debug)
+        self._rpn = RPN(self._num_anchors, self._config.rpn, debug=self._debug)
         if self._with_rcnn:
-            self._rcnn = RCNN(self._num_classes, debug=self._debug)
+            self._rcnn = RCNN(
+                self._num_classes, self._config.rcnn, debug=self._debug
+            )
 
         image_shape = tf.shape(image)[1:3]
 

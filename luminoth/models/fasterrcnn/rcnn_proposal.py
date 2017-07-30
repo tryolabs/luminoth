@@ -12,9 +12,14 @@ class RCNNProposal(snt.AbstractModule):
         - Top N filtering (TODO)
 
     """
-    def __init__(self, num_classes, name='rcnn_proposal'):
+    def __init__(self, num_classes, config, name='rcnn_proposal'):
         super(RCNNProposal, self).__init__(name=name)
         self._num_classes = num_classes
+
+        self._class_max_detections = config.class_max_detections
+        self._class_nms_threshold = config.class_nms_threshold
+        # TODO: Total max detections implementation
+        self._total_max_detections = config.total_max_detections
 
     def _build(self, proposals, bbox_pred, cls_prob, im_shape):
         """
@@ -104,7 +109,8 @@ class RCNNProposal(snt.AbstractModule):
             class_prob = tf.boolean_mask(proposal_label_prob, class_filter)
 
             class_selected_idx = tf.image.non_max_suppression(
-                class_objects_tf, class_prob, 100, iou_threshold=0.6
+                class_objects_tf, class_prob, self._class_max_detections,
+                iou_threshold=self._class_nms_threshold
             )
 
             class_objects_tf = tf.gather(class_objects_tf, class_selected_idx)

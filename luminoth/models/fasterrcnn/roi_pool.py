@@ -7,12 +7,12 @@ ROI_POOLING = 'roi_pooling'
 
 class ROIPoolingLayer(snt.AbstractModule):
     """ROIPoolingLayer which applies ROI pooling (or tf.crop_and_resize)"""
-    def __init__(self, pooling_mode=CROP, pooled_width=7, pooled_height=7,
-                 debug=False, name='roi_pooling'):
+    def __init__(self, config, debug=False, name='roi_pooling'):
         super(ROIPoolingLayer, self).__init__(name=name)
-        self._pooling_mode = pooling_mode
-        self._pooled_width = pooled_width
-        self._pooled_height = pooled_height
+        self._pooling_mode = config.pooling_mode
+        self._pooled_width = config.pooled_width
+        self._pooled_height = config.pooled_height
+        self._pooled_padding = config.padding
         self._debug = debug
 
     def _get_bboxes(self, roi_proposals, im_shape):
@@ -49,7 +49,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         prediction_dict = {
             'roi_pool': tf.nn.max_pool(
                 crops, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
-                padding='VALID'
+                padding=self._pooled_padding
             ),
         }
 
