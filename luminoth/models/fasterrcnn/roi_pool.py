@@ -9,7 +9,7 @@ class ROIPoolingLayer(snt.AbstractModule):
     """ROIPoolingLayer which applies ROI pooling (or tf.crop_and_resize)"""
     def __init__(self, config, debug=False, name='roi_pooling'):
         super(ROIPoolingLayer, self).__init__(name=name)
-        self._pooling_mode = config.pooling_mode
+        self._pooling_mode = config.pooling_mode.lower()
         self._pooled_width = config.pooled_width
         self._pooled_height = config.pooled_height
         self._pooled_padding = config.padding

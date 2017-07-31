@@ -6,7 +6,9 @@ import click
 from .models.fasterrcnn import FasterRCNN
 from .models.pretrained import VGG, ResNetV2
 from .dataset import TFRecordDataset
-from .utils.config import load_config, merge_into, kwargs_to_config
+from .utils.config import (
+    load_config, merge_into, kwargs_to_config, parse_override
+)
 from .utils.vars import get_saver
 
 
@@ -33,7 +35,8 @@ LEARNING_RATE_DECAY_METHODS = set([
 
 @click.command(help='Train models')
 @click.argument('model_type', type=click.Choice(MODELS.keys()))
-@click.option('config_file', '--config', type=click.File('r'), help='Config to use.')
+@click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
+@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 @click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
 @click.option('--checkpoint-file', help='File for the weights of RPN and RCNN for resuming training.')
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint (set to "frcnn" when loading RPN and wanting to train complete network)')
@@ -42,9 +45,9 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')
 @click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')
 @click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')
-@click.option('--no-log', is_flag=True, help='Don\'t save summary logs.')
+@click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')
 @click.option('--display-every', default=1, type=int, help='Show image debug information every N batches (debug mode must be activated)')
-@click.option('--random-shuffle', is_flag=True, help='Ingest data from dataset in random order.')
+@click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')
 @click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')
 @click.option('--summary-every', default=1, type=int, help='Save summary logs every N batches.')
 @click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')
@@ -53,19 +56,23 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
-def train(model_type, config_file, **kwargs):
+def train(model_type, config_file, override_params, **kwargs):
 
     model_class = MODELS[model_type.lower()]
-    model_config = model_class.base_config
+    config = model_class.base_config
 
     if config_file:
         # If we have a custom config file overwritting default settings
         # then we merge those values to the base_config.
-        config = load_config(config_file)
-        config = merge_into(config, model_config)
+        custom_config = load_config(config_file)
+        config = merge_into(custom_config, config)
 
     # Load train extra options
     config.train = merge_into(kwargs_to_config(kwargs), config.train)
+
+    if override_params:
+        override_config = parse_override(override_params)
+        config = merge_into(override_config, config)
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)

@@ -1,16 +1,33 @@
 train:
+  # Run on debug mode (which enables more logging)
   debug: False
+  # Training batch size for images. FasterRCNN currently only supports 1
   batch_size: 1
+  # Where to save the models
   model_dir: models/
+  # Checkpoint file from where to load existing var values
   checkpoint_file:
+  # Ignore scope when loading from checkpoint (useful when training RPN first
+  # and then RPN + RCNN)
   ignore_scope:
+  # Where to save the logs for TensorBoard
   log_dir: /tmp/luminoth/
+  # Save a checkpoint after that many batches
   save_every: 1000
+  # Enables TensorFlow debug mode, which stops and lets you analyze Tensors
+  # after each Session.run
   tf_debug: False
+  # Run name is used for better checkpoint and log hierarchy
   run_name:
+  # Disables logging and saving checkpoints
   no_log: False
+  # Displays debugging images with results every N batches. Debug mode must be
+  # enabled
   display_every: 1
+  # Shuffle the dataset. It should only be disabled when trying to reproduce
+  # some problem on some sample
   random_shuffle: True
+  # Save Tensorboard timeline
   save_timeline: False
   summary_every: 1
   full_trace: False
@@ -88,8 +105,8 @@ rcnn:
   l2_regulalization_scale: 0.0005
 
   roi:
-    pooling_mode: CROP
-    pooled_with: 7
+    pooling_mode: crop
+    pooled_width: 7
     pooled_height: 7
     padding: VALID
 
