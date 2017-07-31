@@ -15,6 +15,67 @@ from sys import stdout
 font = ImageFont.load_default()
 
 
+def add_images_to_tensoboard(pred_dict, global_step, summary_dir, with_rcnn):
+    summary_writer = tf.summary.FileWriter(summary_dir)
+    summary = add_image_to_summary(draw_anchors(pred_dict), 'draw_anchors')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_positive_anchors(pred_dict), 'draw_positive_anchors')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0.9), 'draw_top_nms_proposals/0.9')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0.75), 'draw_top_nms_proposals/0.75')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0), 'draw_top_nms_proposals/0.0')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_batch_proposals(pred_dict, display_anchor=True), 'draw_batch_proposals/display_anchor')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_batch_proposals(pred_dict, display_anchor=False), 'draw_batch_proposals/no_display_anchor')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True), 'draw_rpn_cls_loss/foreground-top10-worst')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=False), 'draw_rpn_cls_loss/foreground-top10-best')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=True), 'draw_rpn_cls_loss/background-top10-worst')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=False), 'draw_rpn_cls_loss/background-top10-best')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_bbox_pred(pred_dict), 'draw_rpn_bbox_pred')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_bbox_pred_with_target(pred_dict), 'draw_rpn_bbox_pred_with_target/worst')
+    summary_writer.add_summary(summary, global_step)
+    summary = add_image_to_summary(draw_rpn_bbox_pred_with_target(pred_dict, worst=False), 'draw_rpn_bbox_pred_with_target/best')
+    summary_writer.add_summary(summary, global_step)
+    if with_rcnn:
+        summary = add_image_to_summary(draw_rcnn_cls_batch(pred_dict), 'draw_rcnn_cls_batch')
+        summary_writer.add_summary(summary, global_step)
+        summary = add_image_to_summary(draw_rcnn_input_proposals(pred_dict), 'draw_rcnn_input_proposals')
+        summary_writer.add_summary(summary, global_step)
+        summary = add_image_to_summary(draw_rcnn_cls_batch_errors(pred_dict, worst=False), 'draw_rcnn_cls_batch_errors/best')
+        summary_writer.add_summary(summary, global_step)
+        summary = add_image_to_summary(draw_rcnn_reg_batch_errors(pred_dict), 'draw_rcnn_reg_batch_errors/worst')
+        summary_writer.add_summary(summary, global_step)
+        summary = add_image_to_summary(draw_object_prediction(pred_dict), 'draw_object_prediction')
+        summary_writer.add_summary(summary, global_step)
+
+    summary_writer.close()
+
+
+def add_image_to_summary(image_pil, tag):
+    summary = tf.Summary(value=[
+        tf.Summary.Value(tag=tag, image=tf.Summary.Image(
+            encoded_image_string=imagepil_to_str(image_pil)))
+    ])
+    return summary
+
+
+def imagepil_to_str(image_pil):
+    output = io.BytesIO()
+    image_pil.save(output, format='PNG')
+    png_string = output.getvalue()
+    output.close()
+    return png_string
+
+
 def imgcat(data, width='auto', height='auto', preserveAspectRatio=False,
            inline=True, filename=''):
     """
@@ -105,7 +166,7 @@ def draw_positive_anchors(pred_dict):
     for gt_box in gt_boxes:
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_anchors(pred_dict):
@@ -120,7 +181,7 @@ def draw_anchors(pred_dict):
     for anchor_id, anchor in enumerate(anchors):
         draw.rectangle(list(anchor), fill=(255, 0, 0, 2), outline=(0, 255, 0, 6))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_bbox(image, bbox):
@@ -133,7 +194,7 @@ def draw_bbox(image, bbox):
     draw = ImageDraw.Draw(image_pil, 'RGBA')
     draw.rectangle(bbox, fill=(255, 0, 0, 60), outline=(0, 255, 0, 200))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_top_proposals(pred_dict):
@@ -169,7 +230,7 @@ def draw_top_proposals(pred_dict):
 
         draw.text(tuple([x, y]), text=str(target), font=font, fill=fill)
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_batch_proposals(pred_dict, display_anchor=True):
@@ -243,7 +304,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
         box = list(gt_box[:4])
         draw.rectangle(box, fill=(0, 255, 0, 60), outline=(0, 255, 0, 70))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
@@ -291,7 +352,7 @@ def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
                 list(gt_box[:4]), fill=(0, 0, 255, 60),
                 outline=(0, 0, 255, 150))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
@@ -350,7 +411,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     for gt_box in gt_boxes:
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rpn_bbox_pred(pred_dict, n=5):
@@ -395,7 +456,7 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
         draw.line([(anchor[2], anchor[3]), (bbox[2], bbox[3])], fill=(0,0,0,170), width=1)
         draw.line([(anchor[0], anchor[3]), (bbox[0], bbox[3])], fill=(0,0,0,170), width=1)
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     if worst:
@@ -452,7 +513,7 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     draw.rectangle(bbox_target, fill=(255, 0, 0, 20), outline=(255, 0, 0, 100))
 
     print('Loss is {}'.format(loss))
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
@@ -490,7 +551,7 @@ def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
         draw.text(tuple(gt_box[:2]), text=str(gt_box[4]), font=font, fill=(0, 0, 255, 255))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, worst=True, n=10):
@@ -541,7 +602,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
         # draw.text(tuple(gt_box[:2]), text=str(gt_box[4]), font=font, fill=(0, 0, 255, 255))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rcnn_reg_batch_errors(pred_dict):
@@ -607,7 +668,7 @@ def draw_rcnn_reg_batch_errors(pred_dict):
     for gt_box in gt_boxes:
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def recalculate_objects(pred_dict):
@@ -653,7 +714,7 @@ def draw_object_prediction(pred_dict, topn=50):
     #     draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
     #     draw.text(tuple([bbox[0], bbox[1]]), text='{}'.format(label), font=font, fill=(0, 0, 0, 255))
 
-    imgcat_pil(image_pil)
+    return image_pil
 
 
 def draw_rcnn_input_proposals(pred_dict):
@@ -680,4 +741,4 @@ def draw_rcnn_input_proposals(pred_dict):
         draw.rectangle(proposal, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
         draw.text(tuple([proposal[0], proposal[1]]), text='{:.2f}'.format(overlap)[1:], font=font, fill=(0, 0, 0, 255))
 
-    imgcat_pil(image_pil)
+    return image_pil

@@ -89,12 +89,12 @@ def train(model_type, config_file, override_params, **kwargs):
     train_image = train_dataset['image']
     train_filename = train_dataset['filename']
     train_scale_factor = train_dataset['scale_factor']
-    # TODO: This is not the best place to configure rank? Why is rank not
-    # transmitted through the queue
-    train_image.set_shape((None, None, 3))
 
     train_bboxes = train_dataset['bboxes']
 
+    # TODO: This is not the best place to configure rank? Why is rank not
+    # transmitted through the queue
+    train_image.set_shape((None, None, 3))
     # We add fake batch dimension to train data. TODO: DEFINITELY NOT THE BEST
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
@@ -103,6 +103,8 @@ def train(model_type, config_file, override_params, **kwargs):
     prediction_dict = model(train_image, pretrained_dict['net'], train_bboxes)
 
     total_loss = model.loss(prediction_dict)
+
+    global_step = tf.train.create_global_step()
 
     # load_weights returns no_op when empty checkpoint_file.
     load_op = pretrained.load_weights(
@@ -114,12 +116,6 @@ def train(model_type, config_file, override_params, **kwargs):
         partial_loader = get_saver(
             (model, pretrained, ), ignore_scope=config.train.ignore_scope
         )
-
-    global_step = tf.get_variable(
-        name="global_step", shape=[], dtype=tf.int64,
-        initializer=tf.zeros_initializer(), trainable=False,
-        collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
-    )
 
     learning_rate_decay_method = config.train.learning_rate_decay_method
     if not learning_rate_decay_method or learning_rate_decay_method == 'none':
@@ -185,6 +181,11 @@ def train(model_type, config_file, override_params, **kwargs):
 
     tf.logging.info('Starting training for {}'.format(model))
 
+    checkpoint_path = os.path.join(
+        config.train.model_dir, config.train.run_name,
+        model.scope_name
+    )
+    summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
     summarizer = tf.summary.merge([
         tf.summary.merge_all(),
         model.summary,
@@ -204,10 +205,7 @@ def train(model_type, config_file, override_params, **kwargs):
                 saver.restore(sess, config.train.checkpoint_file)
 
         if not config.train.no_log:
-            writer = tf.summary.FileWriter(
-                os.path.join(config.train.log_dir, config.train.run_name),
-                sess.graph
-            )
+            writer = tf.summary.FileWriter(summary_dir, sess.graph)
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -253,35 +251,12 @@ def train(model_type, config_file, override_params, **kwargs):
                     )
 
                 if config.train.debug and step % config.train.display_every == 0:
-                    from luminoth.utils.image_vis import (
-                        draw_anchors, draw_positive_anchors,
-                        draw_top_nms_proposals, draw_batch_proposals,
-                        draw_rpn_cls_loss, draw_rpn_bbox_pred,
-                        draw_rpn_bbox_pred_with_target, draw_rcnn_cls_batch,
-                        draw_rcnn_input_proposals, draw_rcnn_cls_batch_errors,
-                        draw_rcnn_reg_batch_errors, draw_object_prediction
-                    )
+                    from luminoth.utils.image_vis import add_images_to_tensoboard
                     print('Scaled image with {}'.format(scale_factor))
                     print('Image size: {}'.format(pred_dict['image_shape']))
-                    draw_anchors(pred_dict)
-                    draw_positive_anchors(pred_dict)
-                    draw_top_nms_proposals(pred_dict, 0.9)
-                    draw_top_nms_proposals(pred_dict, 0)
-                    draw_batch_proposals(pred_dict, display_anchor=True)
-                    draw_batch_proposals(pred_dict, display_anchor=False)
-                    draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True)
-                    draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=False)
-                    draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=True)
-                    draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=False)
-                    draw_rpn_bbox_pred(pred_dict)
-                    draw_rpn_bbox_pred_with_target(pred_dict)
-                    draw_rpn_bbox_pred_with_target(pred_dict, worst=False)
-                    if config.network.with_rcnn:
-                        draw_rcnn_cls_batch(pred_dict)
-                        draw_rcnn_input_proposals(pred_dict)
-                        draw_rcnn_cls_batch_errors(pred_dict, worst=False)
-                        draw_rcnn_reg_batch_errors(pred_dict)
-                        draw_object_prediction(pred_dict)
+                    add_images_to_tensoboard(
+                        pred_dict, step, summary_dir, config.network.with_rcnn
+                    )
 
                     if config.train.save_timeline:
                         from tensorflow.python.client import timeline
@@ -299,13 +274,7 @@ def train(model_type, config_file, override_params, **kwargs):
                 if not config.train.no_log:
                     if step % config.train.save_every == 0:
                         # We don't support partial saver.
-                        saver.save(
-                            sess,
-                            os.path.join(
-                                config.train.model_dir, config.train.run_name,
-                                model.scope_name
-                            ), global_step=step
-                        )
+                        saver.save(sess, checkpoint_path, global_step=step)
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('iter = {}, train_loss = {:.2f}'.format(
