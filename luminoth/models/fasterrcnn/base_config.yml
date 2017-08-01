@@ -57,6 +57,7 @@ pretrained:
   weights:
   endpoint: vgg_16/conv5/conv5_1
   finetune_num_layers: 3
+  weight_decay: 0.0005
 
 loss:
   rpn_cls_loss_weight: 1.0

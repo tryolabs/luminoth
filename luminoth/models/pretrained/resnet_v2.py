@@ -12,11 +12,13 @@ class ResNetV2(Pretrained):
         self._trainable = config.trainable
         self._endpoint = config.endpoint or DEFAULT_ENDPOINT
         self._finetune_num_layers = config.finetune_num_layers
+        self._weight_decay = config.weight_decay
 
     def _build(self, inputs):
         inputs = self._preprocess(inputs)
         resnet_scope = resnet_v2.resnet_utils.resnet_arg_scope(
-            is_training=self._trainable
+            is_training=self._trainable,
+            weight_decay=self._weight_decay
         )
         with arg_scope(resnet_scope):
             net, end_points = resnet_v2.resnet_v2_101(inputs)

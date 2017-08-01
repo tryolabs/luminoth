@@ -7,16 +7,16 @@ DEFAULT_ENDPOINT = 'vgg_16/conv5/conv5_1'
 
 
 class VGG(Pretrained):
-
     def __init__(self, config, name='vgg'):
         super(VGG, self).__init__(name=name)
         self._trainable = config.trainable
         self._endpoint = config.endpoint or DEFAULT_ENDPOINT
         self._finetune_num_layers = config.finetune_num_layers
+        self._weight_decay = config.weight_decay
 
     def _build(self, inputs, is_training=False):
         inputs = self._preprocess(inputs)
-        with arg_scope(vgg.vgg_arg_scope()):
+        with arg_scope(vgg.vgg_arg_scope(weight_decay=self._weight_decay)):
             _, end_points = vgg.vgg_16(
                 inputs, is_training=self._trainable, spatial_squeeze=False
             )
