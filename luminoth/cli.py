@@ -1,11 +1,13 @@
 import click
 
+from .tools import dataset
 from .train import train
-from .tools.voc import voc
 
 
 @click.group()
 def cli():
     pass
 
+
+cli.add_command(dataset)
 cli.add_command(train)
