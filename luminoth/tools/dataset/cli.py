@@ -3,7 +3,7 @@ import click
 from .voc import voc
 
 
-@click.group()
+@click.group(help='Groups of commands to manage datasets')
 def dataset():
     pass
 
