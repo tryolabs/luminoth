@@ -3,6 +3,7 @@ import tensorflow as tf
 
 def bbox_overlap_iou(bboxes1, bboxes2):
     """
+    TODO: Check for invalid values when union is zero or intersection is negative?
     Args:
         bboxes1: shape (total_bboxes1, 4)
             with x1, y1, x2, y2 point order.
