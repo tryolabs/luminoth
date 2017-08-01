@@ -47,7 +47,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')
 @click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')
 @click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')
-@click.option('--display-every', default=1, type=int, help='Show image debug information every N batches (debug mode must be activated)')
+@click.option('--display-every', default=500, type=int, help='Show image debug information every N batches (debug mode must be activated)')
 @click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')
 @click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')
 @click.option('--summary-every', default=1, type=int, help='Save summary logs every N batches.')
@@ -273,7 +273,9 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                     )
 
                 if config.train.debug and step % config.train.display_every == 0:
-                    from luminoth.utils.image_vis import add_images_to_tensoboard
+                    from luminoth.utils.image_vis import (
+                        add_images_to_tensoboard
+                    )
                     print('Scaled image with {}'.format(scale_factor))
                     print('Image size: {}'.format(pred_dict['image_shape']))
                     add_images_to_tensoboard(

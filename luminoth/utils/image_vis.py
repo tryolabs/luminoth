@@ -6,8 +6,8 @@ import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import tensorflow as tf
 
-from .bbox_transform import bbox_transform_inv
 from .bbox import bbox_overlaps
+from .bbox_transform import bbox_transform_inv
 from base64 import b64encode
 from sys import stdout
 
@@ -174,9 +174,9 @@ def draw_positive_anchors(pred_dict):
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    print('We have {} positive_anchors'.format(positive_anchors.shape[0]))
-    # print('Indices, values and bbox: {}'.format(list(zip(positive_indices, list(overlap_iou), positive_anchors))))
-    print('GT boxes: {}'.format(gt_boxes))
+    tf.logging.debug('We have {} positive_anchors'.format(positive_anchors.shape[0]))
+    # tf.logging.debug('Indices, values and bbox: {}'.format(list(zip(positive_indices, list(overlap_iou), positive_anchors))))
+    tf.logging.debug('GT boxes: {}'.format(gt_boxes))
 
     for label, positive_anchor in zip(list(overlap_iou), positive_anchors):
         draw.rectangle(list(positive_anchor), fill=(255, 0, 0, 40), outline=(0, 255, 0, 100))
@@ -195,7 +195,7 @@ def draw_anchors(pred_dict):
     """
     Draws positive anchors used as "correct" in RPN
     """
-    print('All anchors')
+    tf.logging.debug('All anchors')
     anchors = pred_dict['all_anchors']
 
     image_pil, draw = get_image_draw(pred_dict)
@@ -220,7 +220,7 @@ def draw_bbox(image, bbox):
 
 
 def draw_top_proposals(pred_dict):
-    print('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
+    tf.logging.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
     scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposal_prediction']['proposals']
     targets = pred_dict['rpn_prediction']['rpn_cls_target']
@@ -256,9 +256,9 @@ def draw_top_proposals(pred_dict):
 
 
 def draw_batch_proposals(pred_dict, display_anchor=True):
-    print('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
-    print('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
-    print('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
+    tf.logging.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
+    tf.logging.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
+    tf.logging.debug('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
     scores = pred_dict['rpn_prediction']['rpn_cls_prob']
     scores = scores[:, 1]
     bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
@@ -330,7 +330,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
 
 
 def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
-    print('Top NMS proposals (min_score = {})'.format(min_score))
+    tf.logging.debug('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
     # Remove batch id
@@ -385,9 +385,9 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     """
     loss = pred_dict['rpn_prediction']['cross_entropy_per_anchor']
     type_str = 'foreground' if foreground else 'background'
-    print('RPN classification loss (anchors, with the softmax score) (mean softmax loss (all): {})'.format(loss.mean()))
-    print('Showing {} only'.format(type_str))
-    print('{} {} performers'.format('Worst' if worst else 'Best', topn))
+    tf.logging.debug('RPN classification loss (anchors, with the softmax score) (mean softmax loss (all): {})'.format(loss.mean()))
+    tf.logging.debug('Showing {} only'.format(type_str))
+    tf.logging.debug('{} {} performers'.format('Worst' if worst else 'Best', topn))
     prob = pred_dict['rpn_prediction']['rpn_cls_prob']
     prob = prob.reshape([-1, 2])[:, 1]
     target = pred_dict['rpn_prediction']['rpn_cls_target']
@@ -408,7 +408,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     prob = prob[positive_indices]
     anchors = anchors[positive_indices]
 
-    print('Mean loss for {}: {}'.format(type_str, loss.mean()))
+    tf.logging.debug('Mean loss for {}: {}'.format(type_str, loss.mean()))
 
     sorted_idx = loss.argsort()
     if worst:
@@ -420,7 +420,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     prob = prob[sorted_idx]
     anchors = anchors[sorted_idx]
 
-    print('Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
+    tf.logging.debug('Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -443,7 +443,7 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
     We display the final bounding box and the anchor. Drawing lines between the
     corners.
     """
-    print('RPN regression loss (bbox to original anchors, with the smoothL1Loss)')
+    tf.logging.debug('RPN regression loss (bbox to original anchors, with the smoothL1Loss)')
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     target = target.reshape([-1, 1])
     # Get anchors with positive label.
@@ -486,8 +486,8 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     else:
         draw_desc = 'best'
 
-    print('Display prediction vs original for {} performer or batch.'.format(draw_desc))
-    print('green = anchor, magenta = prediction, red = anchor * target (should be GT)')
+    tf.logging.debug('Display prediction vs original for {} performer or batch.'.format(draw_desc))
+    tf.logging.debug('green = anchor, magenta = prediction, red = anchor * target (should be GT)')
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     target = target.reshape([-1, 1])
     # Get anchors with positive label.
@@ -534,13 +534,13 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     draw.rectangle(bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
     draw.rectangle(bbox_target, fill=(255, 0, 0, 20), outline=(255, 0, 0, 100))
 
-    print('Loss is {}'.format(loss))
+    tf.logging.debug('Loss is {}'.format(loss))
     return image_pil
 
 
 def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
-    print('Show the bboxes used for training classifier. (GT labels are -1 from cls targets)')
-    print('blue => GT, green => foreground, red => background')
+    tf.logging.debug('Show the bboxes used for training classifier. (GT labels are -1 from cls targets)')
+    tf.logging.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['cls_target']
@@ -577,8 +577,8 @@ def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
 
 
 def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, worst=True, n=10):
-    print('Show the {} classification errors in batch used for training classifier.'.format('worst' if worst else 'best'))
-    print('blue => GT, green => foreground, red => background')
+    tf.logging.debug('Show the {} classification errors in batch used for training classifier.'.format('worst' if worst else 'best'))
+    tf.logging.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['cls_target']
@@ -628,8 +628,8 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
 
 
 def draw_rcnn_reg_batch_errors(pred_dict):
-    print('Show errors in batch used for training classifier regressor.')
-    print('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
+    tf.logging.debug('Show errors in batch used for training classifier regressor.')
+    tf.logging.debug('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['cls_target']
@@ -713,7 +713,7 @@ def recalculate_objects(pred_dict):
 
 
 def draw_object_prediction(pred_dict, topn=50):
-    print('Display top scored objects with label.')
+    tf.logging.debug('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
     objects_labels = pred_dict['classification_prediction']['objects_labels']
     objects_labels_prob = pred_dict['classification_prediction']['objects_labels_prob']
@@ -738,7 +738,7 @@ def draw_object_prediction(pred_dict, topn=50):
 
 
 def draw_rcnn_input_proposals(pred_dict):
-    print('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
+    tf.logging.debug('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     gt_boxes = pred_dict['gt_boxes'][:,:4]
 
