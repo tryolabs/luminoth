@@ -37,6 +37,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.argument('model_type', type=click.Choice(MODELS.keys()))
 @click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
+@click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')
 @click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
 @click.option('--checkpoint-file', help='File for the weights of RPN and RCNN for resuming training.')
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint (set to "frcnn" when loading RPN and wanting to train complete network)')
@@ -56,7 +57,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
-def train(model_type, config_file, override_params, **kwargs):
+def train(model_type, config_file, override_params, continue_training, **kwargs):
 
     model_class = MODELS[model_type.lower()]
     config = model_class.base_config
@@ -104,7 +105,32 @@ def train(model_type, config_file, override_params, **kwargs):
 
     total_loss = model.loss(prediction_dict)
 
-    global_step = tf.train.create_global_step()
+    initial_global_step = 0
+    checkpoint_path = os.path.join(
+        config.train.model_dir, config.train.run_name,
+        model.scope_name
+    )
+    if continue_training:
+        last_checkpoint = tf.train.latest_checkpoint(
+            os.path.dirname(checkpoint_path)
+        )
+        if not last_checkpoint:
+            raise ValueError(
+                'Could not find checkpoint in {}. Check run name'.format(
+                    checkpoint_path))
+        initial_global_step = int(last_checkpoint.split('-')[-1])
+        tf.logging.info('Starting training from global_step {}'.format(
+            initial_global_step))
+        tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint))
+        config.train.checkpoint_file = last_checkpoint
+
+    global_step_init = tf.constant_initializer(initial_global_step)
+
+    global_step = tf.get_variable(
+        name="global_step", shape=[], dtype=tf.int64,
+        initializer=global_step_init, trainable=False,
+        collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP]
+    )
 
     # load_weights returns no_op when empty checkpoint_file.
     load_op = pretrained.load_weights(
@@ -181,10 +207,6 @@ def train(model_type, config_file, override_params, **kwargs):
 
     tf.logging.info('Starting training for {}'.format(model))
 
-    checkpoint_path = os.path.join(
-        config.train.model_dir, config.train.run_name,
-        model.scope_name
-    )
     summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
     summarizer = tf.summary.merge([
         tf.summary.merge_all(),
@@ -210,7 +232,7 @@ def train(model_type, config_file, override_params, **kwargs):
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         count_images = 0
-        step = 0
+        step = initial_global_step
 
         if config.train.tf_debug:
             from tensorflow.python import debug as tensorflow_debug
