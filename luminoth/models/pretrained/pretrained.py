@@ -59,3 +59,12 @@ class Pretrained(snt.AbstractModule):
         for i in range(num_channels):
             channels[i] -= means[i]
         return tf.concat(axis=3, values=channels)
+
+    def get_trainable_vars(self):
+        all_variables = snt.get_variables_in_module(self)
+        var_names = [v.name for v in all_variables]
+        last_idx = [
+            i for i, name in enumerate(var_names) if self._endpoint in name
+        ][0]
+
+        return all_variables[last_idx - self._finetune_num_layers * 2:last_idx]

@@ -8,10 +8,11 @@ DEFAULT_ENDPOINT = 'vgg_16/conv5/conv5_1'
 
 class VGG(Pretrained):
 
-    def __init__(self, trainable=True, endpoint=DEFAULT_ENDPOINT, name='vgg'):
+    def __init__(self, config, name='vgg'):
         super(VGG, self).__init__(name=name)
-        self._trainable = trainable
-        self._endpoint = endpoint
+        self._trainable = config.trainable
+        self._endpoint = config.endpoint or DEFAULT_ENDPOINT
+        self._finetune_num_layers = config.finetune_num_layers
 
     def _build(self, inputs, is_training=False):
         inputs = self._preprocess(inputs)

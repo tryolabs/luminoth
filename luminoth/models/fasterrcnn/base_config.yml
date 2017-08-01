@@ -50,9 +50,13 @@ dataset:
 network:
   num_classes: 20
   with_rcnn: True
-  pretrained_net: vgg_16
-  pretrained_trainable: False
-  pretrained_weights:
+
+pretrained:
+  net: vgg_16
+  trainable: True
+  weights:
+  endpoint: vgg_16/conv5/conv5_1
+  finetune_num_layers: 3
 
 loss:
   rpn_cls_loss_weight: 1.0

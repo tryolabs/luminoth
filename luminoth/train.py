@@ -81,8 +81,8 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = model_class(config)
-    pretrained = PRETRAINED_MODULES[config.network.pretrained_net](
-        trainable=config.network.pretrained_trainable
+    pretrained = PRETRAINED_MODULES[config.pretrained.net](
+        config.pretrained
     )
     dataset = TFRecordDataset(config)
     train_dataset = dataset()
@@ -134,7 +134,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
     # load_weights returns no_op when empty checkpoint_file.
     load_op = pretrained.load_weights(
-        checkpoint_file=config.network.pretrained_weights
+        checkpoint_file=config.pretrained.weights
     )
 
     saver = get_saver((model, pretrained, ))
@@ -176,8 +176,11 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         optimizer = optimizer_cls(learning_rate)
 
     trainable_vars = snt.get_variables_in_module(model)
-    if config.network.pretrained_trainable:
-        trainable_vars += snt.get_variables_in_module(pretrained)
+    if config.pretrained.trainable:
+        pretrained_trainable_vars = pretrained.get_trainable_vars()
+        tf.logging.info('Training {} vars from pretrained module.'.format(
+            len(pretrained_trainable_vars)))
+        trainable_vars += pretrained_trainable_vars
     else:
         tf.logging.info('Not training variables from pretrained module')
 
