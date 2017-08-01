@@ -15,47 +15,69 @@ from sys import stdout
 font = ImageFont.load_default()
 
 
+summaries = {
+    'fasterrcnn': {
+        'rpn': {
+            'draw_anchors': None,
+            'draw_positive_anchors': None,
+            'draw_top_nms_proposals': [
+                None, {'min_score': 0.9}, {'min_score': 0.75}, {'min_score': 0}
+            ],
+            'draw_batch_proposals': [
+                {'display_anchor': True}, {'display_anchor': False}
+            ],
+            'draw_rpn_cls_loss': [
+                {'foreground': True, 'topn': 10, 'worst': True},
+                {'foreground': True, 'topn': 10, 'worst': False},
+                {'foreground': False, 'topn': 10, 'worst': True},
+                {'foreground': False, 'topn': 10, 'worst': False},
+            ],
+            'draw_rpn_bbox_pred': None,
+            'draw_rpn_bbox_pred_with_target': [
+                {'worst': True}, {'worst': False}
+            ]
+        },
+        'rcnn': {
+            'draw_rcnn_cls_batch': None,
+            'draw_rcnn_input_proposals': None,
+            'draw_rcnn_cls_batch_errors': [{'worst': True}, {'worst': False}],
+            'draw_object_prediction': None
+        }
+    }
+}
+
+
+def add_to_summary(summaries, pred_dict, summary_writer, global_step):
+    for fn_name, arguments in summaries.items():
+        if not arguments:
+            arguments = [{}]
+
+        for argument in arguments:
+            if not argument:
+                argument = {}
+                tag = fn_name
+            else:
+                tag = os.path.join(fn_name, ','.join(
+                    '{}={}'.format(k, v) for k, v in argument.items()
+                ))
+
+            summary = add_image_to_summary(
+                globals()[fn_name](pred_dict, **argument), tag)
+            summary_writer.add_summary(summary, global_step)
+
+
 def add_images_to_tensoboard(pred_dict, global_step, summary_dir, with_rcnn):
     summary_writer = tf.summary.FileWriter(summary_dir)
-    summary = add_image_to_summary(draw_anchors(pred_dict), 'draw_anchors')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_positive_anchors(pred_dict), 'draw_positive_anchors')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0.9), 'draw_top_nms_proposals/0.9')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0.75), 'draw_top_nms_proposals/0.75')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_top_nms_proposals(pred_dict, 0), 'draw_top_nms_proposals/0.0')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_batch_proposals(pred_dict, display_anchor=True), 'draw_batch_proposals/display_anchor')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_batch_proposals(pred_dict, display_anchor=False), 'draw_batch_proposals/no_display_anchor')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True), 'draw_rpn_cls_loss/foreground-top10-worst')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=False), 'draw_rpn_cls_loss/foreground-top10-best')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=True), 'draw_rpn_cls_loss/background-top10-worst')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_cls_loss(pred_dict, foreground=False, topn=10, worst=False), 'draw_rpn_cls_loss/background-top10-best')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_bbox_pred(pred_dict), 'draw_rpn_bbox_pred')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_bbox_pred_with_target(pred_dict), 'draw_rpn_bbox_pred_with_target/worst')
-    summary_writer.add_summary(summary, global_step)
-    summary = add_image_to_summary(draw_rpn_bbox_pred_with_target(pred_dict, worst=False), 'draw_rpn_bbox_pred_with_target/best')
-    summary_writer.add_summary(summary, global_step)
+
+    add_to_summary(
+        summaries['fasterrcnn']['rpn'], pred_dict, summary_writer,
+        global_step
+    )
     if with_rcnn:
-        summary = add_image_to_summary(draw_rcnn_cls_batch(pred_dict), 'draw_rcnn_cls_batch')
-        summary_writer.add_summary(summary, global_step)
-        summary = add_image_to_summary(draw_rcnn_input_proposals(pred_dict), 'draw_rcnn_input_proposals')
-        summary_writer.add_summary(summary, global_step)
-        summary = add_image_to_summary(draw_rcnn_cls_batch_errors(pred_dict, worst=False), 'draw_rcnn_cls_batch_errors/best')
-        summary_writer.add_summary(summary, global_step)
-        summary = add_image_to_summary(draw_rcnn_reg_batch_errors(pred_dict), 'draw_rcnn_reg_batch_errors/worst')
-        summary_writer.add_summary(summary, global_step)
-        summary = add_image_to_summary(draw_object_prediction(pred_dict), 'draw_object_prediction')
-        summary_writer.add_summary(summary, global_step)
+        add_to_summary(
+            summaries['fasterrcnn']['rcnn'], pred_dict, summary_writer,
+            global_step
+        )
 
     summary_writer.close()
 
@@ -681,8 +703,6 @@ def recalculate_objects(pred_dict):
     bbox_offsets = bbox_offsets[proposals_target >= 0]
     proposals = proposals[proposals_target >= 0]
     proposals_target = proposals_target[proposals_target >= 0]
-
-    import ipdb; ipdb.set_trace()
 
     bbox_offsets_idx_pairs = np.stack(np.array([proposals_target * 4, proposals_target * 4 + 1, proposals_target * 4 + 2, proposals_target * 4 + 3]), axis=1)
     bbox_offsets = np.take(bbox_offsets, bbox_offsets_idx_pairs.astype(np.int))
