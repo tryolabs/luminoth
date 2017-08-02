@@ -5,7 +5,7 @@ import tensorflow as tf
 from .rcnn import RCNN
 from .rpn import RPN
 
-from luminoth.utils.generate_anchors import generate_anchors as generate_anchors_ref
+from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.ops import meshgrid
 from luminoth.utils.image import draw_bboxes
 from luminoth.utils.vars import variable_summaries
@@ -31,7 +31,7 @@ class FasterRCNN(snt.AbstractModule):
         self._anchor_ratios = np.array(config.anchors.ratios)
         self._anchor_stride = config.anchors.stride
 
-        self._anchor_reference = generate_anchors_ref(
+        self._anchor_reference = generate_anchors_reference(
             self._anchor_base_size, self._anchor_ratios, self._anchor_scales
         )
         self._num_anchors = self._anchor_reference.shape[0]
