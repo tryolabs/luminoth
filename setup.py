@@ -15,6 +15,7 @@ setup(
         'Pillow==4.0.0',
         'PyYAML==3.12',
         'easydict==1.7',
+        'lxml==3.8.0',
     ],
     entry_points="""
         [console_scripts]
