@@ -83,7 +83,7 @@ rpn:
 
   proposals:
     pre_nms_top_n: 12000
-    post_nms_top_n: 20000
+    post_nms_top_n: 2000
     nms_threshold: 0.6
     min_size: 0  # disable using 0
 
