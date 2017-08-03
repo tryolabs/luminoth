@@ -123,7 +123,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         )
         tf.logging.info('Starting training from global_step {}'.format(
             initial_global_step))
-        last_checkpoint_path = last_checkpoint.model_checkpoint_path + '.index'
+        last_checkpoint_path = last_checkpoint.model_checkpoint_path
         tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint_path))
         config.train.checkpoint_file = last_checkpoint_path
 
