@@ -111,18 +111,21 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         model.scope_name
     )
     if continue_training:
-        last_checkpoint = tf.train.latest_checkpoint(
+        last_checkpoint = tf.train.get_checkpoint_state(
             os.path.dirname(checkpoint_path)
         )
-        if not last_checkpoint:
+        if not last_checkpoint or not last_checkpoint.model_checkpoint_path:
             raise ValueError(
                 'Could not find checkpoint in {}. Check run name'.format(
                     checkpoint_path))
-        initial_global_step = int(last_checkpoint.split('-')[-1])
+        initial_global_step = int(
+            last_checkpoint.model_checkpoint_path.split('-')[-1]
+        )
         tf.logging.info('Starting training from global_step {}'.format(
             initial_global_step))
-        tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint))
-        config.train.checkpoint_file = last_checkpoint
+        last_checkpoint_path = last_checkpoint.model_checkpoint_path + '.index'
+        tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint_path))
+        config.train.checkpoint_file = last_checkpoint_path
 
     global_step_init = tf.constant_initializer(initial_global_step)
 
