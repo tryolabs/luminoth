@@ -49,14 +49,20 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
     model_class = MODELS[model_type.lower()]
     config = model_class.base_config
 
-    if config_file:
-        # If we have a custom config file overwritting default settings
-        # then we merge those values to the base_config.
-        custom_config = load_config(config_file)
-        config = merge_into(custom_config, config)
+    # if config_file:
+    #     # If we have a custom config file overwritting default settings
+    #     # then we merge those values to the base_config.
+    #     custom_config = load_config(config_file)
+    #     config = merge_into(custom_config, config)
+
+    config_file = tf.gfile.Open('gs://luminoth/base_config.yml')
+    config = load_config(config_file)
 
     # Load train extra options
     config.train = merge_into(kwargs_to_config(kwargs), config.train)
+
+    config.train.log_dir = 'gs://luminoth/logs'
+    config.dataset.dir = 'gs://luminoth/dataset/voc'
 
     if override_params:
         override_config = parse_override(override_params)
@@ -246,7 +252,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                     )
 
                 (
-                    _, summary, train_loss, step, pred_dict, filename, *_
+                    _, summary, train_loss, step, pred_dict, filename, _
                 ) = sess.run([
                     train_op, summarizer, total_loss, global_step,
                     prediction_dict, train_filename,
@@ -299,3 +305,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
         # Wait for all threads to stop.
         coord.join(threads)
+
+
+if __name__ == '__main__':
+    train(['fasterrcnn'])

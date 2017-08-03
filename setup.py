@@ -16,10 +16,11 @@ setup(
         'PyYAML==3.12',
         'easydict==1.7',
         'lxml==3.8.0',
+        'tensorflow==1.2.1',
     ],
     entry_points="""
         [console_scripts]
         lumi=luminoth:cli
     """,
-    python_requires='>=3.4',
+    python_requires='>=2.7',
 )
