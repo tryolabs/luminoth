@@ -239,3 +239,6 @@ class FasterRCNN(snt.AbstractModule):
             summaries.append(tf.summary.merge_all(key='rcnn'))
 
         return tf.summary.merge(summaries)
+
+    def get_trainable_vars(self):
+        return snt.get_variables_in_module(self)

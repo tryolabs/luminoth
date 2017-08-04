@@ -1,27 +1,14 @@
-import os
-import sonnet as snt
-import tensorflow as tf
 import click
+import os
+import tensorflow as tf
 
-from .models.fasterrcnn import FasterRCNN
-from .models.pretrained import VGG, ResNetV2
 from .dataset import TFRecordDataset
+from .models import MODELS, PRETRAINED_MODELS
 from .utils.config import (
     load_config, merge_into, kwargs_to_config, parse_override
 )
 from .utils.vars import get_saver
 
-
-MODELS = {
-    'fasterrcnn': FasterRCNN,
-}
-
-PRETRAINED_MODULES = {
-    'vgg': VGG,
-    'vgg_16': VGG,
-    'resnet': ResNetV2,
-    'resnetv2': ResNetV2,
-}
 
 OPTIMIZERS = {
     'adam': tf.train.AdamOptimizer,
@@ -81,7 +68,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = model_class(config)
-    pretrained = PRETRAINED_MODULES[config.pretrained.net](
+    pretrained = PRETRAINED_MODELS[config.pretrained.net](
         config.pretrained
     )
     dataset = TFRecordDataset(config)
@@ -178,7 +165,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
     else:
         optimizer = optimizer_cls(learning_rate)
 
-    trainable_vars = snt.get_variables_in_module(model)
+    trainable_vars = model.get_trainable_vars()
     if config.pretrained.trainable:
         pretrained_trainable_vars = pretrained.get_trainable_vars()
         tf.logging.info('Training {} vars from pretrained module.'.format(

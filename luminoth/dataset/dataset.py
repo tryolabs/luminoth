@@ -19,7 +19,8 @@ class Dataset(snt.AbstractModule):
         dimension is bigger than `image_max_size` or when the smaller side is
         smaller than `image_min_size`.
 
-        Then, using the ratio we used, we need to properly scale the bounding boxes.
+        Then, using the ratio we used, we need to properly scale the bounding
+        boxes.
 
         Args:
             image: Tensor with image of shape (H, W, 3).
@@ -43,16 +44,15 @@ class Dataset(snt.AbstractModule):
         x_max = x_max / width
         y_max = y_max / height
 
-
         # We calculate the upscale factor, the rate we need to use to end up
         # with an image with it's lowest dimension at least `image_min_size`.
-        # In case of being already big enough the scale factor is 1. (no change)
+        # In case of being big enough the scale factor is 1. (no change)
         min_dimension = tf.minimum(height, width)
         image_min_size = tf.constant(self._image_min_size, tf.float32)
         upscale_factor = tf.maximum(image_min_size / min_dimension, 1.)
 
-        # We do the same calculating the downscale factor, to end up with an image
-        # where the biggest dimension is less than `image_max_size`.
+        # We do the same calculating the downscale factor, to end up with an
+        # image where the biggest dimension is less than `image_max_size`.
         # When the image is small enough the scale factor is 1. (no change)
         max_dimension = tf.maximum(height, width)
         image_max_size = tf.constant(self._image_max_size, tf.float32)
