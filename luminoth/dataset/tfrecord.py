@@ -29,7 +29,7 @@ class TFRecordDataset(Dataset):
         """Returns a tuple containing image, image metadata and label."""
 
         split_path = os.path.join(
-            self._dataset_dir, '{}.tfrecords'.format(self._subset)
+            self._dataset_dir, '{}.tfrecords'.format(self._split)
         )
 
         filename_queue = tf.train.string_input_producer(

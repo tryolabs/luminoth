@@ -40,7 +40,7 @@ train:
 
 dataset:
   dir: 'datasets/voc/tf'
-  subset: train
+  split: train
   image_preprocessing:
     min_size: 600
     max_size: 1024
