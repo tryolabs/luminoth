@@ -103,8 +103,6 @@ def _string(value):
 
 
 def image_to_example(data_dir, classes, image_id):
-
-    print('image_to_example: {}'.format(image_id))
     annotation_path = get_image_annotation(data_dir, image_id)
     image_path = get_image_path(data_dir, image_id)
 
@@ -134,7 +132,6 @@ def image_to_example(data_dir, classes, image_id):
 
     if len(object_features_values['label']) == 0:
         # No bounding box matches the available classes.
-        print('\tignoring {}'.format(image_id))
         return
 
     object_feature_lists = {
@@ -173,14 +170,20 @@ def image_to_example(data_dir, classes, image_id):
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')
 @click.option('--limit-classes', type=int, default=DEFAULT_TOTAL_CLASSES, help='Limit dataset with `N` random classes.')
 @click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')
+@click.option('--debug', is_flag=True, help='Set debug level logging.')
 def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
-        limit_examples, limit_classes, seed):
+        limit_examples, limit_classes, seed, debug):
     """
     Prepare VOC dataset for ingestion.
 
     Converts the VOC dataset into three (one per split) TFRecords files.
     """
-    print('Saving output_dir = {}'.format(output_dir))
+    if debug:
+        tf.logging.set_verbosity(tf.logging.DEBUG)
+    else:
+        tf.logging.set_verbosity(tf.logging.INFO)
+
+    tf.logging.info('Saving output_dir = {}'.format(output_dir))
     os.makedirs(output_dir, exist_ok=True)
 
     classes = read_classes(data_dir)
@@ -188,7 +191,7 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
     if limit_classes < DEFAULT_TOTAL_CLASSES:
         random.seed(seed)
         classes = random.sample(classes, limit_classes)
-        print('Limiting to {} classes: {}'.format(
+        tf.logging.info('Limiting to {} classes: {}'.format(
             limit_classes, classes
         ))
 
@@ -204,10 +207,10 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
     json.dump(classes, tf.gfile.GFile(classes_file, 'w'))
 
     splits = [s for s in splits if s not in set(ignore_splits)]
-    print('Generating outputs for splits = {}'.format(", ".join(splits)))
+    tf.logging.debug('Generating outputs for splits = {}'.format(", ".join(splits)))
 
     for split in splits:
-        print('Converting split = {}'.format(split))
+        tf.logging.debug('Converting split = {}'.format(split))
         if only_filename:
             record_filename = '{}-{}.tfrecords'.format(split, only_filename)
         elif limit_examples:
@@ -234,3 +237,4 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
                 break
 
         writer.close()
+        tf.logging.info('Saved split {} to "{}"'.format(split, record_file))

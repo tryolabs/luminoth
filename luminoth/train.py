@@ -269,8 +269,6 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                     from luminoth.utils.image_vis import (
                         add_images_to_tensoboard
                     )
-                    print('Scaled image with {}'.format(scale_factor))
-                    print('Image size: {}'.format(pred_dict['image_shape']))
                     add_images_to_tensoboard(
                         pred_dict, step, summary_dir, config.network.with_rcnn
                     )

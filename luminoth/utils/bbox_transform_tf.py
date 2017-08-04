@@ -114,6 +114,3 @@ if __name__ == '__main__':
         })
 
         assert np.all(gt_boxes_val == final_decoded_bboxes)
-
-        print(final_decoded_bboxes)
-

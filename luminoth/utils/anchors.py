@@ -103,5 +103,3 @@ if __name__ == '__main__':
     a = generate_anchors_reference(
         base_size=16, ratios=[0.5, 1, 2], scales=2**np.arange(3, 6)
     )
-    print(time.time() - t)
-    print(a)

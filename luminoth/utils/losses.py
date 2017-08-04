@@ -37,10 +37,12 @@ if __name__ == '__main__':
     loss_tf = smooth_l1_loss(bbox_prediction_tf, bbox_target_tf)
     with tf.Session() as sess:
         loss = sess.run(
-            [loss_tf],
+            loss_tf,
             feed_dict={
-                bbox_prediction_tf: [[ 0.47450006, -0.80413032, -0.26595005,  0.17124325]],
-                bbox_target_tf: [[ 0.10058594,  0.07910156,  0.10555581, -0.1224325 ]],
+                bbox_prediction_tf: [
+                    [0.47450006, -0.80413032, -0.26595005,  0.17124325]
+                ],
+                bbox_target_tf: [
+                    [0.10058594,  0.07910156,  0.10555581, -0.1224325]
+                ],
             })
-
-        print('Loss: {}'.format(loss))

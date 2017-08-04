@@ -51,5 +51,3 @@ if __name__ == '__main__':
             bboxes1: bboxes1_vals,
             bboxes2: bboxes2_vals,
         })
-
-        print(overlap)
