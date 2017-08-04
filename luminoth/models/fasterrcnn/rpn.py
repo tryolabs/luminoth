@@ -1,3 +1,7 @@
+"""
+RPN - Region Proposal Network
+"""
+
 import sonnet as snt
 import tensorflow as tf
 
@@ -65,6 +69,46 @@ class RPN(snt.AbstractModule):
 
     def _build(self, pretrained_feature_map, gt_boxes, image_shape,
                all_anchors, is_training=True):
+        """Builds the RPN model subgraph.
+
+        Args:
+            pretrained_feature_map: A Tensor with the output of some pretrained
+                network. Its dimensions should be
+                `[feature_map_height, feature_map_width, depth]` where depth is
+                512 for the default layer in VGG and 1024 for the default layer
+                in ResNet.
+            gt_boxes: A Tensor with the ground-truth boxes for the image.
+                Its dimensions should be `[total_gt_boxes, 4]`, and it should
+                consist of [x1, y1, x2, y2], being (x1, y1) -> top left point,
+                and (x2, y2) -> bottom right point of the bounding box.
+            image_shape: A Tensor with the shape of the original image.
+            all_anchors: A Tensor with all the anchor bounding boxes. Its shape
+                should be [feature_map_height * feature_map_width * total_anchors, 4]
+
+        Returns:
+            prediction_dict: A dict with the following keys:
+                proposals: A Tensor with an unknown number of proposals for
+                    objects on the image.
+                scores: A Tensor with a objectivness probability for each
+                    proposal. The score should be the output of the softmax for
+                    object.
+
+                If training is True, then some more Tensors are added to the
+                prediction dictionary to be used for calculating the loss.
+
+                rpn_cls_prob: A Tensor with the probability of being
+                    background and foreground for each anchor.
+                rpn_cls_score: A Tensor with the cls score of being background
+                    and foreground for each anchor (the input for the softmax).
+                rpn_bbox_pred: A Tensor with the bounding box regression for
+                    each anchor.
+                rpn_cls_target: A Tensor with the target for each of the
+                    anchors. The shape is [num_anchors,].
+                rpn_bbox_target: A Tensor with the target for each of the
+                    anchors. In case of ignoring the anchor for the target then
+                    we still have a bbox target for each anchors, and it's
+                    filled with zeroes when ignored.
+        """
         # We start with a common conv layer applied to the feature map.
         self._instantiate_layers()
         self._proposal = RPNProposal(self._num_anchors, self._config.proposals)
