@@ -76,7 +76,6 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
     train_image = train_dataset['image']
     train_filename = train_dataset['filename']
-    train_scale_factor = train_dataset['scale_factor']
 
     train_bboxes = train_dataset['bboxes']
 
@@ -195,6 +194,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
         tf.local_variables_initializer()
     )
 
+    # TODO: Why do we need to run this?
     metric_ops = tf.get_collection('metric_ops')
     metrics = tf.get_collection('metrics')
 
@@ -224,7 +224,6 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        count_images = 0
         step = initial_global_step
 
         if config.train.tf_debug:
@@ -247,11 +246,10 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                     )
 
                 (
-                    _, summary, train_loss, step, pred_dict, filename,
-                    scale_factor, *_
+                    _, summary, train_loss, step, pred_dict, filename, *_
                 ) = sess.run([
                     train_op, summarizer, total_loss, global_step,
-                    prediction_dict, train_filename, train_scale_factor,
+                    prediction_dict, train_filename,
                     metric_ops
                 ], run_metadata=run_metadata, options=run_options)
 
@@ -282,10 +280,9 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                         with tf.gfile.GFile(timeline_filename, 'w') as f:
                             f.write(chrome_trace)
 
-                count_images += 1
-
-                tf.logging.info('train_loss: {}'.format(train_loss))
-                tf.logging.info('step: {}, file: {}'.format(step, filename))
+                tf.logging.info('step: {}, file: {}, train_loss: {}'.format(
+                    step, filename, train_loss
+                ))
 
                 if not config.train.no_log:
                     if step % config.train.save_every == 0:
@@ -293,16 +290,12 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                         saver.save(sess, checkpoint_path, global_step=step)
 
         except tf.errors.OutOfRangeError:
-            tf.logging.info('iter = {}, train_loss = {:.2f}'.format(
+            tf.logging.info('step = {}, train_loss = {:.2f}'.format(
                 step, train_loss))
             tf.logging.info('finished training -- epoch limit reached')
-            tf.logging.info('count_images = {}'.format(count_images))
+            # TODO: Print summary
         finally:
             coord.request_stop()
 
         # Wait for all threads to stop.
         coord.join(threads)
-
-
-if __name__ == '__main__':
-    train()
