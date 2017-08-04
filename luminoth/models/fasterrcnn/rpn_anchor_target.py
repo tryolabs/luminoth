@@ -10,9 +10,6 @@ class RPNAnchorTarget(snt.AbstractModule):
     """
     RPNAnchorTarget
 
-    TODO: (copied) Assign anchors to ground-truth targets. Produces anchor
-    classification labels and bounding-box regression targets.
-
     Detailed responsabilities:
     - Keep anchors that are inside the image.
     - We need to set each anchor with a label:
@@ -24,9 +21,6 @@ class RPNAnchorTarget(snt.AbstractModule):
             useful for subsampling negative labels
 
     - Create BBox targets with anchors and GT.
-        TODO:
-        Cual es la diferencia entre bbox_inside_weights y bbox_outside_weights
-
 
     Things to take into account:
     - We can assign "don't care" labels to anchors we want to ignore in batch.
@@ -35,8 +29,6 @@ class RPNAnchorTarget(snt.AbstractModule):
     Returns:
         labels: label for each anchor
         bbox_targets: bbox regresion values for each anchor
-        bbox_inside_weights: TODO: ??
-        bbox_outside_weights: TODO: ??
 
     """
     def __init__(self, num_anchors, config, debug=False, name='anchor_target'):
