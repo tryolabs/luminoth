@@ -60,7 +60,7 @@ class RPNAnchorTarget(snt.AbstractModule):
             tf.logging.warning(
                 'Using RPN Anchor Target in debug mode makes random seed to be fixed at 0.')
 
-    def _build(self, pretrained_shape, gt_boxes, im_info, all_anchors):
+    def _build(self, pretrained_shape, gt_boxes, im_size, all_anchors):
         """
         Args:
             pretrained_shape:
@@ -69,7 +69,7 @@ class RPNAnchorTarget(snt.AbstractModule):
                 A Tensor with the groundtruth bounding boxes of the image of
                 the batch being processed. It's dimensions should be (num_gt, 5).
                 The last dimension is used for the label.
-            im_info:
+            im_size:
                 Shape of original image (height, width) in order to define
                 anchor targers in respect with gt_boxes.
             all_anchors:
@@ -96,7 +96,7 @@ class RPNAnchorTarget(snt.AbstractModule):
             labels, bbox_targets, max_overlaps
         ) = tf.py_func(
             self._anchor_target_layer_np,
-            [pretrained_shape, gt_boxes, im_info, all_anchors],
+            [pretrained_shape, gt_boxes, im_size, all_anchors],
             [tf.float32, tf.float32, tf.float32],
             stateful=False,
             name='anchor_target_layer_np'
@@ -105,14 +105,14 @@ class RPNAnchorTarget(snt.AbstractModule):
 
         return labels, bbox_targets, max_overlaps
 
-    def _anchor_target_layer(self, pretrained_shape, gt_boxes, im_info, all_anchors):
+    def _anchor_target_layer(self, pretrained_shape, gt_boxes, im_size, all_anchors):
         """
         Function working with Tensors instead of instances for proper
         computing in the Tensorflow graph.
         """
         raise NotImplemented()
 
-    def _anchor_target_layer_np(self, pretrained_shape, gt_boxes, im_info, all_anchors):
+    def _anchor_target_layer_np(self, pretrained_shape, gt_boxes, im_size, all_anchors):
 
         if self._debug:
             np.random.seed(0)
@@ -131,8 +131,8 @@ class RPNAnchorTarget(snt.AbstractModule):
         inds_inside = np.where(
             (all_anchors[:, 0] >= -self._allowed_border) &
             (all_anchors[:, 1] >= -self._allowed_border) &
-            (all_anchors[:, 2] < im_info[1] + self._allowed_border) &  # width
-            (all_anchors[:, 3] < im_info[0] + self._allowed_border)    # height
+            (all_anchors[:, 2] < im_size[1] + self._allowed_border) &  # width
+            (all_anchors[:, 3] < im_size[0] + self._allowed_border)    # height
         )[0]
 
         # keep only inside anchors
@@ -209,11 +209,12 @@ class RPNAnchorTarget(snt.AbstractModule):
         return labels, bbox_targets, max_overlaps
 
     def _compute_targets(self, boxes, groundtruth_boxes):
+
         """Compute bounding-box regression targets for an image."""
 
         assert boxes.shape[0] == groundtruth_boxes.shape[0]
         assert boxes.shape[1] == 4
-        assert groundtruth_boxes.shape[1] == 5
+        assert groundtruth_boxes.shape[1] in [4, 5]
 
         return bbox_transform(
             boxes, groundtruth_boxes[:, :4]).astype(np.float32, copy=False)

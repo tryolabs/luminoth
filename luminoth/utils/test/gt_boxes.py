@@ -1,7 +1,8 @@
 import numpy as np
 
 
-def generate_gt_boxes(total_boxes, image_size, min_size=10):
+def generate_gt_boxes(total_boxes, image_size, min_size=10,
+                      total_classes=None):
     """
     Generate `total_boxes` fake (but consistent) ground-truth boxes for an
     image of size `image_size` (height, width).
@@ -39,8 +40,16 @@ def generate_gt_boxes(total_boxes, image_size, min_size=10):
     gt_boxes = np.column_stack((random_leftop, rightbottom))
 
     assert (gt_boxes[:, 0] < gt_boxes[:, 2]).all(), \
-        'Gt boxes generation failed'
+        'Gt boxes without consistent Xs'
     assert (gt_boxes[:, 1] < gt_boxes[:, 3]).all(), \
-        'Gt boxes generation failed'
+        'Gt boxes without consistent Ys'
+
+    if total_classes:
+        random_classes = np.random.randint(
+            low=0, high=total_classes - 1, size=(total_boxes, 1))
+        gt_boxes = np.column_stack((gt_boxes, random_classes))
+
+        assert (gt_boxes[:, 1] < total_classes).all(), \
+            'Gt boxes without consistent classes'
 
     return gt_boxes

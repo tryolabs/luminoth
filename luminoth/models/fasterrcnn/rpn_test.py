@@ -2,6 +2,10 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
+from easydict import EasyDict
+from luminoth.utils.test import generate_gt_boxes, generate_anchors
+from luminoth.utils.anchors import generate_anchors_reference
+
 from .rpn import RPN
 
 
@@ -9,78 +13,204 @@ class RPNTest(tf.test.TestCase):
 
     def setUp(self):
         super(RPNTest, self).setUp()
-        self.anchor_scales = [8, 16, 32]
-        self.anchor_ratios = [0.5, 1, 2]
-        self.num_channels = 512
-        self.kernel_shape = [3, 3]
+        self.num_anchors = 9
+        self.config = EasyDict({
+            'num_channels': 512,
+            'kernel_shape': [3, 3],
+            'initializer': {
+                'type': 'truncated_normal_initializer',
+                'mean': 0.0,
+                'stddev': 0.01,
+            },
+            'l2_regulalization_scale': 0.0005,
+            'activation_function': 'relu6',
+            'proposals': {
+                'pre_nms_top_n': 12000,
+                'post_nms_top_n': 2000,
+                'nms_threshold': 0.6,
+                'min_size': 0,
+            },
+            'target': {
+                'allowed_border': 0,
+                'clobber_positives': False,
+                'foreground_threshold': 0.7,
+                'background_threshold_high': 0.3,
+                'background_threshold_low': 0.,
+                'foreground_fraction': 0.5,
+                'minibatch_size': 256,
+            }
+        })
 
-    def testConstructor(self):
-        with self.assertRaisesRegexp(TypeError, 'anchor_scales must be iterable'):
-            net = RPN(None, self.anchor_ratios)
+        self.base_size = 256
+        self.scales = np.array([0.5, 1, 2])
+        self.ratios = np.array([0.5, 1, 2])
+        self.stride = 16
 
-        with self.assertRaisesRegexp(TypeError, 'anchor_ratios must be iterable'):
-            net = RPN(self.anchor_scales, None)
+    # def testConstructor(self):
+    #     with self.assertRaisesRegexp(
+    #             TypeError, 'anchor_scales must be iterable'):
+    #         net = RPN(None, self.anchor_ratios)
 
-        with self.assertRaisesRegexp(ValueError, 'anchor_scales must not be empty'):
-            net = RPN([], self.anchor_ratios)
+    #     with self.assertRaisesRegexp(
+    #             TypeError, 'anchor_ratios must be iterable'):
+    #         net = RPN(self.anchor_scales, None)
 
-        with self.assertRaisesRegexp(ValueError, 'anchor_ratios must not be empty'):
-            net = RPN(self.anchor_scales, [])
+    #     with self.assertRaisesRegexp(
+    #             ValueError, 'anchor_scales must not be empty'):
+    #         net = RPN([], self.anchor_ratios)
+
+    #     with self.assertRaisesRegexp(
+    #             ValueError, 'anchor_ratios must not be empty'):
+    #         net = RPN(self.anchor_scales, [])
 
     def testBasic(self):
+        """Tests shapes are consistent with anchor generation.
+        """
         model = RPN(
-            self.anchor_scales, self.anchor_ratios, self.num_channels,
-            self.kernel_shape
+            self.num_anchors, self.config, debug=True
         )
-        # With an image of (100, 100, 3) we get a VGG output of (32, 32, 512)
         # (plus the batch number)
         pretrained_output_shape = (1, 32, 32, 512)
         pretrained_output = tf.placeholder(
             tf.float32, shape=pretrained_output_shape)
-        layers = model(pretrained_output)
+
+        image_shape_val = (
+            int(pretrained_output_shape[1] * self.stride),
+            int(pretrained_output_shape[2] * self.stride),
+        )
+
+        gt_boxes_shape = (4, 4)
+        gt_boxes = tf.placeholder(tf.float32, shape=gt_boxes_shape)
+        image_shape_shape = (2,)
+        image_shape = tf.placeholder(tf.float32, shape=image_shape_shape)
+        total_anchors = (
+            pretrained_output_shape[1] * pretrained_output_shape[2] *
+            self.num_anchors
+        )
+        all_anchors_shape = (total_anchors, 4)
+        all_anchors = tf.placeholder(tf.float32, shape=all_anchors_shape)
+        layers = model(pretrained_output, gt_boxes, image_shape, all_anchors)
 
         with self.test_session() as sess:
             # As in the case of a real session we need to initialize the
             # variables.
             sess.run(tf.global_variables_initializer())
             layers_inst = sess.run(layers, feed_dict={
-                pretrained_output: np.random.rand(*pretrained_output_shape)
+                pretrained_output: np.random.rand(
+                    *pretrained_output_shape
+                ),
+                gt_boxes: generate_gt_boxes(
+                    gt_boxes_shape[0], image_shape_val
+                ),
+                all_anchors: generate_anchors(
+                    generate_anchors_reference(
+                        self.base_size, self.ratios, self.scales
+                    ),
+                    16,
+                    pretrained_output_shape[1:3]
+                ),
+                image_shape: image_shape_val,
             })
 
-        # Since pretrained
-        rpn_shape = layers_inst['rpn'].shape
-        # RPN has the same shape as the pretrained layer.
-        self.assertEqual(pretrained_output_shape, rpn_shape)
-
-        num_anchors = model._num_anchors
-
-        # Class score generates 2 values per anchor
+        # Class score generates 2 values per anchor.
         rpn_cls_score_shape = layers_inst['rpn_cls_score'].shape
-        rpn_cls_score_true_shape = pretrained_output_shape[
-            :-1] + (num_anchors * 2,)  # num_anchors * 2
+        rpn_cls_score_true_shape = (total_anchors, 2)
         self.assertEqual(rpn_cls_score_shape, rpn_cls_score_true_shape)
 
-        rpn_cls_score_reshape_shape = layers_inst[
-            'rpn_cls_score_reshape'].shape
-        rpn_cls_score_reshape_true_shape = pretrained_output_shape[
-            :-1] + (num_anchors * 2,)  # num_anchors * 2
-        self.assertEqual(rpn_cls_score_reshape_shape, (1, 32, 288, 2))
-
-        # RPN class prob shape has the spatial reshape
+        # Probs have the same shape as cls scores.
         rpn_cls_prob_shape = layers_inst['rpn_cls_prob'].shape
-        self.assertEqual(rpn_cls_prob_shape, (1, 32, 288, 2))
+        self.assertEqual(rpn_cls_prob_shape, rpn_cls_score_true_shape)
 
-        rpn_cls_prob_reshape_shape = layers_inst['rpn_cls_prob_reshape'].shape
-        rpn_cls_prob_reshape_true_shape = pretrained_output_shape[
-            :-1] + (num_anchors * 2,)  # num_anchors * 2
-        self.assertEqual(rpn_cls_prob_reshape_shape,
-                         rpn_cls_prob_reshape_true_shape)
+        # We check softmax with the sum of the output.
+        rpn_cls_prob_sum = layers_inst['rpn_cls_prob'].sum(axis=1)
+        self.assertAllClose(rpn_cls_prob_sum, np.ones(total_anchors))
 
-        rpn_bbox_pred_shape = layers_inst['rpn_bbox_pred'].shape
-        rpn_bbox_pred_true_shape = pretrained_output_shape[
-            :-1] + (num_anchors * 4,)  # num_anchors * 4 (bbox regression)
-        self.assertEqual(rpn_bbox_pred_shape, rpn_bbox_pred_true_shape)
+        # Proposals and scores are related to the output of the NMS with limits.
+        total_proposals = layers_inst['proposals'].shape[0]
+        total_scores = layers_inst['scores'].shape[0]
 
+        # Check we don't get more than top_n proposals.
+        self.assertGreaterEqual(
+            self.config.proposals.post_nms_top_n, total_proposals
+        )
+
+        # Check we get a score for each proposal.
+        self.assertEqual(total_proposals, total_scores)
+
+        # Check that we get a regression for each anchor.
+        self.assertEqual(
+            layers_inst['rpn_bbox_pred'].shape,
+            (total_anchors, 4)
+        )
+
+        # Check that we get a target for each regression for each anchor.
+        self.assertEqual(
+            layers_inst['rpn_bbox_target'].shape,
+            (total_anchors, 4)
+        )
+
+        # Check that we get a target class for each anchor.
+        self.assertEqual(
+            layers_inst['rpn_cls_target'].shape,
+            (total_anchors,)
+        )
+
+        # Check that targets are composed of [-1, 0, 1] only.
+        rpn_cls_target = layers_inst['rpn_cls_target']
+        self.assertEqual(
+            tuple(np.sort(np.unique(rpn_cls_target))),
+            (-1, 0., 1.)
+        )
+
+        batch_cls_target = rpn_cls_target[
+            (rpn_cls_target == 0.) | (rpn_cls_target == 1.)
+        ]
+
+        # Check that the non negative target class are exactly the size
+        # as the minibatch
+        self.assertEqual(
+            batch_cls_target.shape,
+            (self.config.target.minibatch_size, )
+        )
+
+        # Check that we get upto foreground_fraction of positive anchors.
+        self.assertLessEqual(
+            batch_cls_target[batch_cls_target == 1.].shape[0] /
+            batch_cls_target.shape[0],
+            self.config.target.foreground_fraction
+        )
+
+    def testLoss(self):
+        model = RPN(
+            self.num_anchors, self.config, debug=True
+        )
+
+        rpn_cls_prob = tf.placeholder(tf.float32)
+        rpn_cls_target = tf.placeholder(tf.float32)
+        rpn_cls_score = tf.placeholder(tf.float32)
+        rpn_bbox_target = tf.placeholder(tf.float32)
+        rpn_bbox_pred = tf.placeholder(tf.float32)
+
+        loss = model.loss({
+            'rpn_cls_prob': rpn_cls_prob,
+            'rpn_cls_target': rpn_cls_target,
+            'rpn_cls_score': rpn_cls_score,
+            'rpn_bbox_target': rpn_bbox_target,
+            'rpn_bbox_pred': rpn_bbox_pred,
+        })
+
+        # Test perfect score.
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            loss_dict = sess.run(loss, feed_dict={
+                rpn_cls_prob: [[0, 1], [1., 0]],
+                rpn_cls_target: [1, 0],
+                rpn_cls_score: [[-100., 100.], [100., -100.]],
+                rpn_bbox_target: [[0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1]],
+                rpn_bbox_pred: [[0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1]],
+            })
+
+            self.assertAllClose(tuple(loss_dict.values()), (0, 0))
 
 if __name__ == "__main__":
     tf.test.main()
