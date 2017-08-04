@@ -36,7 +36,7 @@ def node2dict(root):
 
 
 def read_xml(path):
-    with open(path) as f:
+    with tf.gfile.GFile(path) as f:
         root = etree.fromstring(f.read())
 
     annotations = {}
@@ -52,7 +52,7 @@ def read_xml(path):
 
 
 def read_image(path):
-    with open(path, 'rb') as f:
+    with tf.gfile.GFile(path, 'rb') as f:
         image = f.read()
     return image
 
@@ -67,7 +67,7 @@ def load_split(root, split='train'):
 
     split_path = os.path.join(
         root, 'ImageSets', 'Main', '{}.txt'.format(split))
-    with open(split_path) as f:
+    with tf.gfile.GFile(split_path) as f:
         for line in f:
             yield line.strip()
 
@@ -201,7 +201,7 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
 
     classes_file = os.path.join(output_dir, classes_filename)
 
-    json.dump(classes, open(classes_file, 'w'))
+    json.dump(classes, tf.gfile.GFile(classes_file, 'w'))
 
     splits = [s for s in splits if s not in set(ignore_splits)]
     print('Generating outputs for splits = {}'.format(", ".join(splits)))

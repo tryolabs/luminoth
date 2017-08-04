@@ -1,15 +1,16 @@
-import os.path
-import yaml
 import easydict
+import os.path
+import tensorflow as tf
+import yaml
 
 
-def load_config(file):
-    return easydict.EasyDict(yaml.load(file))
+def load_config(filename):
+    return easydict.EasyDict(yaml.load(tf.gfile.GFile(filename)))
 
 
 def get_base_config(path, base_config_filename='base_config.yml'):
     config_path = os.path.join(os.path.dirname(path), base_config_filename)
-    return easydict.EasyDict(yaml.load(open(config_path)))
+    return load_config(config_path)
 
 
 def kwargs_to_config(kwargs):

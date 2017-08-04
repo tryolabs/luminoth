@@ -22,7 +22,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 
 @click.command(help='Train models')
 @click.argument('model_type', type=click.Choice(MODELS.keys()))
-@click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
+@click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 @click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')
 @click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
@@ -280,7 +280,8 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                         run_tmln = timeline.Timeline(
                             run_metadata.step_stats)
                         chrome_trace = run_tmln.generate_chrome_trace_format()
-                        with open('timeline_{}.json'.format(step), 'w') as f:
+                        timeline_filename = 'timeline_{}.json'.format(step)
+                        with tf.gfile.GFile(timeline_filename, 'w') as f:
                             f.write(chrome_trace)
 
                 count_images += 1
