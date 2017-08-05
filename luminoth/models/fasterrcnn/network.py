@@ -15,7 +15,7 @@ from luminoth.utils.config import get_base_config
 class FasterRCNN(snt.AbstractModule):
     """Faster RCNN Network"""
 
-    # base_config = get_base_config(__file__)
+    base_config = get_base_config(__file__)
 
     def __init__(self, config, debug=False, with_rcnn=True, num_classes=None,
                  name='fasterrcnn'):

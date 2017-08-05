@@ -1,6 +1,6 @@
 import click
 
-from .tools import dataset
+from .tools import cloud, dataset
 from .train import train
 
 
@@ -9,5 +9,6 @@ def cli():
     pass
 
 
+cli.add_command(cloud)
 cli.add_command(dataset)
 cli.add_command(train)
