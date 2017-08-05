@@ -21,7 +21,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 
 
 @click.command(help='Train models')
-@click.argument('model_type', type=click.Choice(MODELS.keys()))
+@click.argument('model_type', type=click.Choice(MODELS.keys()), required=False, default=next(iter(MODELS.keys())))
 @click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 @click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')
@@ -44,25 +44,20 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
+@click.option('--job-dir')  # TODO: Ignore this arg passed by Google Cloud ML.
 def train(model_type, config_file, override_params, continue_training, **kwargs):
 
     model_class = MODELS[model_type.lower()]
     config = model_class.base_config
 
-    # if config_file:
-    #     # If we have a custom config file overwritting default settings
-    #     # then we merge those values to the base_config.
-    #     custom_config = load_config(config_file)
-    #     config = merge_into(custom_config, config)
-
-    config_file = tf.gfile.Open('gs://luminoth/base_config.yml')
-    config = load_config(config_file)
+    if config_file:
+        # If we have a custom config file overwritting default settings
+        # then we merge those values to the base_config.
+        custom_config = load_config(config_file)
+        config = merge_into(custom_config, config)
 
     # Load train extra options
     config.train = merge_into(kwargs_to_config(kwargs), config.train)
-
-    config.train.log_dir = 'gs://luminoth/logs'
-    config.dataset.dir = 'gs://luminoth/dataset/voc'
 
     if override_params:
         override_config = parse_override(override_params)
@@ -308,4 +303,4 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
 
 if __name__ == '__main__':
-    train(['fasterrcnn'])
+    train()

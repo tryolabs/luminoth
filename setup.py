@@ -7,6 +7,8 @@ setup(
     license='BSD 3-Clause License',
     packages=find_packages(),
     url="https://github.com/tryolabs/luminoth",
+    include_package_data=True,
+    package_data={'': ['*.yml']},
     setup_requires=[
     ],
     install_requires=[
@@ -17,6 +19,9 @@ setup(
         'easydict==1.7',
         'lxml==3.8.0',
         'tensorflow==1.2.1',
+        'dm-sonnet==1.8',
+        'google-api-python-client==1.6.2',
+        'google-cloud-storage==1.2.0',
     ],
     entry_points="""
         [console_scripts]

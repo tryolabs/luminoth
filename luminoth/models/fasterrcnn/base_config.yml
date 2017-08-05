@@ -38,6 +38,9 @@ train:
   momentum: 0.9
   num_epochs: 10000
 
+  # TODO: Remove this arg passed by Google Cloud ML.
+  job_dir: null
+
 dataset:
   dir: 'datasets/voc/tf'
   split: train
