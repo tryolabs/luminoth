@@ -27,11 +27,11 @@ def upload_file(bucket, base_path, filename):
 
 
 @click.command(help='Start a training job in Google Cloud ML')
-@click.argument('job_id', required=False)
+@click.option('--job-id', help='JobId for saving models and logs.')
 @click.option('--project-id', required=True)
 @click.option('--service-account-json', required=True)
-@click.option('--bucket', 'bucket_name', required=True)
-@click.option('--dataset', required=True)
+@click.option('--bucket', 'bucket_name', required=True, help='Where to save models and logs.')
+@click.option('--dataset', required=True, help='Bucket where the dataset is located.')
 @click.option('--config')
 def gc(job_id, project_id, service_account_json, bucket_name, config, dataset):
     args = []
@@ -41,15 +41,22 @@ def gc(job_id, project_id, service_account_json, bucket_name, config, dataset):
 
     # Define path in bucket to store job's config, logs, etc.
     base_path = 'lumi_{}'.format(job_id)
+
+    # Check if absolute or relative dataset path
+    if not dataset.startswith('gs://'):
+        dataset = 'gs://{}'.format(dataset)
+
     args.extend([
         '--log-dir', 'gs://{}/{}/logs'.format(bucket_name, base_path),
         '--model-dir', 'gs://{}/{}/model'.format(bucket_name, base_path),
-        '--override', 'dataset.dir=gs://{}/{}'.format(bucket_name, dataset)
+        '--override', 'dataset.dir={}'.format(dataset)
     ])
+
+    # Creates bucket for logs and models if it doesn't exist
+    bucket = get_bucket(service_account_json, bucket_name)
 
     if config:
         # Upload config file to be used by the training job.
-        bucket = get_bucket(service_account_json, bucket_name)
         path = upload_file(bucket, base_path, config)
         args.extend(['--config', 'gs://{}/{}'.format(bucket_name, path)])
 
@@ -58,8 +65,8 @@ def gc(job_id, project_id, service_account_json, bucket_name, config, dataset):
     cloudml = discovery.build('ml', 'v1', credentials=credentials)
 
     training_inputs = {
-        'scaleTier': 'BASIC',
-        'packageUris': ['gs://luminoth/luminoth-0.0.1-py2-none-any.whl'],
+        'scaleTier': 'BASIC_GPU',
+        'packageUris': ['gs://luminoth-config/luminoth-0.0.1-py2-none-any.whl'],
         'pythonModule': 'luminoth.train',
         'args': args,
         'region': 'us-central1',
