@@ -10,6 +10,19 @@ from google.cloud import storage
 from google.oauth2 import service_account
 
 
+SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
+MACHINE_TYPES = [
+    'standard', 'large_model', 'complex_model_s', 'complex_model_m',
+    'complex_model_l', 'standard_gpu', 'complex_model_m_gpu',
+    'complex_model_l_gpu'
+]
+
+DEFAULT_SCALE_TIER = 'BASIC_GPU'
+DEFAULT_MASTER_TYPE = 'standard_gpu'
+DEFAULT_WORKER_TYPE = 'standard_gpu'
+DEFAULT_WORKER_COUNT = 2
+
+
 @click.group(help='Train models in Google Cloud ML')
 def gc():
     pass
@@ -44,11 +57,15 @@ def cloud_service(credentials, service, version='v1'):
 @click.option('--job-id', help='JobId for saving models and logs.')
 @click.option('--project-id', required=True)
 @click.option('--service-account-json', required=True)
-@click.option('--bucket', 'bucket_name', required=True, help='Where to save models and logs.') # noqa
-@click.option('--dataset', required=True, help='Bucket where the dataset is located.') # noqa
+@click.option('--bucket', 'bucket_name', required=True, help='Where to save models and logs.')  # noqa
+@click.option('--dataset', required=True, help='Bucket where the dataset is located.')  # noqa
 @click.option('--config', help='Path to config to use in training.')
+@click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
+@click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
+@click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
+@click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
 def train(job_id, project_id, service_account_json, bucket_name, config,
-          dataset):
+          dataset, scale_tier, master_type, worker_type, worker_count):
     args = []
 
     if not job_id:
@@ -79,7 +96,7 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
     cloudml = cloud_service(credentials, 'ml')
 
     training_inputs = {
-        'scaleTier': 'BASIC_GPU',
+        'scaleTier': scale_tier,
         'packageUris': [
             'gs://luminoth-config/luminoth-0.0.1-py2-none-any.whl'
         ],
@@ -89,6 +106,11 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
         'jobDir': 'gs://{}/{}/train/'.format(bucket_name, base_path),
         'runtimeVersion': '1.2'
     }
+
+    if scale_tier == 'CUSTOM':
+        training_inputs['masterType'] = master_type
+        training_inputs['workerType'] = worker_type
+        training_inputs['workerCount'] = worker_count
 
     job_spec = {
         'jobId': job_id,
