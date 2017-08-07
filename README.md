@@ -39,7 +39,7 @@ git clone https://github.com/tryolabs/luminoth.git; cd luminoth;
 and then run
 
 ```
-$ python setup.py install
+python setup.py install
 ```
 
 This should install all required dependencies.
@@ -60,13 +60,25 @@ There one main command line interface which you can use with the `lumi` command.
 
 ## Datasets
 
-Convert the [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html) data to Tensorflow's *tfrecords*.
+Convert datasets to TensorFlow's *`.tfrecords`* for efficient processing using the computation graphs (and for cloud support).
+
+- [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html)
 
 ```
 lumi dataset voc --data-dir ~/dataset/voc/ --output-dir ~/dataset/voc/tf/
 ```
 
-Convert the ImageNet object detection dataset.
+- [ImageNet](http://image-net.org/download)
+
+```
+lumi dataset imagenet --data-dir ~/dataset/imagenet/ --output-dir ~/dataset/imagenet/tf/
+```
+
+- [COCO](http://mscoco.org/dataset/#download)
+
+```
+lumi dataset coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
+```
 
 ## Training
 
@@ -74,4 +86,16 @@ Copy FasterRCNN's base_config.yml and customize parameters.
 
 ```
 lumi train fasterrcnn --config fasterrcnn-custom.yml
+```
+
+For more info on how to train and what options are available check our docs.
+
+## Visualizing results
+
+We strive to get a useful and understandable summary and graph visualizations. We consider them to be essential not only for monitoring (duh!) but for getting a broader understanding of whats going under the hood. The same way it is important for code to be understandable and easy to follow, the computation graph should be as well.
+
+By default summary and graph logs are saved to `/tmp/luminoth`. You can use TensorBoard by running:
+
+```
+tensorboard --logdir /tmp/luminoth
 ```
