@@ -56,7 +56,11 @@ Currently we are focusing on object detection problems, and have a fully functio
 
 # Usage
 
-There one main command line interface which you can use with the `lumi` command.
+There is one main command line interface which you can use with the `lumi` command. Whenever you are confused on how you are supposed to do something just type:
+
+`lumi --help` or `lumi <subcommand> --help`
+
+and a list of available options with descriptions will show up.
 
 ## Datasets
 
@@ -82,17 +86,11 @@ lumi dataset coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
 
 ## Training
 
-Copy FasterRCNN's base_config.yml and customize parameters.
-
-```
-lumi train fasterrcnn --config fasterrcnn-custom.yml
-```
-
-For more info on how to train and what options are available check our docs.
+Check our [TRAINING.md](./TRAINING.md) on how to train locally or in Google Cloud.
 
 ## Visualizing results
 
-We strive to get a useful and understandable summary and graph visualizations. We consider them to be essential not only for monitoring (duh!) but for getting a broader understanding of whats going under the hood. The same way it is important for code to be understandable and easy to follow, the computation graph should be as well.
+We strive to get useful and understandable summary and graph visualizations. We consider them to be essential not only for monitoring (duh!), but for getting a broader understanding of whats going under the hood. The same way it is important for code to be understandable and easy to follow, the computation graph should be as well.
 
 By default summary and graph logs are saved to `/tmp/luminoth`. You can use TensorBoard by running:
 
