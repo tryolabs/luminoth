@@ -13,6 +13,7 @@ import click
 
 from .tools import cloud, dataset, server
 from .train import train
+from .eval import evaluate
 
 
 @click.group()
@@ -22,5 +23,6 @@ def cli():
 
 cli.add_command(cloud)
 cli.add_command(dataset)
+cli.add_command(evaluate)
 cli.add_command(train)
 cli.add_command(server)
