@@ -1,12 +1,34 @@
 import sonnet as snt
 import tensorflow as tf
 
+# Types of RoI "pooling"
 CROP = 'crop'
 ROI_POOLING = 'roi_pooling'
 
 
 class ROIPoolingLayer(snt.AbstractModule):
-    """ROIPoolingLayer which applies ROI pooling (or tf.crop_and_resize)"""
+    """ROIPoolingLayer which applies ROI pooling (or tf.crop_and_resize).
+
+    RoI pooling or RoI extraction is used to extract fixed size features from a
+    feature map using variabled sized values for extraction. Since we have
+    plently of proposals of different shapes and sizes, we need a way to use
+    all the information available in the pretrained feature map.
+
+    There are two basic ways to do this, the original one in the FasterRCNN's
+    paper is RoI Pooling, which as the name suggests, it maxpools directly from
+    the region of interest, or proposal, into a fixed sized Tensor.
+
+    The alternative way uses TensorFlow's image utility operation called,
+    `crop_and_resize` which first crops an Tensor using a normalized proposal,
+    and then applies extrapolationt to resize it to the desired size,
+    generating a fixed sized Tensor.
+
+    Since there isn't a std support implemenation of RoIPooling, we apply the
+    easier but still proven alternatve way.
+
+    TODO: Should not be called ROIPoolingLayer, since it doesn't always apply
+    RoI pooling.
+    """
     def __init__(self, config, debug=False, name='roi_pooling'):
         super(ROIPoolingLayer, self).__init__(name=name)
         self._pooling_mode = config.pooling_mode.lower()
@@ -17,8 +39,18 @@ class ROIPoolingLayer(snt.AbstractModule):
 
     def _get_bboxes(self, roi_proposals, im_shape):
         """
-        Get normalized coordinates for RoIs (between 0 and 1 for easy cropping)
-        in TF order (y1, x1, y2, x2)
+        Gets normalized coordinates for RoIs (between 0 and 1 for cropping)
+        in TensorFlow's order (y1, x1, y2, x2).
+
+        Arguments:
+            roi_proposals: A Tensor with the bounding boxes of shape
+                (total_proposals, 5), where the values for each proposal are
+                (batch_num, x_min, y_min, x_max, y_max).
+            im_shape: A Tensor with the shape of the image (height, width).
+
+        Returns:
+            bboxes: A Tensor with normalized bounding boxes in TensorFlow's
+                format order. Its should is (total_proposals, 4).
         """
         with tf.name_scope('get_bboxes'):
             im_shape = tf.cast(im_shape, tf.float32)
@@ -32,20 +64,24 @@ class ROIPoolingLayer(snt.AbstractModule):
             x2 = x2 / im_shape[1]
             y2 = y2 / im_shape[0]
 
-            # Won't be backpropagated to rois anyway, but to save time TODO: Remove
             bboxes = tf.stack([y1, x1, y2, x2], axis=1)
 
             return bboxes
 
     def _roi_crop(self, roi_proposals, pretrained, im_shape):
+        # Get normalized bounding boxes.
         bboxes = self._get_bboxes(roi_proposals, im_shape)
+        # Generate fake batch ids
         bboxes_shape = tf.shape(bboxes)
         batch_ids = tf.zeros((bboxes_shape[0], ), dtype=tf.int32)
+        # Apply crop and resize with extracting a crop double the desired size.
         crops = tf.image.crop_and_resize(
             pretrained, bboxes, batch_ids,
             [self._pooled_width * 2, self._pooled_height * 2], name="crops"
         )
 
+        # Applies max pool with [2,2] kernel to reduce the crops two half the
+        # size, and thus having the desired output.
         prediction_dict = {
             'roi_pool': tf.nn.max_pool(
                 crops, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
