@@ -5,30 +5,65 @@ from luminoth.utils.bbox_transform_tf import bbox_decode
 
 
 class RPNProposal(snt.AbstractModule):
-    """
-    Outputs object detection proposals by applying estimated bounding-box
-    transformations to a set of regular boxes (called "anchors").
+    """Transforms anchors and RPN predictions into object proposals.
 
-    Applies NMS and top-N filtering to proposals to limit the number of proposals.
+    Using the fixed anchors and the RPN predictions for both classification
+    and regression (adjusting the bounding box), we return a list of objects
+    sorted by relevance.
 
-    TODO: Better documentation.
+    Besides applying the transformations (or adjustments) from the prediction,
+    it also tries to get rid of duplicate proposals by using non maximum
+    supression (NMS).
     """
     def __init__(self, num_anchors, config, name='proposal_layer'):
         super(RPNProposal, self).__init__(name=name)
         self._num_anchors = num_anchors
 
         # Filtering config
+        # Before applying NMS we filter the top N anchors.
         self._pre_nms_top_n = config.pre_nms_top_n
+        # After applying NMS we filter the top M anchors.
+        # It's important to understand that because of NMS, it is not certain
+        # we will have this many output proposals. This is just the upper bound.
         self._post_nms_top_n = config.post_nms_top_n
+        # Threshold to use for NMS.
         self._nms_threshold = config.nms_threshold
-        # TF CMU paper suggests removing min size limit -> not used
+        # TODO: Currently we do not filter out proposals by size.
         self._min_size = config.min_size
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
+        """
+
+        Arguments:
+            rpn_cls_prob: A Tensor with the softmax output for each anchor.
+                Its shape should be (total_anchors, 2), with the probability of
+                being background and the probability of being foreground for
+                each anchor.
+            rpn_bbox_pred: A Tensor with the regression output for each anchor.
+                Its shape should be (total_anchors, 4).
+            all_anchors: A Tensor with the anchors bounding boxes of shape
+                (total_anchors, 4), having (x_min, y_min, x_max, y_max) for
+                each anchor.
+            im_shape: A Tensor with the image shape in format (height, width).
+
+        Returns:
+            prediction_dict with the following keys:
+                nms_proposals: A Tensor with the final selected proposed
+                    bounding boxes. Its shape should be
+                    (total_nms_proposals, 4).
+                nms_proposals_scores: A Tensor with the probability of being an
+                    object for that proposal. Its shape should be
+                    (total_nms_proposals, 1)
+                proposals: A Tensor with all the RPN proposals without any
+                    filtering.
+                scores: A Tensor with a score for each of the unfiltered RPN
+                    proposals.
+        """
+        # Scores are extracted from the second scalar of the cls probability.
+        # cls_probability is a softmax of (background, foreground).
         scores = tf.slice(rpn_cls_prob, [0, 1], [-1, -1])
-        scores = tf.identity(scores, name='scores_after_slice')
+        # Force flatten the scores (it should be already be flatten).
         scores = tf.reshape(scores, [-1])
-        scores = tf.identity(scores, name='scores_after_reshape')
 
         # We first, remove anchor that partially fall ouside an image.
         height = im_shape[0]
@@ -37,7 +72,7 @@ class RPNProposal(snt.AbstractModule):
         (x_min_anchor, y_min_anchor,
          x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
 
-        # Filter anchors that are partially outside the image. TODO: Revisar
+        # Filter anchors that are partially outside the image.
         anchor_filter = tf.logical_and(
             tf.logical_and(
                 tf.greater_equal(x_min_anchor, 0),
@@ -49,7 +84,7 @@ class RPNProposal(snt.AbstractModule):
             )
         )
 
-        # We (force) reshape the filter so that we can use it as a boolean mask.
+        # We (force) reshape the filter so that we can use it as a boolean mask
         anchor_filter = tf.reshape(anchor_filter, [-1])
 
         # Filter anchors, predictions and scores.
@@ -75,7 +110,9 @@ class RPNProposal(snt.AbstractModule):
 
         proposals = tf.stack([x_min, y_min, x_max, y_max], axis=1)
 
-        # Filter proposals with negative area. TODO: Optional, is not done in paper, can it happen (given log of width ratio?)
+        # Filter proposals with negative area.
+        # TODO: Optional, is not done in paper, maybe we should make it
+        # configurable.
         proposal_filter = tf.greater_equal(
             (x_max - x_min) * (y_max - y_min), 0)
         proposal_filter = tf.reshape(proposal_filter, [-1])
@@ -86,7 +123,7 @@ class RPNProposal(snt.AbstractModule):
         proposals = tf.boolean_mask(
             proposals, proposal_filter, name='filter_invalid_proposals')
 
-        # Get pre NMS top selections
+        # Get top `pre_nms_top_n` indices by sorting the proposals by score.
         k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])
         top_k = tf.nn.top_k(scores, k=k)
         scores = top_k.values
@@ -97,10 +134,8 @@ class RPNProposal(snt.AbstractModule):
         x_max = tf.gather(x_max, top_k.indices, name='gather_topk_x_max')
         y_max = tf.gather(y_max, top_k.indices, name='gather_topk_x_max')
 
-        # proposals = tf.gather(proposals, top_k.indices, name='gather_topk_proposals')
-
-        # We reorder the proposals for non_max_supression compatibility.
-
+        # We reorder the proposals into TensorFlows bounding box order for
+        # `tf.image.non_max_supression` compatibility.
         proposals_tf_order = tf.stack([y_min, x_min, y_max, x_max], axis=1)
 
         # We cut the pre_nms filter in pure TF version and go straight into NMS.

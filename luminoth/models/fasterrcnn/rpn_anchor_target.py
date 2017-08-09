@@ -7,29 +7,46 @@ from luminoth.utils.bbox_transform import bbox_transform, unmap
 
 
 class RPNAnchorTarget(snt.AbstractModule):
-    """
-    RPNAnchorTarget
+    """RPNAnchorTarget: Get RPN's classification and regression targets.
 
-    Detailed responsabilities:
-    - Keep anchors that are inside the image.
-    - We need to set each anchor with a label:
-        1 is positive
-            when GT overlap is >= 0.7 or for GT max overlap (one anchor)
-        0 is negative
-            when GT overlap is < 0.3
-        -1 is don't care
-            useful for subsampling negative labels
+    RPNAnchorTarget is responsable for calculating the correct values for both
+    classification and regression problems. It is also responsable for defining
+    which anchors and target values are going to be used for the RPN minibatch.
 
-    - Create BBox targets with anchors and GT.
+    For calculating the correct values for classification, being classification
+    the question of "does this anchor refer to an object?" returning an
+    objectiveness score, we calculate the intersection over union (IoU) between
+    the anchors boxes and the ground truth boxes and assign values. When the
+    intersection between anchors and groundtruth is above a threshold, we can
+    mark the anchor as an object or as being foreground.
+    In case of not having any intersection or having a low IoU value, then we
+    say that the anchor refers to background.
 
-    Things to take into account:
-    - We can assign "don't care" labels to anchors we want to ignore in batch.
+    For calculating the correct values for the regression, the problem of
+    transforming the fixed size anchor into a more suitable bounding box (equal
+    to the ground truth box) only applies to some of the anchors, the ones that
+    we consider to be foreground.
 
+    RPNAnchorTarget is also responsable for selecting which ones of the anchors
+    are going to be used for the minibatch. This is a random process with some
+    restrictions on the ratio between foreground and background samples.
+
+    For selecting the minibatch, labels are not only set to 0 or 1, for the
+    cases of being background and foreground respectively, but also to -1 for
+    the anchors we just want to ignore and not include in the minibatch.
+
+    In summary:
+    - 1 is positive
+        when GT overlap is >= 0.7 (configurable) or for GT max overlap (one
+        anchor)
+    - 0 is negative
+        when GT overlap is < 0.3 (configurable)
+    -1 is don't care
+        useful for subsampling negative labels
 
     Returns:
         labels: label for each anchor
         bbox_targets: bbox regresion values for each anchor
-
     """
     def __init__(self, num_anchors, config, debug=False, name='anchor_target'):
         super(RPNAnchorTarget, self).__init__(name=name)
@@ -39,9 +56,11 @@ class RPNAnchorTarget(snt.AbstractModule):
         # We set clobber positive to False to make sure that there is always at
         # least one positive anchor per GT box.
         self._clobber_positives = config.clobber_positives
-        # We set anchors as positive when the IoU is greater than `positive_overlap`.
+        # We set anchors as positive when the IoU is greater than
+        # `positive_overlap`.
         self._positive_overlap = config.foreground_threshold
-        # We set anchors as negative when the IoU is less than `negative_overlap`.
+        # We set anchors as negative when the IoU is less than
+        # `negative_overlap`.
         self._negative_overlap = config.background_threshold_high
         # Fraction of the batch to be foreground labeled anchors.
         self._foreground_fraction = config.foreground_fraction
@@ -50,7 +69,9 @@ class RPNAnchorTarget(snt.AbstractModule):
         self._debug = debug
         if self._debug:
             tf.logging.warning(
-                'Using RPN Anchor Target in debug mode makes random seed to be fixed at 0.')
+                'Using RPN Anchor Target in debug mode makes random seed '
+                'to be fixed at 0.'
+            )
 
     def _build(self, pretrained_shape, gt_boxes, im_size, all_anchors):
         """
@@ -59,8 +80,8 @@ class RPNAnchorTarget(snt.AbstractModule):
                 Shape of the pretrained feature map, (H, W).
             gt_boxes:
                 A Tensor with the groundtruth bounding boxes of the image of
-                the batch being processed. It's dimensions should be (num_gt, 5).
-                The last dimension is used for the label.
+                the batch being processed. It's dimensions should be
+                (num_gt, 5). The last dimension is used for the label.
             im_size:
                 Shape of original image (height, width) in order to define
                 anchor targers in respect with gt_boxes.
@@ -72,7 +93,8 @@ class RPNAnchorTarget(snt.AbstractModule):
         should migrate this code to pure Tensorflow tensor-based graph.
 
         TODO: Tensorflow limitations for the migration.
-        TODO: Performance impact of current use of py_func
+            Using random.
+        TODO: Performance impact of current use of py_func.
 
         Returns:
             Tuple of the tensors of:
@@ -201,12 +223,23 @@ class RPNAnchorTarget(snt.AbstractModule):
         return labels, bbox_targets, max_overlaps
 
     def _compute_targets(self, boxes, groundtruth_boxes):
+        """Compute bounding-box regression targets for an image.
 
-        """Compute bounding-box regression targets for an image."""
+        Regression targets are the needed adjustments to transform the bounding
+        boxes of the anchors to each respective ground truth box.
 
-        assert boxes.shape[0] == groundtruth_boxes.shape[0]
-        assert boxes.shape[1] == 4
-        assert groundtruth_boxes.shape[1] in [4, 5]
+        For details on how this adjustment is implemented look a the
+        `bbox_transform` module.
 
+        Arguments:
+            boxes: Numpy array with the anchors bounding boxes.
+                Its shape should be (total_bboxes, 4) where total_bboxes
+                is the number of anchors available in the batch.
+            groundtruth_boxes: Numpy array with the groundtruth_boxes.
+                Its shape should be (total_bboxes, 4) or (total_bboxes, 5)
+                depending if the label is included or not. Either way, we don't
+                need it.
+        """
         return bbox_transform(
-            boxes, groundtruth_boxes[:, :4]).astype(np.float32, copy=False)
+            boxes, groundtruth_boxes[:, :4]
+        ).astype(np.float32, copy=False)
