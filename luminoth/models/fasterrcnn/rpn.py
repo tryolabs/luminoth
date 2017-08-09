@@ -155,8 +155,9 @@ class RPN(snt.AbstractModule):
             proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['rpn'])
         variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
         variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
-        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
-        variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+        if is_training:
+            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
         variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
         variable_summaries(
             rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])

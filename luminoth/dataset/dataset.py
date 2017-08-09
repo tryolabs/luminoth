@@ -3,7 +3,35 @@ import tensorflow as tf
 
 
 class Dataset(snt.AbstractModule):
+    """Abstract dataset module.
+
+    This module implements some of the basic functionalities every dataset
+    usually needs.
+
+    Currently we only support object detection datasets, that means, datasets
+    that have ground truth of bounding boxes.
+
+    Attributes:
+        dataset_dir (str): Base directory of the dataset.
+        num_epochs (int): Number of epochs the dataset should iterate over.
+        batch_size (int): Batch size the module should return.
+        split (str): Split to consume the data from (usually "train", "val" or
+            "test").
+        image_min_size (int): Image minimum size, used for resizing images if
+            needed.
+        image_max_size (int): Image maximum size.
+        random_shuffle (bool): To consume the dataset using random shuffle or
+            to just use a regular FIFO queue.
+
+    TODO: Abstract BoundingBoxesDataset.
+    """
     def __init__(self, config, **kwargs):
+        """
+        Save general purpose attributes for Dataset module.
+
+        Args:
+            config: Config object with all the session properties.
+        """
         super(Dataset, self).__init__(**kwargs)
         self._dataset_dir = config.dataset.dir
         self._num_epochs = config.train.num_epochs
@@ -28,8 +56,11 @@ class Dataset(snt.AbstractModule):
                 where we have (x_min, y_min, x_max, y_max, label) for each one.
 
         Returns:
-            image: Scaled image.
-            bboxes: Scaled bboxes.
+            image: Tensor with scaled image.
+            bboxes: Tensor with scaled (using the same factor as the image)
+                bounding boxes with shape (num_bboxes, 5).
+            scale_factor: Scale factor used to modify the image (1.0 means no
+                change).
         """
         image_shape = tf.to_float(tf.shape(image))
         height = image_shape[0]
@@ -71,14 +102,17 @@ class Dataset(snt.AbstractModule):
         y_max = tf.to_int32(y_max * new_height)
         label = tf.to_int32(label)  # Cast back to int.
 
+        # Calculate new height and new width.
         new_height = tf.to_int32(new_height)
         new_width = tf.to_int32(new_width)
 
+        # Resize image using TensorFlow's own `resize_image` utility.
         image = tf.image.resize_images(
             image, tf.stack([new_height, new_width]),
             method=tf.image.ResizeMethod.BILINEAR
         )
 
+        # Concat points and label to return a [num_bboxes, 5] tensor.
         bboxes = tf.concat([x_min, y_min, x_max, y_max, label], axis=1)
 
         return image, bboxes, scale_factor

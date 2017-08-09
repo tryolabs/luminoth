@@ -1,12 +1,23 @@
-import tensorflow as tf
 import os
+import tensorflow as tf
 
 from .dataset import Dataset
 
 
 class TFRecordDataset(Dataset):
+    """
+    Attributes:
+        context_features (dict): Context features used to parse fixed sized
+            tfrecords.
+        sequence_features (dict): Sequence features used to parse the variable
+            sized part of tfrecords (for ground truth bounding boxes).
 
+    """
     def __init__(self, config, name='tfrecord_dataset', **kwargs):
+        """
+        Arguments:
+            config: Configuration file used in session.
+        """
         super(TFRecordDataset, self).__init__(config, name=name, **kwargs)
 
         self._context_features = {
@@ -26,16 +37,31 @@ class TFRecordDataset(Dataset):
         }
 
     def _build(self):
-        """Returns a tuple containing image, image metadata and label."""
+        """Returns a tuple containing image, image metadata and label.
 
+        Does not receive any input since it doesn't depend on anything inside
+        the graph and it's the starting point of it.
+
+        Returns:
+            dequeue_dict ({}): Dequeued dict returning and image, bounding
+                boxes, filename and the scaling factor used.
+
+        TODO: Join filename, scaling_factor (and possible other fields) into a
+        metadata.
+        """
+
+        # Find split file from which we are going to read.
         split_path = os.path.join(
             self._dataset_dir, '{}.tfrecords'.format(self._split)
         )
 
+        # String input producer allows for a variable number of files to read
+        # from. We just know we have a single file.
         filename_queue = tf.train.string_input_producer(
             [split_path], num_epochs=self._num_epochs
         )
 
+        # Define reader to parse records.
         reader = tf.TFRecordReader()
         _, raw_record = reader.read(filename_queue)
 
@@ -47,8 +73,6 @@ class TFRecordDataset(Dataset):
             sequence_features=self._sequence_features
         )
 
-        # TODO: The fact that it's a JPEG file should also be in `voc.py`.
-        # TODO: Images are around ~500 pixels, should resize first when decoding?
         # Decode and preprocess the example (crop, adjust mean and variance).
         # image_jpeg = tf.decode_raw(example['image_raw'], tf.string)
         image_raw = tf.image.decode_jpeg(context_example['image_raw'])
@@ -67,28 +91,34 @@ class TFRecordDataset(Dataset):
         ymin = self.sparse_to_tensor(sequence_example['ymin'])
         ymax = self.sparse_to_tensor(sequence_example['ymax'])
 
+        # Stack parsed tensors to define bounding boxes of shape (num_boxes, 5)
         bboxes = tf.stack([xmin, ymin, xmax, ymax, label], axis=1)
 
+        # Resize images (if needed)
         image, bboxes, scale_factor = self._resize_image(image, bboxes)
 
         filename = tf.cast(context_example['filename'], tf.string)
+
+        queue_dtypes = [tf.float32, tf.int32, tf.string, tf.float32]
+        queue_names = ['image', 'bboxes', 'filename', 'scale_factor']
 
         if self._random_shuffle:
             queue = tf.RandomShuffleQueue(
                 capacity=100,
                 min_after_dequeue=0,
-                dtypes=[tf.float32, tf.int32, tf.string, tf.float32],
-                names=['image', 'bboxes', 'filename', 'scale_factor'],
+                dtypes=queue_dtypes,
+                names=queue_names,
                 name='tfrecord_random_queue'
             )
         else:
             queue = tf.FIFOQueue(
                 capacity=100,
-                dtypes=[tf.float32, tf.int32, tf.string, tf.float32],
-                names=['image', 'bboxes', 'filename', 'scale_factor'],
+                dtypes=queue_dtypes,
+                names=queue_names,
                 name='tfrecord_fifo_queue'
             )
 
+        # Generate queueing ops for QueueRunner.
         enqueue_ops = [queue.enqueue({
             'image': image,
             'bboxes': bboxes,

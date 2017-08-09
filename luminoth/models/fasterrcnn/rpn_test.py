@@ -46,23 +46,6 @@ class RPNTest(tf.test.TestCase):
         self.ratios = np.array([0.5, 1, 2])
         self.stride = 16
 
-    # def testConstructor(self):
-    #     with self.assertRaisesRegexp(
-    #             TypeError, 'anchor_scales must be iterable'):
-    #         net = RPN(None, self.anchor_ratios)
-
-    #     with self.assertRaisesRegexp(
-    #             TypeError, 'anchor_ratios must be iterable'):
-    #         net = RPN(self.anchor_scales, None)
-
-    #     with self.assertRaisesRegexp(
-    #             ValueError, 'anchor_scales must not be empty'):
-    #         net = RPN([], self.anchor_ratios)
-
-    #     with self.assertRaisesRegexp(
-    #             ValueError, 'anchor_ratios must not be empty'):
-    #         net = RPN(self.anchor_scales, [])
-
     def testBasic(self):
         """Tests shapes are consistent with anchor generation.
         """

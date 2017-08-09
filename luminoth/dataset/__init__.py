@@ -1,1 +1,2 @@
-from .tfrecord import TFRecordDataset
+from .tfrecord import TFRecordDataset  # noqa
+from .dataset import Dataset  # noqa

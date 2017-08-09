@@ -1,3 +1,14 @@
+"""Simple command line utility called `lumi`.
+
+The cli is composed of subcommands that are able to handle different tasks
+needed for training and using deep learning models.
+
+It's base subcommands are:
+    train: For training locally.
+    cloud: For traning and monitoring in the cloud.
+    dataset: For modifying and transforming datasets.
+"""
+
 import click
 
 from .tools import cloud, dataset
