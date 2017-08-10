@@ -100,29 +100,32 @@ class RCNNTargetTest(tf.test.TestCase):
                 self.assertLess(label, 1)
 
     def testMultipleOverlap(self):
-        """Tests that we're choosing the best box when several are foreground for the same gt box.
+        """Tests that we're choosing a foreground box when there's several for the same gt box.
         """
 
         gt_boxes = tf.constant([(200, 300, 250, 390, self._placeholder_label)])
 
         proposed_boxes = tf.constant([
             (self._batch_number, 12, 70, 350, 540),  # noise
-            (self._batch_number, 0, 0, 400, 400),  # noise
-            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015: highest
+            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
             (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
             (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+            (self._batch_number, 0, 0, 400, 400),  # noise
             (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
+            (self._batch_number, 0, 0, 400, 400),  # noise
         ])
 
         (proposals_label, bbox_targets) = self._run_rcnn_target(self._shared_model,
                                                                 gt_boxes,
                                                                 proposed_boxes)
         # Assertions
-        self.assertAlmostEqual(proposals_label[2], self._placeholder_label + 1,
-                               delta=self._equality_delta)
+        not_ignored_number = 0
         for i, label in enumerate(proposals_label):
-            if i != 2:
-                self.assertLess(label, 1)
+            if label >= 1:
+                not_ignored_number += 1
+                self.assertIn(i, [1, 2, 3, 5])
+        self.assertEqual(not_ignored_number, 1)
+
 
 if __name__ == '__main__':
     tf.test.main()
