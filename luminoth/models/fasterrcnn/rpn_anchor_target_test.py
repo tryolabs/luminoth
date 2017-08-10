@@ -16,6 +16,8 @@ class RPNAnchorTargetTest(tf.test.TestCase):
             [[200, 100, 400, 400],  # foreground
              [300, 300, 400, 400],  # background
              [200, 380, 300, 500],  # background
+             [500, 500, 600, 650],  # border outsider
+             [200, 100, 400, 400],  # foreground
              ])
         self.config = easydict.EasyDict({
             'allowed_border': 0,
@@ -63,13 +65,13 @@ class RPNAnchorTargetTest(tf.test.TestCase):
             np.array([1, -1, 0])
         )
 
-        # Check that the foreground has overlaps > 0.7
+        # Check that the foreground has overlaps > 0.7.
         self.assertGreaterEqual(
             max_overlaps_val[0],
             0.7
         )
 
-        # Check that the backgrounds have overlaps < 0.3
+        # Check that the backgrounds have overlaps < 0.3.
         self.assertLessEqual(
             np.less_equal(max_overlaps_val[1:], 0.3).all(),
             True
@@ -80,9 +82,9 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         Tests that despite doesn't exist a foreground, always an anchor is assigned
         """
         labels_val, bbox_targets_val, max_overlaps_val = self.execute(
-            self.all_anchors[1:], self.config)
+            self.all_anchors[1:3], self.config)
 
-        # Check we get an assigned anchor
+        # Check we get an assigned anchor.
         self.assertAllEqual(
             labels_val,
             np.array([1, 0])
@@ -96,11 +98,27 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         config['clobber_positives'] = True
 
         labels_val, bbox_targets_val, max_overlaps_val = self.execute(
-            self.all_anchors[1:], config)
-        # Check we don't get an assigned anchor because of possitive clobbering
+            self.all_anchors[1:3], config)
+
+        # Check we don't get an assigned anchor because of possitive clobbering.
         self.assertAllEqual(
             labels_val,
             np.array([0, 0])
+        )
+
+    def testBorderOutsiders(self):
+        """
+        Test with anchors outside the image
+        """
+        config = self.config
+        config['minibatch_size'] = 4
+        labels_val, bbox_targets_val, max_overlaps_val = self.execute(
+            self.all_anchors[:5], config)
+
+        # Check that the order or anchors is correct.
+        self.assertAllEqual(
+            labels_val,
+            np.array([1, 0, 0, -1, 1])
         )
 
 
