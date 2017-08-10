@@ -2,7 +2,7 @@ import tensorflow as tf
 import sonnet as snt
 import numpy as np
 
-from luminoth.utils.bbox_transform import bbox_transform, unmap
+from luminoth.utils.bbox_transform import encode, unmap
 from luminoth.utils.bbox import bbox_overlaps
 
 
@@ -131,7 +131,7 @@ class RCNNTarget(snt.AbstractModule):
         # background.
         # we only assign to proposals with `overlaps_with_label`.
         proposals_label[overlaps_with_label] = (
-            gt_boxes[:,4][overlaps_best_label] + 1
+            gt_boxes[:, 4][overlaps_best_label] + 1
         )[overlaps_with_label]
 
         # Finally we get the closest proposal for each ground truth box and
@@ -198,7 +198,7 @@ class RCNNTarget(snt.AbstractModule):
         proposals_with_target = proposals[proposal_with_target_idx]
 
         # We create our targets with bbox_transform
-        bbox_targets = bbox_transform(
+        bbox_targets = encode(
             proposals_with_target, proposals_gt_boxes
         )
         # TODO: We should normalize it in order for bbox_targets to have zero

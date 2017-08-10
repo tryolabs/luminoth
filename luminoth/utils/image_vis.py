@@ -7,7 +7,7 @@ import PIL.ImageFont as ImageFont
 import tensorflow as tf
 
 from .bbox import bbox_overlaps
-from .bbox_transform import bbox_transform_inv
+from .bbox_transform import decode
 from base64 import b64encode
 from sys import stdout
 
@@ -273,7 +273,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
     all_anchors = all_anchors[batch_idx]
     targets = targets[batch_idx]
 
-    bboxes = bbox_transform_inv(all_anchors, bbox_pred)
+    bboxes = decode(all_anchors, bbox_pred)
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -463,7 +463,7 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
     all_anchors = pred_dict['all_anchors']
     all_anchors = all_anchors[positive_indices]
 
-    bbox_final = bbox_transform_inv(all_anchors, bbox_pred)
+    bbox_final = decode(all_anchors, bbox_pred)
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -522,8 +522,8 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     bbox_pred = bbox_pred[loss_idx]
     bbox_target = bbox_target[loss_idx]
 
-    bbox = bbox_transform_inv(np.array([anchor]), np.array([bbox_pred]))[0]
-    bbox_target = bbox_transform_inv(np.array([anchor]), np.array([bbox_target]))[0]
+    bbox = decode(np.array([anchor]), np.array([bbox_pred]))[0]
+    bbox_target = decode(np.array([anchor]), np.array([bbox_target]))[0]
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -552,7 +552,7 @@ def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
     cls_targets = cls_targets[batch_idx]
     bbox_offsets_targets = bbox_offsets_targets[batch_idx]
 
-    bboxes = bbox_transform_inv(proposals, bbox_offsets_targets)
+    bboxes = decode(proposals, bbox_offsets_targets)
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -603,7 +603,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
     cls_targets = cls_targets[selected_idx]
     bbox_offsets_targets = bbox_offsets_targets[selected_idx]
 
-    bboxes = bbox_transform_inv(proposals, bbox_offsets_targets)
+    bboxes = decode(proposals, bbox_offsets_targets)
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -658,7 +658,7 @@ def draw_rcnn_reg_batch_errors(pred_dict):
     bbox_offsets_idx_pairs = np.stack(np.array([cls_targets * 4, cls_targets * 4 + 1, cls_targets * 4 + 2, cls_targets * 4 + 3]), axis=1)
     bbox_offsets = np.take(bbox_offsets, bbox_offsets_idx_pairs.astype(np.int))
 
-    bboxes = bbox_transform_inv(proposals, bbox_offsets)
+    bboxes = decode(proposals, bbox_offsets)
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -707,7 +707,7 @@ def recalculate_objects(pred_dict):
     bbox_offsets_idx_pairs = np.stack(np.array([proposals_target * 4, proposals_target * 4 + 1, proposals_target * 4 + 2, proposals_target * 4 + 3]), axis=1)
     bbox_offsets = np.take(bbox_offsets, bbox_offsets_idx_pairs.astype(np.int))
 
-    bboxes = bbox_transform_inv(proposals, bbox_offsets)
+    bboxes = decode(proposals, bbox_offsets)
 
     return bboxes, proposals_target
 

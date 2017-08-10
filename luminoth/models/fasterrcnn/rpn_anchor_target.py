@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 from luminoth.utils.bbox import bbox_overlaps
-from luminoth.utils.bbox_transform import bbox_transform, unmap
+from luminoth.utils.bbox_transform import encode, unmap
 
 
 class RPNAnchorTarget(snt.AbstractModule):
@@ -240,6 +240,6 @@ class RPNAnchorTarget(snt.AbstractModule):
                 depending if the label is included or not. Either way, we don't
                 need it.
         """
-        return bbox_transform(
+        return encode(
             boxes, groundtruth_boxes[:, :4]
         ).astype(np.float32, copy=False)

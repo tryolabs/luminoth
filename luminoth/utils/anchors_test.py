@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from luminoth.utils.anchors import generate_anchors_reference, generate_anchors_reference_old
+from luminoth.utils.anchors import generate_anchors_reference
 
 
 class AnchorsTest(tf.test.TestCase):
