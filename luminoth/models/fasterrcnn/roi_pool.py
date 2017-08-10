@@ -42,7 +42,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         Gets normalized coordinates for RoIs (between 0 and 1 for cropping)
         in TensorFlow's order (y1, x1, y2, x2).
 
-        Arguments:
+        Args:
             roi_proposals: A Tensor with the bounding boxes of shape
                 (total_proposals, 5), where the values for each proposal are
                 (batch_num, x_min, y_min, x_max, y_max).

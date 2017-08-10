@@ -27,7 +27,7 @@ class RCNNProposal(snt.AbstractModule):
     """
     def __init__(self, num_classes, config, name='rcnn_proposal'):
         """
-        Arguments:
+        Args:
             num_classes: Total number of classes RCNN is classifying.
             config: Configuration object.
         """

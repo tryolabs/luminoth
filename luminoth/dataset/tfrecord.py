@@ -15,7 +15,7 @@ class TFRecordDataset(Dataset):
     """
     def __init__(self, config, name='tfrecord_dataset', **kwargs):
         """
-        Arguments:
+        Args:
             config: Configuration file used in session.
         """
         super(TFRecordDataset, self).__init__(config, name=name, **kwargs)

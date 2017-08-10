@@ -96,7 +96,7 @@ class RCNN(snt.AbstractModule):
         """
         Classifies proposals based on the pooled feature map.
 
-        Arguments:
+        Args:
             pretrained_feature_map: The feature map of the image extracted
                 using the pretrained network.
                 Shape (num_proposals, pool_height, pool_width, 512).

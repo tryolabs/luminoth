@@ -1,28 +1,28 @@
 import sonnet as snt
 import tensorflow as tf
 
+# Default RGB means used commonly.
 _R_MEAN = 123.68
 _G_MEAN = 116.78
 _B_MEAN = 103.94
 
 
 class Pretrained(snt.AbstractModule):
-
+    """Pretrained abstract module for handling basic things all pretrained
+    networks share.
+    """
     def load_weights(self, checkpoint_file):
         """
         Creates operations to load weigths from checkpoint for each of the
         variables defined in the module. It is assumed that all variables
-        of the module are included in the checkpoint but with a different prefix.
-
-        TODO: We should get a better way to "translate" variables names from checkpoint to module variables.
+        of the module are included in the checkpoint but with a different
+        prefix.
 
         Args:
             checkpoint_file: Path to checkpoint file.
-            old_prefix: string to replace
-            new_prefix: string to replace with
 
         Returns:
-            Load weights operation
+            load_op: Load weights operation or no_op.
         """
         if checkpoint_file is None:
             return tf.no_op(name='not_loading_pretrained')
@@ -54,17 +54,60 @@ class Pretrained(snt.AbstractModule):
         return load_op
 
     def _substract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
+        """Substract channels from images.
+
+        It is common for CNNs to substract the mean of all images from each
+        channel. In the case of RGB images we first calculate the mean from
+        each of the channels (Red, Green, Blue) and substract those values
+        for training and for inference.
+
+        Args:
+            inputs: A Tensor of images we want to normalize. Its shape is
+                (1, height, width, num_channels).
+            means: A Tensor of shape (num_channels,) with the means to be
+                substracted from each channels on the inputs.
+
+        Returns:
+            outputs: A Tensor of images normalized with the means.
+                Its shape is the same as the input.
+
+        """
         num_channels = len(means)
-        channels = tf.split(axis=3, num_or_size_splits=num_channels, value=inputs)
+        channels = tf.split(
+            axis=3, num_or_size_splits=num_channels, value=inputs
+        )
         for i in range(num_channels):
             channels[i] -= means[i]
         return tf.concat(axis=3, values=channels)
 
     def get_trainable_vars(self):
+        """Get trainable vars for the network.
+
+        Not all variables are trainable, it depends on the endpoint being used.
+        For example, when using a Pretrained network for object detection we
+        don't want to define variables below the selected endpoint to be
+        trainable.
+
+        It is also possible to partially train part of the CNN, for that case
+        we use the `_finetune_num_layers` variable to define how many layers
+        from the chosen endpoint we want to train.
+
+        Returns:
+            trainable_variables: A list of variables.
+        """
         all_variables = snt.get_variables_in_module(self)
         var_names = [v.name for v in all_variables]
         last_idx = [
             i for i, name in enumerate(var_names) if self._endpoint in name
         ][0]
 
-        return all_variables[last_idx - self._finetune_num_layers * 2:last_idx]
+        limit_finetune = (
+            not hasattr(self, '_finetune_num_layers') or
+            not self._finetune_num_layers
+        )
+        if limit_finetune:
+            return all_variables
+        else:
+            return all_variables[
+                last_idx - self._finetune_num_layers * 2:last_idx
+            ]

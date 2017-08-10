@@ -39,6 +39,7 @@ def generate_gt_boxes(total_boxes, image_size, min_size=10,
 
     gt_boxes = np.column_stack((random_leftop, rightbottom))
 
+    # TODO: Remove asserts after writing tests for this function.
     assert (gt_boxes[:, 0] < gt_boxes[:, 2]).all(), \
         'Gt boxes without consistent Xs'
     assert (gt_boxes[:, 1] < gt_boxes[:, 3]).all(), \

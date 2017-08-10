@@ -3,7 +3,9 @@ from tensorflow.contrib.slim.nets import resnet_v2
 
 from .pretrained import Pretrained
 
-DEFAULT_ENDPOINT = 'resnet_v2_101/block4/unit_3/bottleneck_v2/conv3'
+
+# Default endpoint to use for features.
+DEFAULT_ENDPOINT = 'resnet_v1_101/block4/unit_3/bottleneck_v2/conv3'
 
 
 class ResNetV2(Pretrained):
@@ -16,7 +18,7 @@ class ResNetV2(Pretrained):
 
     def _build(self, inputs):
         inputs = self._preprocess(inputs)
-        resnet_scope = resnet_v2.resnet_utils.resnet_arg_scope(
+        resnet_scope = resnet_v1.resnet_utils.resnet_arg_scope(
             is_training=self._trainable,
             weight_decay=self._weight_decay
         )

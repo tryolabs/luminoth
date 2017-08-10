@@ -1,19 +1,17 @@
-import sonnet as snt
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 from easydict import EasyDict
-from luminoth.utils.test import generate_gt_boxes, generate_anchors
+from luminoth.models.fasterrcnn.rpn import RPN
 from luminoth.utils.anchors import generate_anchors_reference
-
-from .rpn import RPN
+from luminoth.utils.test import generate_gt_boxes, generate_anchors
 
 
 class RPNTest(tf.test.TestCase):
-
     def setUp(self):
         super(RPNTest, self).setUp()
         self.num_anchors = 9
+        # Use default settings.
         self.config = EasyDict({
             'num_channels': 512,
             'kernel_shape': [3, 3],
@@ -41,6 +39,7 @@ class RPNTest(tf.test.TestCase):
             }
         })
 
+        # Use default anchor configuration values.
         self.base_size = 256
         self.scales = np.array([0.5, 1, 2])
         self.ratios = np.array([0.5, 1, 2])
@@ -57,15 +56,19 @@ class RPNTest(tf.test.TestCase):
         pretrained_output = tf.placeholder(
             tf.float32, shape=pretrained_output_shape)
 
+        # Estimate image shape from the pretrained output and the anchor stride
         image_shape_val = (
             int(pretrained_output_shape[1] * self.stride),
             int(pretrained_output_shape[2] * self.stride),
         )
 
+        # Use 4 ground truth boxes.
         gt_boxes_shape = (4, 4)
         gt_boxes = tf.placeholder(tf.float32, shape=gt_boxes_shape)
         image_shape_shape = (2,)
         image_shape = tf.placeholder(tf.float32, shape=image_shape_shape)
+        # Total anchors depends on the pretrained output shape and the total
+        # number of anchors per point.
         total_anchors = (
             pretrained_output_shape[1] * pretrained_output_shape[2] *
             self.num_anchors
@@ -79,12 +82,17 @@ class RPNTest(tf.test.TestCase):
             # variables.
             sess.run(tf.global_variables_initializer())
             layers_inst = sess.run(layers, feed_dict={
+                # We don't really care about the value of the pretrained output
+                # only that has the correct shape.
                 pretrained_output: np.random.rand(
                     *pretrained_output_shape
                 ),
+                # Generate random but valid ground truth boxes.
                 gt_boxes: generate_gt_boxes(
                     gt_boxes_shape[0], image_shape_val
                 ),
+                # Generate anchors from a reference and the shape of the
+                # pretrained_output.
                 all_anchors: generate_anchors(
                     generate_anchors_reference(
                         self.base_size, self.ratios, self.scales
@@ -164,10 +172,13 @@ class RPNTest(tf.test.TestCase):
         )
 
     def testLoss(self):
+        """Test that loss returns reasonable values in simple cases.
+        """
         model = RPN(
             self.num_anchors, self.config, debug=True
         )
 
+        # Define placeholders that are used inside the loss method.
         rpn_cls_prob = tf.placeholder(tf.float32)
         rpn_cls_target = tf.placeholder(tf.float32)
         rpn_cls_score = tf.placeholder(tf.float32)
@@ -186,13 +197,19 @@ class RPNTest(tf.test.TestCase):
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             loss_dict = sess.run(loss, feed_dict={
+                # Probability is (background_prob, foreground_prob)
                 rpn_cls_prob: [[0, 1], [1., 0]],
+                # Target: 1 being foreground, 0 being background.
                 rpn_cls_target: [1, 0],
+                # Class scores before applying softmax. Since using cross
+                # entropy, we need a big difference between values.
                 rpn_cls_score: [[-100., 100.], [100., -100.]],
+                # Targets and predictions are exactly equal.
                 rpn_bbox_target: [[0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1]],
                 rpn_bbox_pred: [[0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1]],
             })
 
+            # Assert close since cross-entropy could return very small value.
             self.assertAllClose(tuple(loss_dict.values()), (0, 0))
 
 if __name__ == "__main__":

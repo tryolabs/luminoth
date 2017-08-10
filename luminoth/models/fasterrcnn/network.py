@@ -140,7 +140,7 @@ class FasterRCNN(snt.AbstractModule):
     def loss(self, prediction_dict):
         """Compute the joint training loss for Faster RCNN.
 
-        Arguments:
+        Args:
             prediction_dict: The output dictionary of the _build method from
                 which we use to different main keys:
 
@@ -232,7 +232,7 @@ class FasterRCNN(snt.AbstractModule):
         Anchors are just fixed bounding boxes of different ratios and sizes
         that are uniformly generated throught the image.
 
-        Arguments:
+        Args:
             feature_map: A Tensor of shape
                 `(feature_height, feature_width, 512)` using the VGG as
                 pretrained.

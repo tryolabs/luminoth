@@ -34,7 +34,7 @@ class RPNProposal(snt.AbstractModule):
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
         """
 
-        Arguments:
+        Args:
             rpn_cls_prob: A Tensor with the softmax output for each anchor.
                 Its shape should be (total_anchors, 2), with the probability of
                 being background and the probability of being foreground for

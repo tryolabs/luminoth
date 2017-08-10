@@ -29,7 +29,7 @@ class RCNNTarget(snt.AbstractModule):
     """
     def __init__(self, num_classes, config, debug=False, name='rcnn_proposal'):
         """
-        Arguments:
+        Args:
             num_classes: Number of possible classes.
             config: Configuration object for RCNNTarget.
         """
@@ -58,7 +58,7 @@ class RCNNTarget(snt.AbstractModule):
         Ideally we should implement it as pure TensorFlow operation to avoid
         having to execute it in the CPU.
 
-        Arguments:
+        Args:
             proposals: A Tensor with the RPN bounding boxes proposals.
                 The shape of the Tensor is (num_proposals, 5), where the first
                 of the 5 values for each proposal is the batch number.

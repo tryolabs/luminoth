@@ -19,6 +19,9 @@ def generate_anchors(anchors_reference, anchor_stride, feature_map_size):
     Returns:
         anchors (np.array): array with anchors.
             with shape (height_feature * width_feature * total_anchors, 4)
+
+    TODO: We should create a test for comparing this function vs the one
+          actually used in the computation graph.
     """
 
     grid_width = feature_map_size[1]

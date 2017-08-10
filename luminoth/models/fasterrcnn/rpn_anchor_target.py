@@ -231,7 +231,7 @@ class RPNAnchorTarget(snt.AbstractModule):
         For details on how this adjustment is implemented look a the
         `bbox_transform` module.
 
-        Arguments:
+        Args:
             boxes: Numpy array with the anchors bounding boxes.
                 Its shape should be (total_bboxes, 4) where total_bboxes
                 is the number of anchors available in the batch.
