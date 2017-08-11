@@ -75,7 +75,9 @@ class RPNTest(tf.test.TestCase):
         )
         all_anchors_shape = (total_anchors, 4)
         all_anchors = tf.placeholder(tf.float32, shape=all_anchors_shape)
-        layers = model(pretrained_output, gt_boxes, image_shape, all_anchors)
+        layers = model(
+            pretrained_output, image_shape, all_anchors, gt_boxes=gt_boxes
+        )
 
         with self.test_session() as sess:
             # As in the case of a real session we need to initialize the

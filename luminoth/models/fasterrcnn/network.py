@@ -70,7 +70,7 @@ class FasterRCNN(snt.AbstractModule):
         self._rcnn_reg_loss_weight = config.loss.rcnn_reg_loss_weights
         self._losses_collections = ['fastercnn_losses']
 
-    def _build(self, image, pretrained_feature_map, gt_boxes, is_training=True):
+    def _build(self, image, pretrained_feature_map, gt_boxes=None):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -112,8 +112,7 @@ class FasterRCNN(snt.AbstractModule):
         # Generate anchors for the image based on the anchor reference.
         all_anchors = self._generate_anchors(pretrained_feature_map)
         rpn_prediction = self._rpn(
-            pretrained_feature_map, gt_boxes, image_shape, all_anchors,
-            is_training=is_training
+            pretrained_feature_map, image_shape, all_anchors, gt_boxes=gt_boxes
         )
 
         prediction_dict = {
@@ -128,8 +127,8 @@ class FasterRCNN(snt.AbstractModule):
 
         if self._with_rcnn:
             classification_pred = self._rcnn(
-                pretrained_feature_map, rpn_prediction['proposals'], gt_boxes,
-                image_shape
+                pretrained_feature_map, rpn_prediction['proposals'],
+                image_shape, gt_boxes=gt_boxes
             )
 
             prediction_dict['classification_prediction'] = classification_pred

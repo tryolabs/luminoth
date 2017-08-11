@@ -92,7 +92,8 @@ class RCNN(snt.AbstractModule):
             self._num_classes, self._config.proposals
         )
 
-    def _build(self, pretrained_feature_map, proposals, gt_boxes, im_shape, is_training=True):
+    def _build(self, pretrained_feature_map, proposals, im_shape,
+               gt_boxes=None):
         """
         Classifies proposals based on the pooled feature map.
 
@@ -103,13 +104,13 @@ class RCNN(snt.AbstractModule):
             proposals: A Tensor with the bounding boxes proposed by de RPN. Its
                 shape is (total_num_proposals, 4) using the encoding
                 (x1, y1, x2, y2).
-            gt_boxes: A Tensor with the ground truth boxes of the image. Its
-                shape is (total_num_gt, 5), using the encoding
-                (x1, y1, x2, y2, label).
             im_shape: A Tensor with the shape of the image in the form of
                 (image_height, image_width)
-            is_training: Whether the module is created for training or not,
+            inference: Whether the module is created for training or not,
                 which in turn defines if targets are calculated.
+            gt_boxes (optional): A Tensor with the ground truth boxes of the
+                image. Its shape is (total_num_gt, 5), using the encoding
+                (x1, y1, x2, y2, label).
 
         Returns:
             prediction_dict a dict with the object predictions.
@@ -121,20 +122,30 @@ class RCNN(snt.AbstractModule):
 
         prediction_dict = {}
 
-        # TODO: If not training, we should not depend on proposals_target to
-        # use region of interest pooling, we would just need to use all
-        # available proposals.
-        proposals_target, bbox_target = self._rcnn_target(
-            proposals, gt_boxes)
+        if gt_boxes is not None:
+            # TODO: If not training, we should not depend on proposals_target to
+            # use region of interest pooling, we would just need to use all
+            # available proposals.
+            proposals_target, bbox_target = self._rcnn_target(
+                proposals, gt_boxes)
 
-        with tf.name_scope('prepare_batch'):
-            # We flatten to set shape, but it is already a flat Tensor.
-            in_batch_proposals = tf.reshape(
-                tf.not_equal(proposals_target, -1), [-1]
-            )
-            roi_proposals = tf.boolean_mask(proposals, in_batch_proposals)
-            roi_bbox_target = tf.boolean_mask(bbox_target, in_batch_proposals)
-            roi_proposals_target = tf.boolean_mask(proposals_target, in_batch_proposals)
+            with tf.name_scope('prepare_batch'):
+                # We flatten to set shape, but it is already a flat Tensor.
+                in_batch_proposals = tf.reshape(
+                    tf.not_equal(proposals_target, -1), [-1]
+                )
+                roi_proposals = tf.boolean_mask(
+                    proposals, in_batch_proposals)
+                roi_bbox_target = tf.boolean_mask(
+                    bbox_target, in_batch_proposals)
+                roi_proposals_target = tf.boolean_mask(
+                    proposals_target, in_batch_proposals)
+
+            prediction_dict['cls_target'] = roi_proposals_target
+            prediction_dict['bbox_offsets_target'] = roi_bbox_target
+
+        else:
+            roi_proposals = proposals
 
         roi_prediction = self._roi_pool(
             roi_proposals, pretrained_feature_map,
@@ -184,9 +195,7 @@ class RCNN(snt.AbstractModule):
         prediction_dict['cls_score'] = cls_score
         prediction_dict['cls_prob'] = prob
         prediction_dict['bbox_offsets'] = bbox_offsets
-        prediction_dict['cls_target'] = roi_proposals_target
         prediction_dict['roi_proposals'] = roi_proposals
-        prediction_dict['bbox_offsets_target'] = roi_bbox_target
 
         # objects, objects_labels, and objects_labels_prob are the only keys
         # that matter for drawing objects.

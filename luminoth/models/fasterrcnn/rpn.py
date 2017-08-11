@@ -67,8 +67,8 @@ class RPN(snt.AbstractModule):
             padding='VALID', name='bbox_conv'
         )
 
-    def _build(self, pretrained_feature_map, gt_boxes, image_shape,
-               all_anchors, is_training=True):
+    def _build(self, pretrained_feature_map, image_shape, all_anchors,
+               gt_boxes=None):
         """Builds the RPN model subgraph.
 
         Args:
@@ -77,13 +77,13 @@ class RPN(snt.AbstractModule):
                 `[feature_map_height, feature_map_width, depth]` where depth is
                 512 for the default layer in VGG and 1024 for the default layer
                 in ResNet.
+            image_shape: A Tensor with the shape of the original image.
+            all_anchors: A Tensor with all the anchor bounding boxes. Its shape
+                should be [feature_map_height * feature_map_width * total_anchors, 4]
             gt_boxes: A Tensor with the ground-truth boxes for the image.
                 Its dimensions should be `[total_gt_boxes, 4]`, and it should
                 consist of [x1, y1, x2, y2], being (x1, y1) -> top left point,
                 and (x2, y2) -> bottom right point of the bounding box.
-            image_shape: A Tensor with the shape of the original image.
-            all_anchors: A Tensor with all the anchor bounding boxes. Its shape
-                should be [feature_map_height * feature_map_width * total_anchors, 4]
 
         Returns:
             prediction_dict: A dict with the following keys:
@@ -115,6 +115,9 @@ class RPN(snt.AbstractModule):
         self._anchor_target = RPNTarget(
             self._num_anchors, self._config.target, debug=self._debug
         )
+
+        prediction_dict = {}
+
         rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
 
         # Then we apply separate conv layers for classification and regression.
@@ -137,13 +140,22 @@ class RPN(snt.AbstractModule):
         proposal_prediction = self._proposal(
             rpn_cls_prob, rpn_bbox_pred, all_anchors, image_shape)
 
-        if is_training:
+        if gt_boxes is not None:
             # When training we use a separate module to calculate the target
             # values we want to output.
             (rpn_cls_target, rpn_bbox_target,
              rpn_max_overlap) = self._anchor_target(
                 all_anchors, gt_boxes, image_shape
             )
+
+            prediction_dict['rpn_cls_target'] = rpn_cls_target
+            prediction_dict['rpn_bbox_target'] = rpn_bbox_target
+
+            if self._debug:
+                prediction_dict['rpn_max_overlap'] = rpn_max_overlap
+
+            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
 
         # TODO: Better way to log variable summaries.
         # variable_summaries(self._rpn.w, 'rpn_conv_W', ['rpn'])
@@ -154,33 +166,21 @@ class RPN(snt.AbstractModule):
             proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['rpn'])
         variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
         variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
-        if is_training:
-            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
-            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
         variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
         variable_summaries(
             rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])
         variable_summaries(
             rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
 
-        # TODO: Remove unnecesary variables from prediction dictionary.
-        prediction_dict = {
-            'proposals': proposal_prediction['nms_proposals'],
-            'scores': proposal_prediction['nms_proposals_scores'],
-        }
+        prediction_dict['proposals'] = proposal_prediction['nms_proposals']
+        prediction_dict['scores'] = proposal_prediction['nms_proposals_scores']
 
         if self._debug:
             prediction_dict['proposal_prediction'] = proposal_prediction
 
-        if is_training:
-            prediction_dict['rpn_cls_prob'] = rpn_cls_prob
-            prediction_dict['rpn_cls_score'] = rpn_cls_score
-            prediction_dict['rpn_bbox_pred'] = rpn_bbox_pred
-            prediction_dict['rpn_cls_target'] = rpn_cls_target
-            prediction_dict['rpn_bbox_target'] = rpn_bbox_target
-
-            if self._debug:
-                prediction_dict['rpn_max_overlap'] = rpn_max_overlap
+        prediction_dict['rpn_cls_prob'] = rpn_cls_prob
+        prediction_dict['rpn_cls_score'] = rpn_cls_score
+        prediction_dict['rpn_bbox_pred'] = rpn_bbox_pred
 
         return prediction_dict
 
