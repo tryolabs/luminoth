@@ -6,7 +6,7 @@ import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import tensorflow as tf
 
-from .bbox import bbox_overlaps
+from .bbox_overlap import bbox_overlap
 from .bbox_transform import decode
 from base64 import b64encode
 from sys import stdout
@@ -739,10 +739,10 @@ def draw_object_prediction(pred_dict, topn=50):
 
 def draw_rcnn_input_proposals(pred_dict):
     tf.logging.debug('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
-    proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
-    gt_boxes = pred_dict['gt_boxes'][:,:4]
+    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    gt_boxes = pred_dict['gt_boxes'][:, :4]
 
-    overlaps = bbox_overlaps(
+    overlaps = bbox_overlap(
         np.ascontiguousarray(proposals, dtype=np.float),
         np.ascontiguousarray(gt_boxes, dtype=np.float)
     )

@@ -3,7 +3,7 @@ import sonnet as snt
 import numpy as np
 
 from luminoth.utils.bbox_transform import encode, unmap
-from luminoth.utils.bbox import bbox_overlaps
+from luminoth.utils.bbox_overlap import bbox_overlap
 
 
 class RCNNTarget(snt.AbstractModule):
@@ -95,7 +95,7 @@ class RCNNTarget(snt.AbstractModule):
         # Remove batch id from proposals
         proposals = proposals[:, 1:]
 
-        overlaps = bbox_overlaps(
+        overlaps = bbox_overlap(
             # We need to use float and ascontiguousarray because of Cython
             # implementation of bbox_overlap
             np.ascontiguousarray(proposals, dtype=np.float),

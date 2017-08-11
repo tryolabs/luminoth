@@ -2,7 +2,7 @@ import sonnet as snt
 import tensorflow as tf
 import numpy as np
 
-from luminoth.utils.bbox import bbox_overlaps
+from luminoth.utils.bbox_overlap import bbox_overlap
 from luminoth.utils.bbox_transform import encode, unmap
 
 
@@ -159,7 +159,7 @@ class RPNAnchorTarget(snt.AbstractModule):
 
         # intersection over union (IoU) overlap between the anchors and the
         # ground truth boxes.
-        overlaps = bbox_overlaps(
+        overlaps = bbox_overlap(
             np.ascontiguousarray(anchors, dtype=np.float),
             np.ascontiguousarray(gt_boxes, dtype=np.float))
 

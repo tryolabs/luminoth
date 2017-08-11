@@ -1,8 +1,11 @@
+import numpy as np
 import tensorflow as tf
 
 
-def bbox_overlap_iou(bboxes1, bboxes2):
-    """
+def bbox_overlap_tf(bboxes1, bboxes2):
+    """Calculate Intersection over Union (IoU) between two sets of bounding
+    boxes.
+
     Args:
         bboxes1: shape (total_bboxes1, 4)
             with x1, y1, x2, y2 point order.
@@ -17,9 +20,6 @@ def bbox_overlap_iou(bboxes1, bboxes2):
         Tensor with shape (total_bboxes1, total_bboxes2)
         with the IoU (intersection over union) of bboxes1[i] and bboxes2[j]
         in [i, j].
-
-    TODO: Check for invalid values when union is zero or intersection is negative?
-
     """
     with tf.name_scope('bbox_overlap'):
         x11, y11, x12, y12 = tf.split(bboxes1, 4, axis=1)
@@ -31,25 +31,62 @@ def bbox_overlap_iou(bboxes1, bboxes2):
         xI2 = tf.minimum(x12, tf.transpose(x22))
         yI2 = tf.minimum(y12, tf.transpose(y22))
 
-        inter_area = (xI2 - xI1 + 1) * (yI2 - yI1 + 1)
+        intersection = (
+            tf.maximum(xI2 - xI1 + 1., 0.) *
+            tf.maximum(yI2 - yI1 + 1., 0.)
+        )
 
         bboxes1_area = (x12 - x11 + 1) * (y12 - y11 + 1)
         bboxes2_area = (x22 - x21 + 1) * (y22 - y21 + 1)
 
-        union = (bboxes1_area + tf.transpose(bboxes2_area)) - inter_area
+        union = (bboxes1_area + tf.transpose(bboxes2_area)) - intersection
 
-        return tf.maximum(inter_area / union, 0)
+        iou = tf.maximum(intersection / union, 0)
+
+        return iou
 
 
-if __name__ == '__main__':
-    bboxes1 = tf.placeholder(tf.float32)
-    bboxes2 = tf.placeholder(tf.float32)
-    overlap_op = bbox_overlap_iou(bboxes1, bboxes2)
+def bbox_overlap(bboxes1, bboxes2):
+    """Calculate Intersection of Union between two sets of bounding boxes.
 
-    bboxes1_vals = [[39, 63, 203, 112], [0, 0, 10, 10]]
-    bboxes2_vals = [[3, 4, 24, 32], [54, 66, 198, 114], [6, 7, 60, 44]]
-    with tf.Session() as sess:
-        overlap = sess.run(overlap_op, feed_dict={
-            bboxes1: bboxes1_vals,
-            bboxes2: bboxes2_vals,
-        })
+    Intersection over Union (IoU) of two bounding boxes A and B is calculated
+    doing: (A ∩ B) / (A ∪ B).
+
+    Args:
+        bboxes1: numpy array of shape (total_bboxes1, 4).
+        bboxes2: numpy array of shape (total_bboxes2, 4).
+
+    Returns:
+        iou: numpy array of shape (total_bboxes1, total_bboxes1) a matrix with
+            the intersection over union of bboxes1[i] and bboxes2[j] in
+            iou[i][j].
+    """
+    xI1 = np.maximum(bboxes1[:, [0]], bboxes2[:, [0]].T)
+    yI1 = np.maximum(bboxes1[:, [1]], bboxes2[:, [1]].T)
+
+    xI2 = np.minimum(bboxes1[:, [2]], bboxes2[:, [2]].T)
+    yI2 = np.minimum(bboxes1[:, [3]], bboxes2[:, [3]].T)
+
+    intersection = (
+        np.maximum(xI2 - xI1 + 1, 0.) *
+        np.maximum(yI2 - yI1 + 1, 0.)
+    )
+
+    bboxes1_area = (
+        (bboxes1[:, [2]] - bboxes1[:, [0]] + 1) *
+        (bboxes1[:, [3]] - bboxes1[:, [1]] + 1)
+    )
+    bboxes2_area = (
+        (bboxes2[:, [2]] - bboxes2[:, [0]] + 1) *
+        (bboxes2[:, [3]] - bboxes2[:, [1]] + 1)
+    )
+
+    # Calculate the union as the sum of areas minus intersection
+    union = (bboxes1_area + bboxes2_area.T) - intersection
+
+    # We start we an empty array of zeros.
+    iou = np.zeros((bboxes1.shape[0], bboxes2.shape[0]))
+
+    # Only divide where the intersection is > 0
+    np.divide(intersection, union, out=iou, where=intersection > 0.)
+    return iou
