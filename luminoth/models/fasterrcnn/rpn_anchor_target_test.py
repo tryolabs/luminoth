@@ -1,8 +1,8 @@
-import tensorflow as tf
 import numpy as np
-import easydict
+import tensorflow as tf
 
-from rpn_anchor_target import RPNAnchorTarget
+from easydict import EasyDict
+from luminoth.models.fasterrcnn.rpn_anchor_target import RPNAnchorTarget
 
 
 class RPNAnchorTargetTest(tf.test.TestCase):
@@ -12,7 +12,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         # Setup
         self.gt_boxes = np.array([[200, 0, 400, 400]])
         self.im_size = (600, 600)
-        self.config = easydict.EasyDict({
+        self.config = EasyDict({
             'allowed_border': 0,
             'clobber_positives': False,
             'foreground_threshold': 0.7,
@@ -22,7 +22,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         })
         self.pretrained_shape = (1, 1, 1, 1)
 
-    def executeRPNAnchorTarget(self, anchors, config):
+    def _run_rpn_anchor_target(self, anchors, config):
         pretrained_shape = tf.placeholder(tf.float32, shape=(4,))
         gt_boxes = tf.placeholder(tf.float32, shape=self.gt_boxes.shape)
         im_size = tf.placeholder(tf.float32, shape=(2,))
@@ -34,7 +34,6 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         )
 
         with self.test_session() as sess:
-            sess.run(tf.global_variables_initializer())
             labels_val, bbox_targets_val, max_overlaps_val = sess.run(
                 [labels, bbox_targets, max_overlaps], feed_dict={
                     pretrained_shape: self.pretrained_shape,
@@ -48,101 +47,115 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         """
         Tests a basic case that includes foreground and backgrounds
         """
-        all_anchors = np.array([[200, 100, 400, 400],  # foreground
-                                [300, 300, 400, 400],  # background
-                                [200, 380, 300, 500],  # background
-                                ])
-        labels_val, bbox_targets_val, max_overlaps_val = self.executeRPNAnchorTarget(
-            all_anchors, self.config)
+        all_anchors = np.array([
+            [200, 100, 400, 400],  # foreground
+            [300, 300, 400, 400],  # background
+            [200, 380, 300, 500],  # background
+        ])
+        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+            all_anchors, self.config
+        )
 
-        # Check we get exactly and in order a foreground,
-        # an ignored background (minibatch_size = 2) and a background.
+        # Check we get exactly a foreground, an ignored background (because of
+        # minibatch_size = 2) and a background. Also checks they are in the
+        # correct order
         self.assertAllEqual(
-            labels_val,
+            labels,
             np.array([1, -1, 0])
         )
 
         # Check max_overlaps shape
         self.assertEqual(
-            max_overlaps_val.shape,
+            max_overlaps.shape,
             (3,)
         )
 
-        # Check that the foreground has overlaps > 0.7.
+        # Check that the foreground has overlap > 0.7.
         # Only the first value is checked because it's the only anchor assigned
+        # to foreground.
         self.assertGreaterEqual(
-            max_overlaps_val[0],
+            max_overlaps[0],
             0.7
         )
 
         # Check that the backgrounds have overlaps < 0.3.
         self.assertEqual(
-            np.less_equal(max_overlaps_val[1:], 0.3).all(),
+            np.less_equal(max_overlaps[1:], 0.3).all(),
             True
         )
 
     def testWithNoClearMatch(self):
         """
-        Tests that despite doesn't exist a foreground, always an anchor is assigned.
-        Also tests the positive clobbering behaviour.
+        Tests that despite a foreground doesn't exist, an anchor is always
+        assigned.
+        Also tests the positive clobbering behaviour setting.
         """
-        all_anchors = np.array([[300, 300, 400, 400],  # background
-                                [200, 380, 300, 500],  # background
-                                ])
+        all_anchors = np.array([
+            [300, 300, 400, 400],  # background
+            [200, 380, 300, 500],  # background
+        ])
 
-        labels_val, bbox_targets_val, max_overlaps_val = self.executeRPNAnchorTarget(
-            all_anchors, self.config)
+        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+            all_anchors, self.config
+        )
 
-        # Check we get an assigned anchor.
+        # Check we get only one foreground anchor.
         self.assertAllEqual(
-            labels_val,
+            labels,
             np.array([1, 0])
         )
 
         config = self.config
         config['clobber_positives'] = True
 
-        labels_val, bbox_targets_val, max_overlaps_val = self.executeRPNAnchorTarget(
-            all_anchors, config)
+        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+            all_anchors, config
+        )
 
-        # Check we don't get an assigned anchor because of possitive clobbering.
+        # Check we don't get a foreground anchor because of possitive
+        # clobbering enabled.
         self.assertAllEqual(
-            labels_val,
+            labels,
             np.array([0, 0])
         )
 
     def testBorderOutsiders(self):
         """
-        Test with anchors outside the image
+        Test with anchors that fall partially outside the image.
         """
-        all_anchors = np.array([[200, 100, 400, 400],  # foreground
-                                [300, 300, 400, 400],  # background
-                                [200, 380, 300, 500],  # background
-                                [500, 500, 600, 650],  # border outsider
-                                [200, 100, 400, 400],  # foreground
-                                ])
+        all_anchors = np.array([
+            [200, 100, 400, 400],  # foreground
+            [300, 300, 400, 400],  # background
+            [200, 380, 300, 500],  # background
+            [500, 500, 600, 650],  # border outsider
+            [200, 100, 400, 400],  # foreground
+        ])
 
         config = self.config
         config['minibatch_size'] = 5
-        labels_val, bbox_targets_val, max_overlaps_val = self.executeRPNAnchorTarget(
-            all_anchors, config)
+        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+            all_anchors, config
+        )
 
-        # Check that the order or anchors is correct.
-        # The fourth anchor is always ignored because it has a point outside the image.
+        # Checks that the order of labels for anchors is correct.
+        # The fourth anchor is always ignored because it has a point outside
+        # the image.
         self.assertAllEqual(
-            labels_val,
+            labels,
             np.array([1, 0, 0, -1, 1])
         )
 
-        # Test with different foreground_fraction
+        # Test with a different foreground_fraction value.
         config['foreground_fraction'] = 0.2
-        labels_val, bbox_targets_val, max_overlaps_val = self.executeRPNAnchorTarget(
-            all_anchors, config)
+        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+            all_anchors, config
+        )
 
-        # Check that the order or anchors is correct.
-        # The fourth anchor is always ignored because it has a point outside the image.
+        # Checks that the order of labels for anchors is correct.
+        # The fourth anchor is always ignored because it has a point outside
+        # the image.
         self.assertAllEqual(
-            labels_val,
+            labels,
             np.array([-1, 0, 0, -1, 1])
         )
 
