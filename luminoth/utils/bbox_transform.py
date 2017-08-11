@@ -97,7 +97,7 @@ def decode(bboxes, deltas):
 
 
 def clip_points(points, max_val, min_val):
-    return np.maximum(np.minimum(points, max_val), min)
+    return np.maximum(np.minimum(points, max_val), min_val)
 
 
 def clip_boxes(boxes, image_shape):
