@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-from .vgg import VGG
+from easydict import EasyDict
+from luminoth.models.pretrained import VGG
 
 
 class VGGTest(tf.test.TestCase):
@@ -9,7 +10,12 @@ class VGGTest(tf.test.TestCase):
         super(VGGTest, self).setUp()
 
     def testBasic(self):
-        model = VGG()
+        model = VGG(EasyDict({
+            'trainable': False,
+            'finetune_num_layers': 0,
+            'weight_decay': 0.0,
+            'endpoint': None,
+        }))
 
         batch_image_placeholder = tf.placeholder(
             tf.float32, shape=[1, None, None, 3])

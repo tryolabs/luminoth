@@ -1,8 +1,11 @@
 import tensorflow as tf
 import numpy as np
 
-from .pretrained import Pretrained, _R_MEAN, _G_MEAN, _B_MEAN
-from .vgg import VGG
+from easydict import EasyDict
+from luminoth.models.pretrained.pretrained import (
+    Pretrained, _R_MEAN, _G_MEAN, _B_MEAN
+)
+from luminoth.models.pretrained.vgg import VGG
 
 
 class PretrainedTest(tf.test.TestCase):
@@ -14,7 +17,12 @@ class PretrainedTest(tf.test.TestCase):
             Pretrained()
 
     def testSubstractChannels(self):
-        m = VGG()
+        m = VGG(EasyDict({
+            'trainable': False,
+            'finetune_num_layers': 0,
+            'weight_decay': 0,
+            'endpoint': None,
+        }))
         inputs = tf.placeholder(tf.float32, [1, 2, 2, 3])
         substracted_inputs = m._substract_channels(inputs)
         inputs
