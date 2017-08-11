@@ -1,28 +1,6 @@
 import tensorflow as tf
 
 
-def spatial_softmax(input):
-    with tf.name_scope('SpatialSoftmax'):
-        input_shape = tf.shape(input)
-        reshaped_input = tf.reshape(input, [-1, input_shape[3]])
-        softmaxed = tf.nn.softmax(reshaped_input)
-        return tf.reshape(
-            softmaxed, [-1, input_shape[1], input_shape[2], input_shape[3]]
-        )
-
-def spatial_reshape_layer(input, num_dim):
-    with tf.name_scope('SpatialReshapeLayer'):
-        input_shape = tf.shape(input)
-        # transpose: (1, H, W, A x d) -> (1, H, WxA, d)
-        return tf.reshape(
-            input, [
-                input_shape[0],
-                input_shape[1],
-                -1,
-                int(num_dim)
-            ]
-        )
-
 """
 TODO: From here down: stolen from Tensorflow/models
 """
