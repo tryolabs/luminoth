@@ -6,10 +6,10 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 from luminoth.utils.bbox_transform import encode, unmap
 
 
-class RPNAnchorTarget(snt.AbstractModule):
-    """RPNAnchorTarget: Get RPN's classification and regression targets.
+class RPNTarget(snt.AbstractModule):
+    """RPNTarget: Get RPN's classification and regression targets.
 
-    RPNAnchorTarget is responsable for calculating the correct values for both
+    RPNTarget is responsable for calculating the correct values for both
     classification and regression problems. It is also responsable for defining
     which anchors and target values are going to be used for the RPN minibatch.
 
@@ -27,7 +27,7 @@ class RPNAnchorTarget(snt.AbstractModule):
     to the ground truth box) only applies to some of the anchors, the ones that
     we consider to be foreground.
 
-    RPNAnchorTarget is also responsable for selecting which ones of the anchors
+    RPNTarget is also responsable for selecting which ones of the anchors
     are going to be used for the minibatch. This is a random process with some
     restrictions on the ratio between foreground and background samples.
 
@@ -49,7 +49,7 @@ class RPNAnchorTarget(snt.AbstractModule):
         bbox_targets: bbox regresion values for each anchor
     """
     def __init__(self, num_anchors, config, debug=False, name='anchor_target'):
-        super(RPNAnchorTarget, self).__init__(name=name)
+        super(RPNTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
 
         self._allowed_border = config.allowed_border
@@ -73,11 +73,11 @@ class RPNAnchorTarget(snt.AbstractModule):
                 'to be fixed at 0.'
             )
 
-    def _build(self, pretrained_shape, gt_boxes, im_size, all_anchors):
+    def _build(self, all_anchors, gt_boxes, im_size):
         """
         Args:
-            pretrained_shape:
-                Shape of the pretrained feature map, (H, W).
+            all_anchors:
+                A Tensor with all the bounding boxes coords of the anchors.
             gt_boxes:
                 A Tensor with the groundtruth bounding boxes of the image of
                 the batch being processed. It's dimensions should be
@@ -85,8 +85,6 @@ class RPNAnchorTarget(snt.AbstractModule):
             im_size:
                 Shape of original image (height, width) in order to define
                 anchor targers in respect with gt_boxes.
-            all_anchors:
-                A Tensor with all the bounding boxes coords of the anchors.
 
         We currently use the `anchor_target_layer` based on the code provided
         in the original Caffe implementation by Ross Girshick. Ideally we
@@ -110,7 +108,7 @@ class RPNAnchorTarget(snt.AbstractModule):
             labels, bbox_targets, max_overlaps
         ) = tf.py_func(
             self._anchor_target_layer_np,
-            [pretrained_shape, gt_boxes, im_size, all_anchors],
+            [all_anchors, gt_boxes, im_size],
             [tf.float32, tf.float32, tf.float32],
             stateful=False,
             name='anchor_target_layer_np'
@@ -119,14 +117,14 @@ class RPNAnchorTarget(snt.AbstractModule):
 
         return labels, bbox_targets, max_overlaps
 
-    def _anchor_target_layer(self, pretrained_shape, gt_boxes, im_size, all_anchors):
+    def _anchor_target_layer(self, all_anchors, gt_boxes, im_size):
         """
         Function working with Tensors instead of instances for proper
         computing in the Tensorflow graph.
         """
         raise NotImplemented()
 
-    def _anchor_target_layer_np(self, pretrained_shape, gt_boxes, im_size, all_anchors):
+    def _anchor_target_layer_np(self, all_anchors, gt_boxes, im_size):
 
         if self._debug:
             np.random.seed(0)
@@ -134,8 +132,6 @@ class RPNAnchorTarget(snt.AbstractModule):
         """
         Function to be executed with tf.py_func
         """
-
-        height, width = pretrained_shape[1:3]
         # We have "W x H x k" anchors
         total_anchors = all_anchors.shape[0]
 

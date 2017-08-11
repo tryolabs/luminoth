@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from sonnet.python.modules.conv import Conv2D
 
-from .rpn_anchor_target import RPNAnchorTarget
+from .rpn_target import RPNTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import variable_summaries, get_initializer
@@ -112,7 +112,7 @@ class RPN(snt.AbstractModule):
         # We start with a common conv layer applied to the feature map.
         self._instantiate_layers()
         self._proposal = RPNProposal(self._num_anchors, self._config.proposals)
-        self._anchor_target = RPNAnchorTarget(
+        self._anchor_target = RPNTarget(
             self._num_anchors, self._config.target, debug=self._debug
         )
         rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
@@ -142,8 +142,7 @@ class RPN(snt.AbstractModule):
             # values we want to output.
             (rpn_cls_target, rpn_bbox_target,
              rpn_max_overlap) = self._anchor_target(
-                tf.shape(pretrained_feature_map), gt_boxes, image_shape,
-                all_anchors
+                all_anchors, gt_boxes, image_shape
             )
 
         # TODO: Better way to log variable summaries.
@@ -268,7 +267,7 @@ class RPN(snt.AbstractModule):
 
             # Finally, we need to calculate the regression loss over
             # `rpn_bbox_target` and `rpn_bbox_pred`.
-            # Since `rpn_bbox_target` is obtained from RPNAnchorTarget then we
+            # Since `rpn_bbox_target` is obtained from RPNTarget then we
             # just need to apply SmoothL1Loss.
             rpn_bbox_target = tf.reshape(rpn_bbox_target, [-1, 4])
             rpn_bbox_pred = tf.reshape(rpn_bbox_pred, [-1, 4])

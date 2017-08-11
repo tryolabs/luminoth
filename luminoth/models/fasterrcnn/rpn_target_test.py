@@ -2,13 +2,13 @@ import numpy as np
 import tensorflow as tf
 
 from easydict import EasyDict
-from luminoth.models.fasterrcnn.rpn_anchor_target import RPNAnchorTarget
+from luminoth.models.fasterrcnn.rpn_target import RPNTarget
 
 
-class RPNAnchorTargetTest(tf.test.TestCase):
+class RPNTargetTest(tf.test.TestCase):
 
     def setUp(self):
-        super(RPNAnchorTargetTest, self).setUp()
+        super(RPNTargetTest, self).setUp()
         # Setup
         self.gt_boxes = np.array([[200, 0, 400, 400]])
         self.im_size = (600, 600)
@@ -20,23 +20,20 @@ class RPNAnchorTargetTest(tf.test.TestCase):
             'foreground_fraction': 0.5,
             'minibatch_size': 2
         })
-        self.pretrained_shape = (1, 1, 1, 1)
 
-    def _run_rpn_anchor_target(self, anchors, config):
-        pretrained_shape = tf.placeholder(tf.float32, shape=(4,))
+    def _run_rpn_target(self, anchors, config):
         gt_boxes = tf.placeholder(tf.float32, shape=self.gt_boxes.shape)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         all_anchors = tf.placeholder(tf.float32, shape=anchors.shape)
 
-        model = RPNAnchorTarget(anchors.shape[0], config)
+        model = RPNTarget(anchors.shape[0], config)
         labels, bbox_targets, max_overlaps = model(
-            pretrained_shape, gt_boxes, im_size, all_anchors
+            all_anchors, gt_boxes, im_size
         )
 
         with self.test_session() as sess:
             labels_val, bbox_targets_val, max_overlaps_val = sess.run(
                 [labels, bbox_targets, max_overlaps], feed_dict={
-                    pretrained_shape: self.pretrained_shape,
                     gt_boxes: self.gt_boxes,
                     im_size: self.im_size,
                     all_anchors: anchors,
@@ -52,7 +49,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
             [300, 300, 400, 400],  # background
             [200, 380, 300, 500],  # background
         ])
-        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, self.config
         )
 
@@ -95,7 +92,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
             [200, 380, 300, 500],  # background
         ])
 
-        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, self.config
         )
 
@@ -108,7 +105,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
         config = self.config
         config['clobber_positives'] = True
 
-        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, config
         )
 
@@ -133,7 +130,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
 
         config = self.config
         config['minibatch_size'] = 5
-        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, config
         )
 
@@ -147,7 +144,7 @@ class RPNAnchorTargetTest(tf.test.TestCase):
 
         # Test with a different foreground_fraction value.
         config['foreground_fraction'] = 0.2
-        labels, bbox_targets, max_overlaps = self._run_rpn_anchor_target(
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, config
         )
 
