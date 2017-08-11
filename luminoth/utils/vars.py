@@ -5,13 +5,21 @@ import collections
 
 VALID_INITIALIZERS = {
     'truncated_normal_initializer': tf.truncated_normal_initializer,
-    'variance_scaling_initializer': tf.contrib.layers.variance_scaling_initializer,
+    'variance_scaling_initializer': (
+        tf.contrib.layers.variance_scaling_initializer
+    ),
     'random_normal_initializer': tf.random_normal_initializer,
 }
 
 
 def variable_summaries(var, name, collections):
-    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization).
+
+    Args:
+        - var: Tensor for variable from which we want to log.
+        - name: Variable name.
+        - collections: List of collections to save the summary to.
+    """
     with tf.name_scope(name):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean, collections)
@@ -27,6 +35,18 @@ def variable_summaries(var, name, collections):
 
 
 def get_initializer(initializer_config):
+    """Get variable initializer.
+
+    Args:
+        - initializer_config: Configuration for initializer.
+
+    Returns:
+        initializer: Instantiated variable initializer.
+    """
+
+    if 'type' not in initializer_config:
+        raise ValueError('Initializer missing type.')
+
     if initializer_config.type not in VALID_INITIALIZERS:
         raise ValueError('Initializer "{}" is not valid.'.format(
             initializer_config.type))
@@ -39,6 +59,18 @@ def get_initializer(initializer_config):
 
 def get_saver(modules, var_collections=(tf.GraphKeys.GLOBAL_VARIABLES,),
               ignore_scope=None, **kwargs):
+    """Get tf.train.Saver instance for module.
+
+    Args:
+        - modules: Sonnet module or list of Sonnet modules from where to
+            extract variables.
+        - var_collections: Collections from where to take variables.
+        - ignore_scope (str): Ignore variables that contain scope in name.
+        - kwargs: Keyword arguments to pass to creation of `tf.train.Saver`.
+
+    Returns:
+        - saver: tf.train.Saver instance.
+    """
     if not isinstance(modules, collections.Iterable):
         modules = [modules]
 
