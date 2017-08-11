@@ -15,12 +15,8 @@ class RCNNTargetTest(tf.test.TestCase):
         self._placeholder_label = 3.
         self._batch_number = 1
 
-        self._image_size = (800, 600)
-
         self._config = EasyDict({
-            'allowed_border': 0,
-            'clobber_positives': False,
-            'foreground_threshold': 0.7,
+            'foreground_threshold': 0.5,
             'background_threshold_high': 0.5,
             'background_threshold_low': 0.1,
             'foreground_fraction': 0.5,
@@ -68,7 +64,6 @@ class RCNNTargetTest(tf.test.TestCase):
         (proposals_label, bbox_targets) = self._run_rcnn_target(self._shared_model,
                                                                 gt_boxes,
                                                                 proposed_boxes)
-
         # We test that all values are 'close' (up to self._equality_delta) instead of equal to
         # avoid failing due to a floating point rounding error.
         # We sum 1 to the placeholder label because rcnn_target does the same due to the fact that
@@ -99,6 +94,34 @@ class RCNNTargetTest(tf.test.TestCase):
             if i != 2:
                 self.assertLess(label, 1)
 
+    def testAbsolutelyEmptyCase(self):
+        """Tests the code doesn't break when there's no proposals with IoU > 0.
+        """
+
+        gt_boxes = tf.constant([(40, 90, 100, 105, self._placeholder_label)])
+
+        proposed_boxes = tf.constant([
+            (self._batch_number, 0, 0, 39, 89),
+            (self._batch_number, 101, 106, 300, 450),
+            (self._batch_number, 340, 199, 410, 420),
+        ])
+
+        (proposals_label, bbox_targets) = self._run_rcnn_target(self._shared_model,
+                                                                gt_boxes,
+                                                                proposed_boxes)
+        foreground_fraction = self._config.foreground_fraction
+        minibatch_size = self._config.minibatch_size
+        correct_foreground_number = np.floor(foreground_fraction * minibatch_size)
+
+        foreground_number = proposals_label[proposals_label >= 1].shape[0]
+        background_number = proposals_label[proposals_label == 0].shape[0]
+
+        self.assertAlmostEqual(foreground_number, correct_foreground_number,
+                               delta=self._equality_delta)
+
+        self.assertLessEqual(foreground_number, foreground_fraction * minibatch_size)
+        self.assertLess(background_number, (foreground_fraction * minibatch_size) + 1)
+
     def testMultipleOverlap(self):
         """Tests that we're choosing a foreground box when there's several for the same gt box.
         """
@@ -107,9 +130,11 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant([
             (self._batch_number, 12, 70, 350, 540),  # noise
+            (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
             (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
             (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
             (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
             (self._batch_number, 0, 0, 400, 400),  # noise
             (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
             (self._batch_number, 0, 0, 400, 400),  # noise
@@ -119,12 +144,65 @@ class RCNNTargetTest(tf.test.TestCase):
                                                                 gt_boxes,
                                                                 proposed_boxes)
         # Assertions
-        not_ignored_number = 0
-        for i, label in enumerate(proposals_label):
-            if label >= 1:
-                not_ignored_number += 1
-                self.assertIn(i, [1, 2, 3, 5])
-        self.assertEqual(not_ignored_number, 1)
+        foreground_number = proposals_label[proposals_label >= 1].shape[0]
+        background_number = proposals_label[proposals_label == 0].shape[0]
+
+        foreground_fraction = self._config.foreground_fraction
+
+        self.assertAlmostEqual(foreground_number,
+                               np.floor(self._config.minibatch_size * foreground_fraction),
+                               delta=self._equality_delta)
+        self.assertAlmostEqual(background_number,
+                               np.ceil(self._config.minibatch_size * foreground_fraction),
+                               delta=self._equality_delta)
+
+        foreground_idxs = np.nonzero(proposals_label >= 1)[0]
+        for foreground_idx in foreground_idxs:
+            self.assertIn(foreground_idx, [2, 3, 4, 7])
+
+    def testOddMinibatchSize(self):
+        """Tests we're getting the right results when there's an odd minibatch size.
+        """
+
+        config = EasyDict({
+            'allowed_border': 0,
+            'clobber_positives': False,
+            'foreground_threshold': 0.7,
+            'background_threshold_high': 0.5,
+            'background_threshold_low': 0.1,
+            'foreground_fraction': 0.5,
+            'minibatch_size': 5,
+        })
+
+        model = RCNNTarget(self._num_classes, config)
+
+        gt_boxes = tf.constant([(200, 300, 250, 390, self._placeholder_label)])
+
+        proposed_boxes = tf.constant([
+            (self._batch_number, 12, 70, 350, 540),  # noise
+            (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
+            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
+            (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
+            (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+            (self._batch_number, 0, 0, 400, 400),  # noise
+            (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
+            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+            (self._batch_number, 0, 0, 400, 400),  # noise
+        ])
+
+        (proposals_label, bbox_targets) = self._run_rcnn_target(model, gt_boxes,
+                                                                proposed_boxes)
+
+        foreground_number = proposals_label[proposals_label >= 1].shape[0]
+        background_number = proposals_label[proposals_label == 0].shape[0]
+
+        foreground_fraction = config.foreground_fraction
+        minibatch_size = config.minibatch_size
+
+        self.assertLessEqual(foreground_number, foreground_fraction * minibatch_size)
+        self.assertLess(background_number, (foreground_fraction * minibatch_size) + 1)
 
 
 if __name__ == '__main__':
