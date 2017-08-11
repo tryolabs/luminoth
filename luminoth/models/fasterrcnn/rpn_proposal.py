@@ -1,7 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
-from luminoth.utils.bbox_transform_tf import bbox_decode
+from luminoth.utils.bbox_transform_tf import decode, clip_boxes, change_order
 
 
 class RPNProposal(snt.AbstractModule):
@@ -97,22 +97,13 @@ class RPNProposal(snt.AbstractModule):
         )
 
         # Decode boxes
-        proposals = bbox_decode(all_anchors, rpn_bbox_pred)
-
-        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
-
-        # Clip boxes
-        image_shape = tf.cast(im_shape, tf.float32)
-        x_min = tf.maximum(tf.minimum(x_min, image_shape[1] - 1), 0.)
-        y_min = tf.maximum(tf.minimum(y_min, image_shape[0] - 1), 0.)
-        x_max = tf.maximum(tf.minimum(x_max, image_shape[1] - 1), 0.)
-        y_max = tf.maximum(tf.minimum(y_max, image_shape[0] - 1), 0.)
-
-        proposals = tf.stack([x_min, y_min, x_max, y_max], axis=1)
+        proposals = decode(all_anchors, rpn_bbox_pred)
+        proposals = clip_boxes(proposals, im_shape)
 
         # Filter proposals with negative area.
         # TODO: Optional, is not done in paper, maybe we should make it
         # configurable.
+        (x_min, y_min, x_max, y_max) = tf.unstack(proposals, axis=1)
         proposal_filter = tf.greater_equal(
             (x_max - x_min) * (y_max - y_min), 0)
         proposal_filter = tf.reshape(proposal_filter, [-1])
@@ -128,15 +119,10 @@ class RPNProposal(snt.AbstractModule):
         top_k = tf.nn.top_k(scores, k=k)
         scores = top_k.values
 
-        x_min, y_min, x_max, y_max = tf.unstack(proposals, axis=1)
-        x_min = tf.gather(x_min, top_k.indices, name='gather_topk_x_min')
-        y_min = tf.gather(y_min, top_k.indices, name='gather_topk_y_min')
-        x_max = tf.gather(x_max, top_k.indices, name='gather_topk_x_max')
-        y_max = tf.gather(y_max, top_k.indices, name='gather_topk_x_max')
-
+        top_k_proposals = tf.gather(proposals, top_k.indices)
         # We reorder the proposals into TensorFlows bounding box order for
         # `tf.image.non_max_supression` compatibility.
-        proposals_tf_order = tf.stack([y_min, x_min, y_max, x_max], axis=1)
+        proposals_tf_order = change_order(top_k_proposals)
 
         # We cut the pre_nms filter in pure TF version and go straight into NMS.
         selected_indices = tf.image.non_max_suppression(
@@ -150,10 +136,10 @@ class RPNProposal(snt.AbstractModule):
         nms_proposals_scores = tf.gather(scores, selected_indices, name='gather_nms_proposals_scores')
 
         # We switch back again to the regular bbox encoding.
-        y_min, x_min, y_max, x_max = tf.split(value=nms_proposals, num_or_size_splits=4, axis=1)
+        nms_proposals = change_order(nms_proposals)
         # Adds batch number for consistency and future multi image batche support.
         batch_inds = tf.zeros((tf.shape(nms_proposals)[0], 1), dtype=tf.float32)
-        nms_proposals = tf.concat([batch_inds, x_min, y_min, x_max, y_max], axis=1)
+        nms_proposals = tf.concat([batch_inds, nms_proposals], axis=1)
 
         return {
             'nms_proposals': nms_proposals,

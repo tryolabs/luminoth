@@ -7,7 +7,6 @@ from .rpn import RPN
 
 from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.config import get_base_config
-from luminoth.utils.image import draw_bboxes
 from luminoth.utils.ops import meshgrid
 from luminoth.utils.vars import variable_summaries
 

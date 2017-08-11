@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 def get_width_upright(bboxes):
-    with tf.name_scope('get_width_upright'):
+    with tf.name_scope('BoundingBoxTransform/get_width_upright'):
         bboxes = tf.cast(bboxes, tf.float32)
         x1, y1, x2, y2 = tf.split(bboxes, 4, axis=1)
         width = x2 - x1 + 1.
@@ -15,8 +15,8 @@ def get_width_upright(bboxes):
         return width, height, urx, ury
 
 
-def bbox_encode(bboxes, gt_boxes):
-    with tf.name_scope('bbox_encode'):
+def encode(bboxes, gt_boxes):
+    with tf.name_scope('BoundingBoxTransform/encode'):
         (bboxes_width, bboxes_height,
          bboxes_urx, bboxes_ury) = get_width_upright(bboxes)
 
@@ -35,8 +35,8 @@ def bbox_encode(bboxes, gt_boxes):
         return targets
 
 
-def bbox_decode(roi, deltas):
-    with tf.name_scope('bbox_decode'):
+def decode(roi, deltas):
+    with tf.name_scope('BoundingBoxTransform/decode'):
         (roi_width, roi_height,
          roi_urx, roi_ury) = get_width_upright(roi)
 
@@ -60,7 +60,7 @@ def bbox_decode(roi, deltas):
         return bboxes
 
 
-def clip_bboxes(bboxes, imshape):
+def clip_boxes(bboxes, imshape):
     """
     Clips bounding boxes to image boundaries based on image shape.
 
@@ -75,20 +75,50 @@ def clip_bboxes(bboxes, imshape):
         Tensor with same shape as bboxes but making sure that none
         of the bboxes are inside the image.
     """
-    with tf.name_scope('clip_bboxes'):
-        x1, y1, x2, y2 = tf.split(bboxes, 4, axis=1)
+    with tf.name_scope('BoundingBoxTransform/clip_bboxes'):
+        bboxes = tf.cast(bboxes, dtype=tf.float32)
         imshape = tf.cast(imshape, dtype=tf.float32)
+
+        x1, y1, x2, y2 = tf.split(bboxes, 4, axis=1)
         width = imshape[1]
         height = imshape[0]
-        x1 = tf.maximum(tf.minimum(x1, width - 1.), 0)
-        x2 = tf.maximum(tf.minimum(x2, width - 1.), 0)
+        x1 = tf.maximum(tf.minimum(x1, width - 1.0), 0.0)
+        x2 = tf.maximum(tf.minimum(x2, width - 1.0), 0.0)
 
-        y1 = tf.maximum(tf.minimum(y1, height - 1.), 0)
-        y2 = tf.maximum(tf.minimum(y2, height - 1.), 0)
+        y1 = tf.maximum(tf.minimum(y1, height - 1.0), 0.0)
+        y2 = tf.maximum(tf.minimum(y2, height - 1.0), 0.0)
 
         bboxes = tf.concat([x1, y1, x2, y2], axis=1)
 
         return bboxes
+
+
+def change_order(bboxes):
+    """Change bounding box encoding order.
+
+    TensorFlow works with the (y_min, x_min, y_max, x_max) order while we work
+    with the (x_min, y_min, x_max, y_min).
+
+    While both encoding options have its advantages and disadvantages we
+    decided to use the (x_min, y_min, x_max, y_min), forcing use to switch to
+    TensorFlow's every time we want to use a std function that handles bounding
+    boxes.
+
+    Args:
+        bboxes: A Tensor of shape (total_bboxes, 4)
+
+    Returns:
+        bboxes: A Tensor of shape (total_bboxes, 4) with the order swaped.
+    """
+    with tf.name_scope('BoundingBoxTransform/change_order'):
+        first_min, second_min, first_max, second_max = tf.unstack(
+            bboxes, axis=1
+        )
+        bboxes = tf.stack(
+            [second_min, first_min, second_max, first_max], axis=1
+        )
+        return bboxes
+
 
 if __name__ == '__main__':
     import numpy as np
@@ -102,9 +132,9 @@ if __name__ == '__main__':
     imshape = tf.placeholder(tf.int32)
     imshape_val = (100, 100)
 
-    deltas = bbox_encode(bboxes, gt_boxes)
-    decoded_bboxes = bbox_decode(bboxes, deltas)
-    final_decoded_bboxes = clip_bboxes(decoded_bboxes, imshape)
+    deltas = encode(bboxes, gt_boxes)
+    decoded_bboxes = decode(bboxes, deltas)
+    final_decoded_bboxes = clip_boxes(decoded_bboxes, imshape)
 
     with tf.Session() as sess:
         final_decoded_bboxes = sess.run(final_decoded_bboxes, feed_dict={

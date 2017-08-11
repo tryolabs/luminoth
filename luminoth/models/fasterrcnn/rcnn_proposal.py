@@ -1,7 +1,7 @@
 import sonnet as snt
 import tensorflow as tf
 
-from luminoth.utils.bbox_transform_tf import bbox_decode
+from luminoth.utils.bbox_transform_tf import decode, clip_boxes, change_order
 
 
 class RCNNProposal(snt.AbstractModule):
@@ -106,21 +106,14 @@ class RCNNProposal(snt.AbstractModule):
                 bbox_pred_flatten, label_one_hot_flatten)
 
         # Using the bbox_pred and the proposals we generate the objects.
-        objects_unfiltered = bbox_decode(proposals, bbox_pred)
-
-        x_min, y_min, x_max, y_max = tf.unstack(objects_unfiltered, axis=1)
-
+        objects_unfiltered = decode(proposals, bbox_pred)
         # Clip boxes to image.
-        image_shape = tf.cast(im_shape, tf.float32)
-        x_min = tf.maximum(tf.minimum(x_min, image_shape[1] - 1), 0.)
-        y_min = tf.maximum(tf.minimum(y_min, image_shape[0] - 1), 0.)
-        x_max = tf.maximum(tf.minimum(x_max, image_shape[1] - 1), 0.)
-        y_max = tf.maximum(tf.minimum(y_max, image_shape[0] - 1), 0.)
+        objects_unfiltered = clip_boxes(objects_unfiltered, im_shape)
 
         # We have to use the TensorFlow's bounding box convention to use the
         # included function for NMS.
         # After gathering results we should normalize it back.
-        objects_tf = tf.stack([y_min, x_min, y_max, x_max], axis=1)
+        objects_tf = change_order(objects_unfiltered)
 
         selected_boxes = []
         selected_probs = []
@@ -157,8 +150,7 @@ class RCNNProposal(snt.AbstractModule):
         # stacked on top of each other
         objects_tf = tf.concat(selected_boxes, axis=0)
         # Return to the original convention.
-        y_min, x_min, y_max, x_max = tf.unstack(objects_tf, axis=1)
-        objects = tf.stack([x_min, y_min, x_max, y_max], axis=1)
+        objects = change_order(objects_tf)
         proposal_label = tf.concat(selected_labels, axis=0)
         proposal_label_prob = tf.concat(selected_probs, axis=0)
 
