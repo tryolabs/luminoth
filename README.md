@@ -9,7 +9,7 @@ Luminoth
 
 Luminoth is a computer vision toolkit made with [Tensorflow](https://www.tensorflow.org/) and [Sonnet](https://deepmind.github.io/sonnet/). Our main objective is to create tools and code to easily train and use deep learning models for computer vision problems.
 
-- Code that is both, easy to understand and easy to extend.
+- Code that is both easy to understand and easy to extend.
 - Out-of-the-box state of the art models.
 - Straightforward implementations with TensorBoard support.
 - Cloud integration for training and deploying.
@@ -18,11 +18,11 @@ Luminoth is a computer vision toolkit made with [Tensorflow](https://www.tensorf
 
 ## Why Luminoth
 
-We started building Luminoth at [Tryolabs](https://tryolabs.com/) after realizing we always ended up rewriting many of the common Tensorflow boilerplate code and models over and over. Instead of just building a cookie-cutter for Tensorflow we started to think about what other features we could benefit from, and how would an ideal toolkit would look like.
+We started building Luminoth at [Tryolabs](https://tryolabs.com/) after realizing we always ended up rewriting many of the common Tensorflow boilerplate code and models over and over. Instead of just building a cookie-cutter for Tensorflow we started to think about what other features we could benefit from, and how an ideal toolkit would look like.
 
 ## Why Tensorflow (and why Sonnet)?
 
-It is indisputable that TensorFlow is currently the most mature Deep Learning framework, even though we love (truly love) other frameworks as well, especially [PyTorch](http://pytorch.org), our customers demand stable and production ready Machine Learning solutions.
+It is indisputable that TensorFlow is currently the most mature Deep Learning framework, and even though we love (truly love) other frameworks as well, especially [PyTorch](http://pytorch.org), our customers demand stable and production ready Machine Learning solutions.
 
 [Sonnet](https://deepmind.github.io/sonnet/) fits perfectly with our mission to build code that is easy to follow and to extend. It is tricky to build a computation graph that is abstract and low-level at the same time to allows us to build complex models, and luckily Sonnet is a library that provides just that.
 
