@@ -1,6 +1,10 @@
+numpy==1.13.1
 click==6.7
-ipdb==0.10.2
-ipython==5.3.0
-lxml==3.7.3
 Pillow==4.0.0
-tensorflow==1.0.0
+PyYAML==3.12
+easydict==1.7
+lxml==3.8.0
+tensorflow==1.2.1
+dm-sonnet==1.9
+google-api-python-client==1.6.2
+google-cloud-storage==1.2.0
