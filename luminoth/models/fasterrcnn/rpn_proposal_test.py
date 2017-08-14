@@ -1,9 +1,306 @@
+import numpy as np
 import tensorflow as tf
 
+from easydict import EasyDict
+from luminoth.models.fasterrcnn.rpn_proposal import RPNProposal
+from luminoth.utils.bbox_transform_tf import bbox_decode, bbox_encode, clip_bboxes
 
 class RPNProposalTest(tf.test.TestCase):
+
     def setUp(self):
         super(RPNProposalTest, self).setUp()
+        # Setup
+        self.im_size = (40, 40)
+        self.config = EasyDict({
+            'pre_nms_top_n': 4,
+            'post_nms_top_n': 3,
+            'nms_threshold': 1,
+            'min_size': 0,
+        })
+
+    def _run_rpn_proposal(self, all_anchors, gt_boxes, rpn_cls_prob, config):
+        rpn_cls_prob_tf = tf.placeholder(tf.float32, shape=(all_anchors.shape[0], 2))
+        rpn_bbox_pred_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
+        im_size_tf = tf.placeholder(tf.float32, shape=(2,))
+        all_anchors_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
+        gt_boxes_tf = tf.placeholder(tf.float32, shape=gt_boxes.shape)
+
+        model = RPNProposal(all_anchors.shape[0], config)
+        results = model(rpn_cls_prob_tf, rpn_bbox_pred_tf, all_anchors_tf, im_size_tf)
+
+        rpn_bbox_pred = bbox_encode(all_anchors_tf, gt_boxes_tf)
+
+        with self.test_session() as sess:
+            rpn_bbox_pred = sess.run(rpn_bbox_pred, feed_dict={
+                all_anchors_tf: all_anchors,
+                gt_boxes_tf: gt_boxes
+            })
+            results = sess.run(results, feed_dict={
+                rpn_cls_prob_tf: rpn_cls_prob,
+                rpn_bbox_pred_tf: rpn_bbox_pred,
+                all_anchors_tf: all_anchors,
+                im_size_tf: self.im_size,
+            })
+            return results
+
+    def testNMSThreshold(self):
+        """
+        Test nms threshold
+        """
+        gt_boxes = np.array([
+            [10, 10, 26, 36],
+            [10, 10, 20, 22],
+            [10, 11, 20, 21],
+            [19, 30, 33, 38],
+        ])
+        """
+        IoU Matrix of gt_boxes
+        [[ 1.          0.31154684  0.26361656  0.10408922]
+         [ 0.31154684  1.          0.84615385  0.        ]
+         [ 0.26361656  0.84615385  1.          0.        ]
+         [ 0.10408922  0.          0.          1.        ]]
+        """
+        all_anchors = np.array([
+            [11, 13, 34, 31],
+            [10, 10, 20, 22],
+            [11, 13, 34, 28],
+            [21, 29, 34, 37],
+        ])
+        rpn_cls_prob = np.array([
+            [0.8, 0.2],
+            [0.1, 0.9],
+            [0.4, 0.6],
+            [0.2, 0.8]
+        ])
+        config = self.config
+        config['post_nms_top_n'] = 4
+        config['nms_threshold'] = 0.0
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 2 'nms proposals' because 2 IoU equals to 0.
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (2, 5)
+        )
+
+        config['nms_threshold'] = 0.3
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (3, 5)
+        )
+
+        config['nms_threshold'] = 0.6
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (3, 5)
+        )
+
+        config['nms_threshold'] = 0.8
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.8.
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (3, 5)
+        )
+
+        config['nms_threshold'] = 1.0
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get 'post_nms_top_n' nms proposals because
+        # 'nms_threshold' = 1.
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (4, 5)
+        )
+
+    def testOutsidersAndTopN(self):
+        """
+        Test outside anchors and topN filters
+        """
+        gt_boxes = np.array([
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+            [10, 10, 20, 50],  # Outside anchor
+            [10, 10, 20, 22],
+        ])
+        all_anchors = np.array([
+            [11, 13, 34, 31],
+            [10, 10, 20, 22],
+            [11, 13, 34, 40],
+            [7, 13, 34, 30],
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.9, 0.1],
+            [0.8, 0.2]
+        ])
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 3 'nms proposals' and 3 'proposals' because
+        # we have 4 gt_boxes, but 1 outsider (and nms_threshold = 1).
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (3, 5)
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (3, 4)
+        )
+
+        config = self.config
+        config['post_nms_top_n'] = 2
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, config)
+
+        # Check that with a post_nms_top_n = 2 we have only 2 'nms proposals'
+        # but 3 'proposals'.
+        self.assertAllEqual(
+            results['nms_proposals'].shape,
+            (2, 5)
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (3, 4)
+        )
+
+        config['post_nms_top_n'] = 3
+        config['pre_nms_top_n'] = 2
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, config)
+
+        # Check that with a post_nms_top_n = 3 and pre_nms_top = 2
+        # we have only 2 'nms proposals' but 3 'proposals'.
+        self.assertAllEqual(
+            results['nms_proposals'].shape,
+            (2, 5)
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (3, 4)
+        )
+
+        config['post_nms_top_n'] = 1
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, config)
+
+        # Check that with a post_nms_top_n = 1 and pre_nms_top = 2
+        # we have only 1 'nms proposals' but 3 'proposals'.
+        self.assertAllEqual(
+            results['nms_proposals'].shape,
+            (1, 5)
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (3, 4)
+        )
+
+    def testNegativeArea(self):
+        """
+        Test negative area filters
+        """
+        gt_boxes = np.array([
+            [10, 10, 20, 3],  # Negative area
+            [10, 10, 20, 22],
+            [10, 10, 8, 22],  # Negative area
+            [10, 10, 20, 22],
+        ])
+        all_anchors = np.array([
+            [11, 13, 12, 16],
+            [10, 10, 20, 22],
+            [11, 13, 12, 19],
+            [7, 13, 34, 30],
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.9, 0.1],
+            [0.8, 0.2]
+        ])
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        # Check we get exactly 2 'nms proposals' and 2 'proposals' because
+        # we have 4 gt_boxes, but 2 with negative area (and nms_threshold = 1).
+        self.assertEqual(
+            results['nms_proposals'].shape,
+            (2, 5)
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (2, 4)
+        )
+
+    def testClippingOfProporsals(self):
+        """
+        Test clipping of proposals
+        """
+        gt_boxes = np.array([
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+        ])
+        all_anchors = np.array([
+            [11, 13, 12, 16],
+            [10, 10, 20, 22],
+            [11, 13, 12, 28],
+            [7, 13, 34, 30],
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.9, 0.1],
+            [0.8, 0.2]
+        ])
+
+        results = self._run_rpn_proposal(
+            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+
+        im_size = tf.placeholder(tf.float32, shape=(2,))
+        proposals = tf.placeholder(tf.float32, shape=(results['proposals'].shape))
+        clip_bboxes_tf = clip_bboxes(proposals, im_size)
+
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
+                proposals: results['proposals'],
+                im_size: self.im_size
+            })
+
+        # Check we get proposals clipped to the image.
+        self.assertAllEqual(
+            results['proposals'],
+            clipped_proposals
+        )
 
 
 if __name__ == "__main__":
