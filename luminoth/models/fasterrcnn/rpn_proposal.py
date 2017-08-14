@@ -51,7 +51,7 @@ class RPNProposal(snt.AbstractModule):
             prediction_dict with the following keys:
                 nms_proposals: A Tensor with the final selected proposed
                     bounding boxes. Its shape should be
-                    (total_nms_proposals, 4).
+                    (total_nms_proposals, 5).
                 nms_proposals_scores: A Tensor with the probability of being an
                     object for that proposal. Its shape should be
                     (total_nms_proposals, 1)

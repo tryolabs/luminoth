@@ -73,7 +73,7 @@ def clip_boxes(bboxes, imshape):
 
     Returns
         Tensor with same shape as bboxes but making sure that none
-        of the bboxes are inside the image.
+        of the bboxes are outside the image.
     """
     with tf.name_scope('BoundingBoxTransform/clip_bboxes'):
         bboxes = tf.cast(bboxes, dtype=tf.float32)
