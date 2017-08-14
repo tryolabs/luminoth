@@ -51,7 +51,7 @@ class RPNProposal(snt.AbstractModule):
             prediction_dict with the following keys:
                 nms_proposals: A Tensor with the final selected proposed
                     bounding boxes. Its shape should be
-                    (total_nms_proposals, 5).
+                    (total_nms_proposals, 4).
                 nms_proposals_scores: A Tensor with the probability of being an
                     object for that proposal. Its shape should be
                     (total_nms_proposals, 1)
@@ -118,7 +118,7 @@ class RPNProposal(snt.AbstractModule):
         # Get top `pre_nms_top_n` indices by sorting the proposals by score.
         k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])
         top_k = tf.nn.top_k(scores, k=k)
-        scores = top_k.values
+        top_k_scores = top_k.values
 
         top_k_proposals = tf.gather(proposals, top_k.indices)
         # We reorder the proposals into TensorFlows bounding box order for
@@ -128,7 +128,7 @@ class RPNProposal(snt.AbstractModule):
         # We cut the pre_nms filter in pure TF version and go straight into
         # NMS.
         selected_indices = tf.image.non_max_suppression(
-            proposals_tf_order, tf.squeeze(scores), self._post_nms_top_n,
+            proposals_tf_order, tf.squeeze(top_k_scores), self._post_nms_top_n,
             iou_threshold=self._nms_threshold
         )
 
@@ -138,7 +138,7 @@ class RPNProposal(snt.AbstractModule):
             proposals_tf_order, selected_indices, name='gather_nms_proposals'
         )
         nms_proposals_scores = tf.gather(
-            scores, selected_indices, name='gather_nms_proposals_scores'
+            top_k_scores, selected_indices, name='gather_nms_proposals_scores'
         )
 
         # We switch back again to the regular bbox encoding.
@@ -152,6 +152,6 @@ class RPNProposal(snt.AbstractModule):
         return {
             'nms_proposals': nms_proposals,
             'nms_proposals_scores': nms_proposals_scores,
-            'proposals': proposals,
-            'scores': scores,
+            'proposals': top_k_proposals,
+            'scores': top_k_scores,
         }
