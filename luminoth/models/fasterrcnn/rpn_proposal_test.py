@@ -24,6 +24,8 @@ class RPNProposalTest(tf.test.TestCase):
             tf.float32, shape=(all_anchors.shape[0], 2))
         im_size_tf = tf.placeholder(tf.float32, shape=(2,))
         all_anchors_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
+        # Here we encode 'all_anchors' and 'gt_boxes' to get corrects
+        # predictions that RPNProposal can decodes.
         rpn_bbox_pred = encode(all_anchors, gt_boxes)
 
         model = RPNProposal(all_anchors.shape[0], config)
@@ -100,7 +102,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['nms_proposals_scores'],
-            [0.9, 0.8, 0.6]
+            [0.9, 0.8, 0.2]
         )
 
         config['nms_threshold'] = 0.6
@@ -117,7 +119,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['nms_proposals_scores'],
-            [0.9, 0.8, 0.6]
+            [0.9, 0.8, 0.2]
         )
 
         config['nms_threshold'] = 0.8
@@ -134,7 +136,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['nms_proposals_scores'],
-            [0.9, 0.8, 0.6]
+            [0.9, 0.8, 0.2]
         )
 
         config['nms_threshold'] = 1.0
@@ -222,6 +224,7 @@ class RPNProposalTest(tf.test.TestCase):
             [0.7, 0.6, 0.2]
         )
 
+        # Check that we only filter by pre_nms_top_n
         config['post_nms_top_n'] = 3
         config['pre_nms_top_n'] = 2
 
@@ -229,7 +232,7 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, gt_boxes, rpn_cls_prob, config)
 
         # Check that with a post_nms_top_n = 3 and pre_nms_top = 2
-        # we have only 2 'nms proposals' but 3 'proposals'.
+        # we have only 2 'nms proposals' and 2 'proposals'.
 
         self.assertAllEqual(
             results['nms_proposals'].shape,
@@ -238,7 +241,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertEqual(
             results['proposals'].shape,
-            (3, 4)
+            (2, 4)
         )
 
         # Also check that we get the corrects scores.
@@ -249,16 +252,17 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['scores'],
-            [0.7, 0.6, 0.2]
+            [0.7, 0.6]
         )
 
         config['post_nms_top_n'] = 1
+        config['pre_nms_top_n'] = 2
 
         results = self._run_rpn_proposal(
             all_anchors, gt_boxes, rpn_cls_prob, config)
 
         # Check that with a post_nms_top_n = 1 and pre_nms_top = 2
-        # we have only 1 'nms proposals' but 3 'proposals'.
+        # we have only 1 'nms proposals' and 2 'proposals'.
         self.assertAllEqual(
             results['nms_proposals'].shape,
             (1, 5)
@@ -266,7 +270,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertEqual(
             results['proposals'].shape,
-            (3, 4)
+            (2, 4)
         )
 
         # Also check that we get the corrects scores.
@@ -277,7 +281,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['scores'],
-            [0.7, 0.6, 0.2]
+            [0.7, 0.6]
         )
 
     def testNegativeArea(self):
