@@ -3,7 +3,8 @@ import tensorflow as tf
 
 from easydict import EasyDict
 from luminoth.models.fasterrcnn.rpn_proposal import RPNProposal
-from luminoth.utils.bbox_transform_tf import bbox_decode, bbox_encode, clip_bboxes
+from luminoth.utils.bbox_transform_tf import encode, clip_boxes
+
 
 class RPNProposalTest(tf.test.TestCase):
 
@@ -19,25 +20,19 @@ class RPNProposalTest(tf.test.TestCase):
         })
 
     def _run_rpn_proposal(self, all_anchors, gt_boxes, rpn_cls_prob, config):
-        rpn_cls_prob_tf = tf.placeholder(tf.float32, shape=(all_anchors.shape[0], 2))
-        rpn_bbox_pred_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
+        rpn_cls_prob_tf = tf.placeholder(
+            tf.float32, shape=(all_anchors.shape[0], 2))
         im_size_tf = tf.placeholder(tf.float32, shape=(2,))
         all_anchors_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
-        gt_boxes_tf = tf.placeholder(tf.float32, shape=gt_boxes.shape)
+        rpn_bbox_pred = encode(all_anchors, gt_boxes)
 
         model = RPNProposal(all_anchors.shape[0], config)
-        results = model(rpn_cls_prob_tf, rpn_bbox_pred_tf, all_anchors_tf, im_size_tf)
-
-        rpn_bbox_pred = bbox_encode(all_anchors_tf, gt_boxes_tf)
+        results = model(
+            rpn_cls_prob_tf, rpn_bbox_pred, all_anchors_tf, im_size_tf)
 
         with self.test_session() as sess:
-            rpn_bbox_pred = sess.run(rpn_bbox_pred, feed_dict={
-                all_anchors_tf: all_anchors,
-                gt_boxes_tf: gt_boxes
-            })
             results = sess.run(results, feed_dict={
                 rpn_cls_prob_tf: rpn_cls_prob,
-                rpn_bbox_pred_tf: rpn_bbox_pred,
                 all_anchors_tf: all_anchors,
                 im_size_tf: self.im_size,
             })
@@ -286,8 +281,9 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, gt_boxes, rpn_cls_prob, self.config)
 
         im_size = tf.placeholder(tf.float32, shape=(2,))
-        proposals = tf.placeholder(tf.float32, shape=(results['proposals'].shape))
-        clip_bboxes_tf = clip_bboxes(proposals, im_size)
+        proposals = tf.placeholder(
+            tf.float32, shape=(results['proposals'].shape))
+        clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
