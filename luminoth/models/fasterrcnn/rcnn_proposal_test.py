@@ -292,14 +292,14 @@ class RCNNProposalTest(tf.test.TestCase):
             cls_prob,
         )
         labels = proposal_prediction['proposal_label']
-        num_total = labels.shape[0]
         num_class0 = labels[labels == 0].shape[0]
         num_class1 = labels[labels == 1].shape[0]
 
         self.assertLessEqual(num_class0, limits_config.class_max_detections)
         self.assertLessEqual(num_class1, limits_config.class_max_detections)
-        # TODO: uncomment the following line when we implement total number
+        # TODO: uncomment the following lines when we implement total number
         # restrictions. Right now we're failing this assert:
+        # num_total = labels.shape[0]
         # self.assertLessEqual(num_total, limits_config.total_max_detections)
 
 
