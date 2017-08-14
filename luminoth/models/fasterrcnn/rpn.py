@@ -79,7 +79,8 @@ class RPN(snt.AbstractModule):
                 in ResNet.
             image_shape: A Tensor with the shape of the original image.
             all_anchors: A Tensor with all the anchor bounding boxes. Its shape
-                should be [feature_map_height * feature_map_width * total_anchors, 4]
+                should be
+                [feature_map_height * feature_map_width * total_anchors, 4]
             gt_boxes: A Tensor with the ground-truth boxes for the image.
                 Its dimensions should be `[total_gt_boxes, 4]`, and it should
                 consist of [x1, y1, x2, y2], being (x1, y1) -> top left point,
@@ -204,7 +205,7 @@ class RPN(snt.AbstractModule):
             Multiloss between cls probability and bbox target.
         """
 
-        rpn_cls_prob = prediction_dict['rpn_cls_prob']
+        # rpn_cls_prob = prediction_dict['rpn_cls_prob']
         rpn_cls_score = prediction_dict['rpn_cls_score']
         rpn_cls_target = prediction_dict['rpn_cls_target']
 
@@ -234,7 +235,7 @@ class RPN(snt.AbstractModule):
             # Now we only have the labels we are going to compare with the
             # cls probability.
             labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored)
-            cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
+            # cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
             cls_score = tf.boolean_mask(rpn_cls_score, labels_not_ignored)
 
             # We need to transform `labels` to `cls_prob` shape.

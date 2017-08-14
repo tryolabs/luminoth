@@ -11,6 +11,7 @@ from .bbox_transform import decode
 from base64 import b64encode
 from sys import stdout
 
+# flake8: noqa
 
 font = ImageFont.load_default()
 

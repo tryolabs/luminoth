@@ -1,1 +1,1 @@
-from .cli import dataset
+from .cli import dataset  # noqa

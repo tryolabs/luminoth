@@ -164,12 +164,12 @@ def image_to_example(data_dir, classes, image_id):
 @click.command()
 @click.option('--data-dir', default='datasets/voc')
 @click.option('--output-dir', default='datasets/voc/tf')
-@click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])
+@click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])  # noqa
 @click.option('ignore_splits', '--ignore-split', multiple=True)
 @click.option('--only-filename', help='Create dataset with a single example.')
-@click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')
-@click.option('--limit-classes', type=int, default=DEFAULT_TOTAL_CLASSES, help='Limit dataset with `N` random classes.')
-@click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')
+@click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
+@click.option('--limit-classes', type=int, default=DEFAULT_TOTAL_CLASSES, help='Limit dataset with `N` random classes.')  # noqa
+@click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
 def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
         limit_examples, limit_classes, seed, debug):
@@ -198,7 +198,9 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
     if only_filename:
         classes_filename = 'classes-{}.json'.format(only_filename)
     elif limit_examples:
-        classes_filename = 'classes-top{}-{}classes.json'.format(limit_examples, limit_classes)
+        classes_filename = 'classes-top{}-{}classes.json'.format(
+            limit_examples, limit_classes
+        )
     else:
         classes_filename = 'classes.json'
 
@@ -207,7 +209,8 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
     json.dump(classes, tf.gfile.GFile(classes_file, 'w'))
 
     splits = [s for s in splits if s not in set(ignore_splits)]
-    tf.logging.debug('Generating outputs for splits = {}'.format(", ".join(splits)))
+    tf.logging.debug(
+        'Generating outputs for splits = {}'.format(", ".join(splits)))
 
     for split in splits:
         tf.logging.debug('Converting split = {}'.format(split))

@@ -8,6 +8,7 @@ from luminoth.utils.test import generate_gt_boxes, generate_anchors
 
 
 class RPNTest(tf.test.TestCase):
+
     def setUp(self):
         super(RPNTest, self).setUp()
         self.num_anchors = 9
@@ -118,7 +119,8 @@ class RPNTest(tf.test.TestCase):
         rpn_cls_prob_sum = layers_inst['rpn_cls_prob'].sum(axis=1)
         self.assertAllClose(rpn_cls_prob_sum, np.ones(total_anchors))
 
-        # Proposals and scores are related to the output of the NMS with limits.
+        # Proposals and scores are related to the output of the NMS with
+        # limits.
         total_proposals = layers_inst['proposals'].shape[0]
         total_scores = layers_inst['scores'].shape[0]
 
@@ -213,6 +215,7 @@ class RPNTest(tf.test.TestCase):
 
             # Assert close since cross-entropy could return very small value.
             self.assertAllClose(tuple(loss_dict.values()), (0, 0))
+
 
 if __name__ == "__main__":
     tf.test.main()

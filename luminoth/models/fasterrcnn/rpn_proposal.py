@@ -24,7 +24,8 @@ class RPNProposal(snt.AbstractModule):
         self._pre_nms_top_n = config.pre_nms_top_n
         # After applying NMS we filter the top M anchors.
         # It's important to understand that because of NMS, it is not certain
-        # we will have this many output proposals. This is just the upper bound.
+        # we will have this many output proposals. This is just the upper
+        # bound.
         self._post_nms_top_n = config.post_nms_top_n
         # Threshold to use for NMS.
         self._nms_threshold = config.nms_threshold
@@ -124,7 +125,8 @@ class RPNProposal(snt.AbstractModule):
         # `tf.image.non_max_supression` compatibility.
         proposals_tf_order = change_order(top_k_proposals)
 
-        # We cut the pre_nms filter in pure TF version and go straight into NMS.
+        # We cut the pre_nms filter in pure TF version and go straight into
+        # NMS.
         selected_indices = tf.image.non_max_suppression(
             proposals_tf_order, tf.squeeze(scores), self._post_nms_top_n,
             iou_threshold=self._nms_threshold
@@ -132,13 +134,19 @@ class RPNProposal(snt.AbstractModule):
 
         # Selected_indices is a smaller tensor, we need to extract the
         # proposals and scores using it.
-        nms_proposals = tf.gather(proposals_tf_order, selected_indices, name='gather_nms_proposals')
-        nms_proposals_scores = tf.gather(scores, selected_indices, name='gather_nms_proposals_scores')
+        nms_proposals = tf.gather(
+            proposals_tf_order, selected_indices, name='gather_nms_proposals'
+        )
+        nms_proposals_scores = tf.gather(
+            scores, selected_indices, name='gather_nms_proposals_scores'
+        )
 
         # We switch back again to the regular bbox encoding.
         nms_proposals = change_order(nms_proposals)
-        # Adds batch number for consistency and future multi image batche support.
-        batch_inds = tf.zeros((tf.shape(nms_proposals)[0], 1), dtype=tf.float32)
+        # Adds batch number for consistency and multi image batch support.
+        batch_inds = tf.zeros(
+            (tf.shape(nms_proposals)[0], 1), dtype=tf.float32
+        )
         nms_proposals = tf.concat([batch_inds, nms_proposals], axis=1)
 
         return {

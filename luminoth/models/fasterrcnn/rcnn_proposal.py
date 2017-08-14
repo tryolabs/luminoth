@@ -79,7 +79,10 @@ class RCNNProposal(snt.AbstractModule):
         # We are going to use only the non-background proposals.
         proposal_filter = tf.greater_equal(proposal_label, 0)
 
-        with tf.control_dependencies([tf.assert_equal(tf.shape(proposals)[0], tf.shape(bbox_pred)[0])]):
+        equal_shapes = tf.assert_equal(
+            tf.shape(proposals)[0], tf.shape(bbox_pred)[0]
+        )
+        with tf.control_dependencies([equal_shapes]):
             # Filter all tensors for getting all non-background proposals.
             proposals = tf.boolean_mask(
                 proposals, proposal_filter)
@@ -92,15 +95,19 @@ class RCNNProposal(snt.AbstractModule):
 
         # Create one hot with labels for using it to filter bbox_predictions.
         label_one_hot = tf.one_hot(proposal_label, depth=self._num_classes)
-        # Flatten label_one_hot to get (num_non_background_proposals * num_classes, 1) for filtering.
-        label_one_hot_flatten = tf.cast(tf.reshape(label_one_hot, [-1]), tf.bool)
-        # Flatten bbox_predictions getting (num_non_background_proposals * num_classes, 4).
+        # Flatten label_one_hot to get
+        # (num_non_background_proposals * num_classes, 1) for filtering.
+        label_one_hot_flatten = tf.cast(
+            tf.reshape(label_one_hot, [-1]), tf.bool
+        )
+        # Flatten bbox_predictions getting
+        # (num_non_background_proposals * num_classes, 4).
         bbox_pred_flatten = tf.reshape(bbox_pred, [-1, 4])
 
-        with tf.control_dependencies([
-                tf.assert_equal(
-                    tf.shape(bbox_pred_flatten)[0],
-                    tf.shape(label_one_hot_flatten)[0])]):
+        equal_shapes = tf.assert_equal(
+            tf.shape(bbox_pred_flatten)[0], tf.shape(label_one_hot_flatten)[0]
+        )
+        with tf.control_dependencies([equal_shapes]):
             # Control same number of dimensions between bbox and mask.
             bbox_pred = tf.boolean_mask(
                 bbox_pred_flatten, label_one_hot_flatten)

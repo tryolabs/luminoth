@@ -21,6 +21,7 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             pip install -r requirements.txt
+            pip install flake8
 
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
@@ -28,11 +29,13 @@ jobs:
             - "venv"
 
       - run:
+          name: run linter
+          command: |
+            . venv/bin/activate
+            flake8 luminoth
+
+      - run:
           name: run tests
           command: |
             . venv/bin/activate
             python -m unittest discover -s luminoth -p "*_test.py"
-
-      - store_artifacts:
-          path: test-reports
-          destination: test-reports

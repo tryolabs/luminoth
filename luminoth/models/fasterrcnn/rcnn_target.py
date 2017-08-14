@@ -48,7 +48,8 @@ class RCNNTarget(snt.AbstractModule):
 
         if self._debug:
             tf.logging.warning(
-                'Using RCNN Target in debug mode makes random seed to be fixed at 0.')
+                'Using RCNN Target in debug mode makes random seed '
+                'to be fixed at 0.')
 
     def _build(self, proposals, gt_boxes):
         """
@@ -137,7 +138,7 @@ class RCNNTarget(snt.AbstractModule):
         # Finally we get the closest proposal for each ground truth box and
         # mark it as positive.
         gt_argmax_overlaps = overlaps.argmax(axis=0)
-        proposals_label[gt_argmax_overlaps] = gt_boxes[:,4] + 1
+        proposals_label[gt_argmax_overlaps] = gt_boxes[:, 4] + 1
 
         # proposals_label now has [0, num_classes + 1] for proposals we are
         # going to use and -1 for the ones we should ignore.

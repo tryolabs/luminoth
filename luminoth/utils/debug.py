@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+# flake8: noqa
+
 
 def debug(*args, **kwargs):
     def call_ipdb(*args, **kwargs):
