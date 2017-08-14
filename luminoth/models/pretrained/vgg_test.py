@@ -29,8 +29,10 @@ class VGGTest(tf.test.TestCase):
             out = sess.run(intermediate_layer, feed_dict={
                 batch_image_placeholder: np.random.rand(1, width, height, 3)
             })
-            # with width and height between 500 and 600 we should have this output
+            # with width and height between 500 and 600 we should have this
+            # output
             self.assertEqual(out['net'].shape, (1, 37, 37, 512))
+
 
 if __name__ == '__main__':
     tf.test.main()

@@ -21,31 +21,32 @@ LEARNING_RATE_DECAY_METHODS = set([
 
 
 @click.command(help='Train models')
-@click.argument('model_type', type=click.Choice(MODELS.keys()), required=False, default=next(iter(MODELS.keys())))
+@click.argument('model_type', type=click.Choice(MODELS.keys()), required=False, default=next(iter(MODELS.keys())))  # noqa
 @click.option('config_file', '--config', '-c', help='Config to use.')
-@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
-@click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')
-@click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')
-@click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')
-@click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')
-@click.option('--log-dir', default='/tmp/luminoth/', help='Directory for Tensorboard logs.')
-@click.option('--save-every', default=1000, help='Save checkpoint after that many batches.')
-@click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')
-@click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')
-@click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')
-@click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')
-@click.option('--display-every', default=500, type=int, help='Show image debug information every N batches (debug mode must be activated)')
-@click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')
-@click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')
-@click.option('--summary-every', default=1, type=int, help='Save summary logs every N batches.')
-@click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')
-@click.option('--initial-learning-rate', default=0.0001, type=float, help='Initial learning rate.')
-@click.option('--learning-rate-decay', default=10000, type=int, help='Decay learning rate after N batches.')
-@click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')
-@click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')
-@click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')
+@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
+@click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')  # noqa
+@click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')  # noqa
+@click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')  # noqa
+@click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')  # noqa
+@click.option('--log-dir', default='/tmp/luminoth/', help='Directory for Tensorboard logs.')  # noqa
+@click.option('--save-every', default=1000, help='Save checkpoint after that many batches.')  # noqa
+@click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')  # noqa
+@click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')  # noqa
+@click.option('--run-name', default='train', help='Run name used to log in Tensorboard and isolate checkpoints.')  # noqa
+@click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')  # noqa
+@click.option('--display-every', default=500, type=int, help='Show image debug information every N batches (debug mode must be activated)')  # noqa
+@click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')  # noqa
+@click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')  # noqa
+@click.option('--summary-every', default=1, type=int, help='Save summary logs every N batches.')  # noqa
+@click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')  # noqa
+@click.option('--initial-learning-rate', default=0.0001, type=float, help='Initial learning rate.')  # noqa
+@click.option('--learning-rate-decay', default=10000, type=int, help='Decay learning rate after N batches.')  # noqa
+@click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')  # noqa
+@click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')  # noqa
+@click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')  # noqa
 @click.option('--job-dir')  # TODO: Ignore this arg passed by Google Cloud ML.
-def train(model_type, config_file, override_params, continue_training, **kwargs):
+def train(model_type, config_file, override_params, continue_training,
+          **kwargs):
 
     model_class = MODELS[model_type.lower()]
     config = model_class.base_config
@@ -179,7 +180,12 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
     # Clip by norm. Grad can be null when not training some modules.
     with tf.name_scope('clip_gradients_by_norm'):
         grads_and_vars = [
-            (tf.check_numerics(tf.clip_by_norm(gv[0], 10.), 'Invalid gradient'), gv[1])
+            (
+                tf.check_numerics(
+                    tf.clip_by_norm(gv[0], 10.),
+                    'Invalid gradient'
+                ), gv[1]
+            )
             if gv[0] is not None else gv
             for gv in grads_and_vars
         ]
@@ -197,7 +203,7 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
     # TODO: Why do we need to run this?
     metric_ops = tf.get_collection('metric_ops')
-    metrics = tf.get_collection('metrics')
+    # metrics = tf.get_collection('metrics')
 
     tf.logging.info('Starting training for {}'.format(model))
 
@@ -214,7 +220,8 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
 
         # Restore all variables from checkpoint file
         if config.train.checkpoint_file:
-            # If ignore_scope is set, we don't load those variables from checkpoint.
+            # If ignore_scope is set, we don't load those variables from
+            # checkpoint.
             if config.train.ignore_scope:
                 partial_loader.restore(sess, config.train.checkpoint_file)
             else:
@@ -264,7 +271,11 @@ def train(model_type, config_file, override_params, continue_training, **kwargs)
                         run_metadata, str(step)
                     )
 
-                if config.train.debug and step % config.train.display_every == 0:
+                display_images = (
+                    config.train.debug and
+                    step % config.train.display_every == 0
+                )
+                if display_images:
                     from luminoth.utils.image_vis import (
                         add_images_to_tensoboard
                     )

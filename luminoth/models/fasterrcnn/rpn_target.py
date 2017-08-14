@@ -186,7 +186,8 @@ class RPNTarget(snt.AbstractModule):
         labels[max_overlaps >= self._positive_overlap] = 1
 
         if self._clobber_positives:
-            # assign background labels last so that negative labels can clobber positives
+            # assign background labels last so that negative labels can clobber
+            # positives
             labels[max_overlaps < self._negative_overlap] = 0
 
         # subsample positive labels if we have too many
@@ -209,7 +210,8 @@ class RPNTarget(snt.AbstractModule):
         bbox_targets = self._compute_targets(
             anchors, gt_boxes[argmax_overlaps, :]).astype(np.float32)
 
-        # We unroll "inside anchors" value for all anchors (for shape compatibility)
+        # We unroll "inside anchors" value for all anchors (for shape
+        # compatibility)
         labels = unmap(labels, total_anchors, inds_inside, fill=-1)
         bbox_targets = unmap(bbox_targets, total_anchors, inds_inside, fill=0)
         max_overlaps = unmap(max_overlaps, total_anchors, inds_inside, fill=0)

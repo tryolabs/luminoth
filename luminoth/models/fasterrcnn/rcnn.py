@@ -123,8 +123,8 @@ class RCNN(snt.AbstractModule):
         prediction_dict = {}
 
         if gt_boxes is not None:
-            # TODO: If not training, we should not depend on proposals_target to
-            # use region of interest pooling, we would just need to use all
+            # TODO: If not training, we should not depend on proposals_target
+            # to use region of interest pooling, we would just need to use all
             # available proposals.
             proposals_target, bbox_target = self._rcnn_target(
                 proposals, gt_boxes)
@@ -200,8 +200,10 @@ class RCNN(snt.AbstractModule):
         # objects, objects_labels, and objects_labels_prob are the only keys
         # that matter for drawing objects.
         prediction_dict['objects'] = proposal_prediction['objects']
-        prediction_dict['objects_labels'] = proposal_prediction['proposal_label']
-        prediction_dict['objects_labels_prob'] = proposal_prediction['proposal_label_prob']
+        prediction_dict['objects_labels'] = (
+            proposal_prediction['proposal_label'])
+        prediction_dict['objects_labels_prob'] = (
+            proposal_prediction['proposal_label_prob'])
 
         if self._debug:
             prediction_dict['proposal_prediction'] = proposal_prediction
@@ -247,7 +249,7 @@ class RCNN(snt.AbstractModule):
         with self._enter_variable_scope():
             with tf.name_scope('RCNNLoss'):
                 cls_score = prediction_dict['cls_score']
-                cls_prob = prediction_dict['cls_prob']
+                # cls_prob = prediction_dict['cls_prob']
                 # Cast target explicitly as int32.
                 cls_target = tf.cast(prediction_dict['cls_target'], tf.int32)
 
@@ -260,8 +262,8 @@ class RCNN(snt.AbstractModule):
                 # We apply boolean mask to score, prob and target.
                 cls_score_labeled = tf.boolean_mask(
                     cls_score, not_ignored, name='cls_score_labeled')
-                cls_prob_labeled = tf.boolean_mask(
-                    cls_prob, not_ignored, name='cls_prob_labeled')
+                # cls_prob_labeled = tf.boolean_mask(
+                #    cls_prob, not_ignored, name='cls_prob_labeled')
                 cls_target_labeled = tf.boolean_mask(
                     cls_target, not_ignored, name='cls_target_labeled')
 
@@ -272,14 +274,18 @@ class RCNN(snt.AbstractModule):
                 )
 
                 # We get cross entropy loss of each proposal.
-                cross_entropy_per_proposal = tf.nn.softmax_cross_entropy_with_logits(
-                    labels=cls_target_one_hot, logits=cls_score_labeled
+                cross_entropy_per_proposal = (
+                    tf.nn.softmax_cross_entropy_with_logits(
+                        labels=cls_target_one_hot, logits=cls_score_labeled
+                    )
                 )
 
                 if self._debug:
                     # Save the cross entropy per proposal to be able to
                     # visualize proposals with high and low error.
-                    prediction_dict['cross_entropy_per_proposal'] = cross_entropy_per_proposal
+                    prediction_dict['cross_entropy_per_proposal'] = (
+                        cross_entropy_per_proposal
+                    )
 
                 # Second we need to calculate the smooth l1 loss between
                 # `bbox_offsets` and `bbox_offsets_target`.
@@ -334,7 +340,9 @@ class RCNN(snt.AbstractModule):
                 if self._debug:
                     # Also save reg loss per proposals to be able to visualize
                     # good and bad proposals in debug mode.
-                    prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+                    prediction_dict['reg_loss_per_proposal'] = (
+                        reg_loss_per_proposal
+                    )
 
                 return {
                     'rcnn_cls_loss': tf.reduce_mean(
