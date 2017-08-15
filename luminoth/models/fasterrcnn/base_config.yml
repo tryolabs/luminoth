@@ -108,7 +108,7 @@ rpn:
     type: truncated_normal_initializer
     mean: 0.0
     stddev: 0.01
-  l2_regulalization_scale: 0.0005  # disable using 0
+  l2_regularization_scale: 0.0005  # disable using 0
   activation_function: relu6
 
   proposals:
@@ -148,7 +148,7 @@ rcnn:
     factor: 1.0
     uniform: True
     mode: FAN_AVG
-  l2_regulalization_scale: 0.0005
+  l2_regularization_scale: 0.0005
 
   roi:
     pooling_mode: crop
