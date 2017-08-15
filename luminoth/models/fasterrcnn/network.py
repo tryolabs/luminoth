@@ -7,7 +7,6 @@ from .rpn import RPN
 
 from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.config import get_base_config
-from luminoth.utils.ops import meshgrid
 from luminoth.utils.vars import variable_summaries
 
 
@@ -246,7 +245,7 @@ class FasterRCNN(snt.AbstractModule):
             grid_height = feature_map_shape[0]
             shift_x = tf.range(grid_width) * self._anchor_stride
             shift_y = tf.range(grid_height) * self._anchor_stride
-            shift_x, shift_y = meshgrid(shift_x, shift_y)
+            shift_x, shift_y = tf.meshgrid(shift_x, shift_y)
 
             shift_x = tf.reshape(shift_x, [-1])
             shift_y = tf.reshape(shift_y, [-1])
