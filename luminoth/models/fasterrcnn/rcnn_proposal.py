@@ -58,9 +58,9 @@ class RCNNProposal(snt.AbstractModule):
                 NMS). The 4-length Tensor for each corresponds to:
                 (x_min, y_min, x_max, y_max).
             objects_label:
-                Shape (final_num_proposals, 1)
+                Shape (final_num_proposals,)
             objects_label_prob:
-                Shape (final_num_proposals, 1)
+                Shape (final_num_proposals,)
 
         """
 
