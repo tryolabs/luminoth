@@ -743,10 +743,7 @@ def draw_rcnn_input_proposals(pred_dict):
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
     gt_boxes = pred_dict['gt_boxes'][:, :4]
 
-    overlaps = bbox_overlap(
-        np.ascontiguousarray(proposals, dtype=np.float),
-        np.ascontiguousarray(gt_boxes, dtype=np.float)
-    )
+    overlaps = bbox_overlap(proposals, gt_boxes)
 
     top_overlap = overlaps.max(axis=1)
 

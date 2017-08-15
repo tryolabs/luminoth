@@ -96,12 +96,7 @@ class RCNNTarget(snt.AbstractModule):
         # Remove batch id from proposals
         proposals = proposals[:, 1:]
 
-        overlaps = bbox_overlap(
-            # We need to use float and ascontiguousarray because of Cython
-            # implementation of bbox_overlap
-            np.ascontiguousarray(proposals, dtype=np.float),
-            np.ascontiguousarray(gt_boxes, dtype=np.float)
-        )
+        overlaps = bbox_overlap(proposals, gt_boxes)
 
         # overlaps returns (num_proposals, num_gt_boxes) with the IoU of
         # proposal P and ground truth box G in overlaps[P, G]

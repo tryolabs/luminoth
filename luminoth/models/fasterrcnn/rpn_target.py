@@ -155,9 +155,7 @@ class RPNTarget(snt.AbstractModule):
 
         # intersection over union (IoU) overlap between the anchors and the
         # ground truth boxes.
-        overlaps = bbox_overlap(
-            np.ascontiguousarray(anchors, dtype=np.float),
-            np.ascontiguousarray(gt_boxes, dtype=np.float))
+        overlaps = bbox_overlap(anchors, gt_boxes)
 
         # Find the closest gt box for each anchor.
         argmax_overlaps = overlaps.argmax(axis=1)
