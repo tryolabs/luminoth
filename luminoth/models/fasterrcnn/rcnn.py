@@ -40,7 +40,7 @@ class RCNN(snt.AbstractModule):
 
         self.initializer = get_initializer(config.initializer)
         self.regularizer = tf.contrib.layers.l2_regularizer(
-            scale=config.l2_regulalization_scale)
+            scale=config.l2_regularization_scale)
 
         # Debug mode makes the module return more detailed Tensors which can be
         # useful for debugging.
@@ -132,7 +132,7 @@ class RCNN(snt.AbstractModule):
             with tf.name_scope('prepare_batch'):
                 # We flatten to set shape, but it is already a flat Tensor.
                 in_batch_proposals = tf.reshape(
-                    tf.not_equal(proposals_target, -1), [-1]
+                    tf.greater_equal(proposals_target, 0), [-1]
                 )
                 roi_proposals = tf.boolean_mask(
                     proposals, in_batch_proposals)

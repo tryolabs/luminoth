@@ -21,7 +21,7 @@ class RPNTest(tf.test.TestCase):
                 'mean': 0.0,
                 'stddev': 0.01,
             },
-            'l2_regulalization_scale': 0.0005,
+            'l2_regularization_scale': 0.0005,
             'activation_function': 'relu6',
             'proposals': {
                 'pre_nms_top_n': 12000,

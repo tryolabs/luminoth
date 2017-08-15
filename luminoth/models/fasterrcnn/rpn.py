@@ -34,7 +34,7 @@ class RPN(snt.AbstractModule):
         # "from a zero-mean Gaussian distribution with standard deviation 0.0
         self._initializer = get_initializer(config.initializer)
         self._regularizer = tf.contrib.layers.l2_regularizer(
-            scale=config.l2_regulalization_scale
+            scale=config.l2_regularization_scale
         )
 
         # We could use normal relu without any problems.
