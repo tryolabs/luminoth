@@ -1,13 +1,13 @@
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import luminoth.models  # TODO: Cyclic import
 
-from .rcnn import RCNN
-from .rpn import RPN
-
+from luminoth.models.fasterrcnn.rcnn import RCNN
+from luminoth.models.fasterrcnn.rpn import RPN
 from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.config import get_base_config
-from luminoth.utils.vars import variable_summaries
+from luminoth.utils.vars import variable_summaries, get_saver
 
 
 class FasterRCNN(snt.AbstractModule):
@@ -69,7 +69,12 @@ class FasterRCNN(snt.AbstractModule):
         self._rcnn_reg_loss_weight = config.loss.rcnn_reg_loss_weights
         self._losses_collections = ['fastercnn_losses']
 
-    def _build(self, image, pretrained_feature_map, gt_boxes=None):
+        # We want the pretrained model to be outside the FasterRCNN name scope.
+        self.pretrained = luminoth.models.get_model(config.pretrained.net)(
+            config.pretrained, parent_name=self.module_name
+        )
+
+    def _build(self, image, gt_boxes=None):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -93,6 +98,8 @@ class FasterRCNN(snt.AbstractModule):
                 It's shape should be: (num_bboxes, 4). For each of the bboxes
                 we have (x1, y1, x2, y2)
         """
+        pretrained_prediction = self.pretrained(image)
+        pretrained_feature_map = pretrained_prediction['net']
 
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(self._num_anchors, self._config.rpn, debug=self._debug)
@@ -295,4 +302,25 @@ class FasterRCNN(snt.AbstractModule):
     def get_trainable_vars(self):
         """Get trainable vars included in the module.
         """
-        return snt.get_variables_in_module(self)
+        trainable_vars = snt.get_variables_in_module(self)
+        if self._config.pretrained.trainable:
+            pretrained_trainable_vars = self.pretrained.get_trainable_vars()
+            tf.logging.info('Training {} vars from pretrained module.'.format(
+                len(pretrained_trainable_vars)))
+            trainable_vars += pretrained_trainable_vars
+        else:
+            tf.logging.info('Not training variables from pretrained module')
+
+        return trainable_vars
+
+    def get_saver(self, ignore_scope=None):
+        """Get an instance of tf.train.Saver for all modules and submodules.
+        """
+        return get_saver((self, self.pretrained), ignore_scope=ignore_scope)
+
+    def load_pretrained_weights(self):
+        """Get operation to load pretrained weights from file.
+        """
+        return self.pretrained.load_weights(
+            checkpoint_file=self._config.pretrained.weights
+        )

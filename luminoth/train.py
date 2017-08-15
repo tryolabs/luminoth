@@ -2,13 +2,11 @@ import click
 import os
 import tensorflow as tf
 
-from .dataset import TFRecordDataset
-from .models import MODELS, PRETRAINED_MODELS
-from .utils.config import (
+from luminoth.dataset import TFRecordDataset
+from luminoth.models import get_model
+from luminoth.utils.config import (
     load_config, merge_into, kwargs_to_config, parse_override
 )
-from .utils.vars import get_saver
-
 
 OPTIMIZERS = {
     'adam': tf.train.AdamOptimizer,
@@ -21,7 +19,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 
 
 @click.command(help='Train models')
-@click.argument('model_type', type=click.Choice(MODELS.keys()), required=False, default=next(iter(MODELS.keys())))  # noqa
+@click.option('model_type', '--model', required=True, default='fasterrcnn')  # noqa
 @click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')  # noqa
@@ -48,7 +46,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 def train(model_type, config_file, override_params, continue_training,
           **kwargs):
 
-    model_class = MODELS[model_type.lower()]
+    model_class = get_model(model_type)
     config = model_class.base_config
 
     # Load train extra options
@@ -70,9 +68,6 @@ def train(model_type, config_file, override_params, continue_training,
         tf.logging.set_verbosity(tf.logging.INFO)
 
     model = model_class(config)
-    pretrained = PRETRAINED_MODELS[config.pretrained.net](
-        config.pretrained
-    )
     dataset = TFRecordDataset(config)
     train_dataset = dataset()
 
@@ -88,8 +83,7 @@ def train(model_type, config_file, override_params, continue_training,
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
 
-    pretrained_dict = pretrained(train_image)
-    prediction_dict = model(train_image, pretrained_dict['net'], train_bboxes)
+    prediction_dict = model(train_image, train_bboxes)
 
     total_loss = model.loss(prediction_dict)
 
@@ -124,14 +118,13 @@ def train(model_type, config_file, override_params, continue_training,
     )
 
     # load_weights returns no_op when empty checkpoint_file.
-    load_op = pretrained.load_weights(
-        checkpoint_file=config.pretrained.weights
-    )
+    # TODO: Make optional for different types of models.
+    load_op = model.load_pretrained_weights()
 
-    saver = get_saver((model, pretrained, ))
+    saver = model.get_saver()
     if config.train.ignore_scope:
-        partial_loader = get_saver(
-            (model, pretrained, ), ignore_scope=config.train.ignore_scope
+        partial_loader = model.get_saver(
+            ignore_scope=config.train.ignore_scope
         )
 
     learning_rate_decay_method = config.train.learning_rate_decay_method
@@ -167,14 +160,6 @@ def train(model_type, config_file, override_params, continue_training,
         optimizer = optimizer_cls(learning_rate)
 
     trainable_vars = model.get_trainable_vars()
-    if config.pretrained.trainable:
-        pretrained_trainable_vars = pretrained.get_trainable_vars()
-        tf.logging.info('Training {} vars from pretrained module.'.format(
-            len(pretrained_trainable_vars)))
-        trainable_vars += pretrained_trainable_vars
-    else:
-        tf.logging.info('Not training variables from pretrained module')
-
     grads_and_vars = optimizer.compute_gradients(total_loss, trainable_vars)
 
     # Clip by norm. Grad can be null when not training some modules.

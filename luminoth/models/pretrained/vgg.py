@@ -1,6 +1,5 @@
 import functools
 
-from tensorflow.contrib.slim import arg_scope
 from tensorflow.contrib.slim.nets import vgg
 
 from .pretrained import Pretrained
