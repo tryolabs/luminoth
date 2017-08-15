@@ -29,17 +29,17 @@ class RCNNProposalTest(tf.test.TestCase):
         if image_shape is None:
             image_shape = self._image_shape
         rcnn_proposal_net = model(proposals, bbox_pred, cls_prob, image_shape)
-        with tf.Session() as sess:
+        with self.test_session() as sess:
             return sess.run(rcnn_proposal_net)
 
     def _compute_tf_graph(self, graph):
-        with tf.Session() as sess:
+        with self.test_session() as sess:
             return sess.run(graph)
 
     def _get_bbox_pred(self, proposed_boxes, gt_boxes_per_class):
         """Computes valid bbox_pred from proposals and gt_boxes for each class.
 
-        Arguments:
+        Args:
             proposed_boxes: Tensor with shape (num_proposals, 5).
             gt_boxes_per_class: Tensor holding the ground truth boxes for each
                 class. Has shape (num_classes, num_gt_boxes_per_class, 4).
@@ -50,10 +50,13 @@ class RCNNProposalTest(tf.test.TestCase):
         """
 
         def bbox_encode(gt_boxes):
-            return encode(proposed_boxes[:, 1:],
-                          gt_boxes)
-        bbox_pred_tensor = tf.map_fn(bbox_encode, gt_boxes_per_class,
-                                     dtype=tf.float32)
+            return encode(
+                proposed_boxes[:, 1:], gt_boxes
+            )
+        bbox_pred_tensor = tf.map_fn(
+            bbox_encode, gt_boxes_per_class,
+            dtype=tf.float32
+        )
         # We need to explicitly unstack the tensor so that tf.concat works
         # properly.
         bbox_pred_list = tf.unstack(bbox_pred_tensor)
@@ -118,12 +121,15 @@ class RCNNProposalTest(tf.test.TestCase):
         #     2. checking that that object has the same box as class 2.
         # We take this to mean we're correctly ignoring the two proposals
         # where 'background' is the highest probability class.
-        self.assertAllClose(proposal_prediction_one_foreground['objects'],
-                            self._compute_tf_graph(gt_boxes_per_class)[2],
-                            atol=self._equality_delta)
+        self.assertAllClose(
+            proposal_prediction_one_foreground['objects'],
+            self._compute_tf_graph(gt_boxes_per_class)[2],
+            atol=self._equality_delta
+        )
         # Assertion for 'all background' case.
-        self.assertEqual(len(proposal_prediction_all_background['objects']),
-                         0)
+        self.assertEqual(
+            len(proposal_prediction_all_background['objects']), 0
+        )
 
     def testNMSFilter(self):
         """Tests that we're applying NMS correctly.
@@ -241,13 +247,12 @@ class RCNNProposalTest(tf.test.TestCase):
             bbox_pred,
             cls_prob,
         )
-        # Assertions
-        for i in range(self._num_classes):
-            self.assertAllClose(
-                proposal_prediction['objects'][i],
-                self._compute_tf_graph(gt_boxes_per_class)[i][0],
-                atol=self._equality_delta
-            )
+
+        self.assertAllClose(
+            proposal_prediction['objects'],
+            self._compute_tf_graph(tf.squeeze(gt_boxes_per_class, axis=1)),
+            atol=self._equality_delta
+        )
 
     def testLimits(self):
         """Tests that we're respecting the limits imposed by the config.
