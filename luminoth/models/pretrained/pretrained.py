@@ -1,6 +1,8 @@
 import sonnet as snt
 import tensorflow as tf
 
+from tensorflow.contrib.slim import arg_scope
+
 # Default RGB means used commonly.
 _R_MEAN = 123.68
 _G_MEAN = 116.78
@@ -11,6 +13,30 @@ class Pretrained(snt.AbstractModule):
     """Pretrained abstract module for handling basic things all pretrained
     networks share.
     """
+    def __init__(self, config, parent_name=None, name='resnet_v2'):
+        super(Pretrained, self).__init__(name=name)
+        self._trainable = config.trainable
+        self._finetune_num_layers = config.finetune_num_layers
+        self._weight_decay = config.weight_decay
+        self._endpoint = config.endpoint or self.DEFAULT_ENDPOINT
+        self._scope_endpoint = '{}/{}'.format(
+            self.module_name, self._endpoint
+        )
+        if parent_name:
+            self._scope_endpoint = '{}/{}'.format(
+                parent_name, self._scope_endpoint
+            )
+
+    def _build(self, inputs):
+        inputs = self._preprocess(inputs)
+
+        with arg_scope(self.arg_scope):
+            net, end_points = self.network(inputs)
+
+            return {
+                'net': dict(end_points)[self._scope_endpoint],
+            }
+
     def load_weights(self, checkpoint_file):
         """
         Creates operations to load weigths from checkpoint for each of the
