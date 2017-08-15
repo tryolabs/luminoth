@@ -51,14 +51,14 @@ def train(model_type, config_file, override_params, continue_training,
     model_class = MODELS[model_type.lower()]
     config = model_class.base_config
 
+    # Load train extra options
+    config.train = merge_into(kwargs_to_config(kwargs), config.train)
+
     if config_file:
         # If we have a custom config file overwritting default settings
         # then we merge those values to the base_config.
         custom_config = load_config(config_file)
         config = merge_into(custom_config, config)
-
-    # Load train extra options
-    config.train = merge_into(kwargs_to_config(kwargs), config.train)
 
     if override_params:
         override_config = parse_override(override_params)
