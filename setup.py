@@ -22,6 +22,7 @@ setup(
         'dm-sonnet==1.9',
         'google-api-python-client==1.6.2',
         'google-cloud-storage==1.2.0',
+        'Flask==0.12.2',
     ],
     entry_points="""
         [console_scripts]
