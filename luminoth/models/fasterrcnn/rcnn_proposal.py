@@ -22,8 +22,6 @@ class RCNNProposal(snt.AbstractModule):
     Besides applying NMS it also filters the top N results, both for classes
     and in general. These values are easily modifiable in the configuration
     files.
-
-    TODO: Apply total max detections. Currently we only have class max detected
     """
     def __init__(self, num_classes, config, name='rcnn_proposal'):
         """
@@ -161,11 +159,21 @@ class RCNNProposal(snt.AbstractModule):
         proposal_label = tf.concat(selected_labels, axis=0)
         proposal_label_prob = tf.concat(selected_probs, axis=0)
 
+        # Get topK detections of all classes.
+        k = tf.minimum(
+            self._total_max_detections,
+            tf.shape(proposal_label_prob)[0]
+        )
+        top_k = tf.nn.top_k(proposal_label_prob, k=k)
+        top_k_proposal_label_prob = top_k.values
+        top_k_objects = tf.gather(objects, top_k.indices)
+        top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
+
         return {
             'objects_unfiltered': objects_unfiltered,
-            'objects': objects,
-            'proposal_label': proposal_label,
-            'proposal_label_prob': proposal_label_prob,
+            'objects': top_k_objects,
+            'proposal_label': top_k_proposal_label,
+            'proposal_label_prob': top_k_proposal_label_prob,
             'selected_boxes': selected_boxes,
             'selected_probs': selected_probs,
             'selected_labels': selected_labels,

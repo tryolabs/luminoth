@@ -248,9 +248,20 @@ class RCNNProposalTest(tf.test.TestCase):
             cls_prob,
         )
 
+        objects = self._compute_tf_graph(
+            tf.squeeze(gt_boxes_per_class, axis=1)
+        )
+        # We need to sort the objects by `cls_prob` from high to low score.
+        cls_prob = self._compute_tf_graph(cls_prob)
+        # Ignoring background prob get the reverse argsort for the max of each
+        # object.
+        decreasing_idxs = cls_prob[:, 1:].max(axis=1).argsort()[::-1]
+        # Sort by indexing.
+        objects_sorted = objects[decreasing_idxs]
+
         self.assertAllClose(
             proposal_prediction['objects'],
-            self._compute_tf_graph(tf.squeeze(gt_boxes_per_class, axis=1)),
+            objects_sorted,
             atol=self._equality_delta
         )
 
@@ -302,10 +313,8 @@ class RCNNProposalTest(tf.test.TestCase):
 
         self.assertLessEqual(num_class0, limits_config.class_max_detections)
         self.assertLessEqual(num_class1, limits_config.class_max_detections)
-        # TODO: uncomment the following lines when we implement total number
-        # restrictions. Right now we're failing this assert:
-        # num_total = labels.shape[0]
-        # self.assertLessEqual(num_total, limits_config.total_max_detections)
+        num_total = labels.shape[0]
+        self.assertLessEqual(num_total, limits_config.total_max_detections)
 
 
 if __name__ == '__main__':
