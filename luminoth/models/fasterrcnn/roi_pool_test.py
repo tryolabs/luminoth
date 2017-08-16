@@ -199,50 +199,42 @@ class ROIPoolingTest(tf.test.TestCase):
 
         # Check that max polling returns values greater or equal
         # than 'a' and crops returns values lower or equal than 'b'
-        self.assertEqual(
-            np.greater_equal(results['roi_pool'][0], a).all(),
-            True
+        self.assertTrue(
+            np.greater_equal(results['roi_pool'][0], a).all()
         )
 
-        self.assertEqual(
-            np.less_equal(results['crops'][0], b).all(),
-            True
+        self.assertTrue(
+            np.less_equal(results['crops'][0], b).all()
         )
 
         # Check that max polling returns values greater or equal
         # than 'a' and crops returns values lower or equal than 'c'
-        self.assertEqual(
-            np.greater_equal(results['roi_pool'][1], a).all(),
-            True
+        self.assertTrue(
+            np.greater_equal(results['roi_pool'][1], a).all()
         )
 
-        self.assertEqual(
-            np.less_equal(results['crops'][1], c).all(),
-            True
+        self.assertTrue(
+            np.less_equal(results['crops'][1], c).all()
         )
 
         # Check that max polling returns values greater or equal
         # than 'b' and crops returns values lower or equal than 'd'
-        self.assertEqual(
-            np.greater_equal(results['roi_pool'][2], b).all(),
-            True
+        self.assertTrue(
+            np.greater_equal(results['roi_pool'][2], b).all()
         )
 
-        self.assertEqual(
-            np.less_equal(results['crops'][2], d).all(),
-            True
+        self.assertTrue(
+            np.less_equal(results['crops'][2], d).all()
         )
 
         # Check that max polling returns values greater or equal
         # than 'c' and crops returns values lower or equal than 'd'
-        self.assertEqual(
-            np.greater_equal(results['roi_pool'][3], c).all(),
-            True
+        self.assertTrue(
+            np.greater_equal(results['roi_pool'][3], c).all()
         )
 
-        self.assertEqual(
-            np.less_equal(results['crops'][3], d).all(),
-            True
+        self.assertTrue(
+            np.less_equal(results['crops'][3], d).all()
         )
 
 
