@@ -55,13 +55,22 @@ class RCNNTargetTest(tf.test.TestCase):
         config.background_threshold_low).
         """
 
-        gt_boxes = tf.constant([(20, 20, 80, 100, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(20, 20, 80, 100, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 55, 75, 85, 105),  # Background, IoU ~0.1293
-            (self._batch_number, 25, 21, 85, 105),  # Foreground, IoU ~0.7934
-            (self._batch_number, 78, 98, 99, 135),  # Ignored, IoU ~0.0015
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 55, 75, 85, 105),  # Background
+                                                        # IoU ~0.1293
+                (self._batch_number, 25, 21, 85, 105),  # Foreground
+                                                        # IoU ~0.7934
+                (self._batch_number, 78, 98, 99, 135),  # Ignored
+                                                        # IoU ~0.0015
+            ],
+            dtype=tf.float32
+        )
 
         proposals_label, bbox_targets = self._run_rcnn_target(
             self._shared_model, gt_boxes, proposed_boxes
@@ -82,14 +91,20 @@ class RCNNTargetTest(tf.test.TestCase):
         foreground threshold.
         """
 
-        gt_boxes = tf.constant([(423, 30, 501, 80, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(423, 30, 501, 80, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 491, 70, 510, 92),  # IoU 0.0277
-            (self._batch_number, 400, 60, 450, 92),  # IoU 0.1147
-            (self._batch_number, 413, 40, 480, 77),  # IoU 0.4998: highest
-            (self._batch_number, 411, 40, 480, 77),  # IoU 0.4914
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 491, 70, 510, 92),  # IoU 0.0277
+                (self._batch_number, 400, 60, 450, 92),  # IoU 0.1147
+                (self._batch_number, 413, 40, 480, 77),  # IoU 0.4998: highest
+                (self._batch_number, 411, 40, 480, 77),  # IoU 0.4914
+            ],
+            dtype=tf.float32
+        )
 
         proposals_label, bbox_targets = self._run_rcnn_target(
             self._shared_model, gt_boxes, proposed_boxes
@@ -109,13 +124,19 @@ class RCNNTargetTest(tf.test.TestCase):
         """Tests the code doesn't break when there's no proposals with IoU > 0.
         """
 
-        gt_boxes = tf.constant([(40, 90, 100, 105, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(40, 90, 100, 105, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 0, 0, 39, 89),
-            (self._batch_number, 101, 106, 300, 450),
-            (self._batch_number, 340, 199, 410, 420),
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 0, 0, 39, 89),
+                (self._batch_number, 101, 106, 300, 450),
+                (self._batch_number, 340, 199, 410, 420),
+            ],
+            dtype=tf.float32
+        )
 
         (proposals_label, bbox_targets) = self._run_rcnn_target(
             self._shared_model,
@@ -125,7 +146,8 @@ class RCNNTargetTest(tf.test.TestCase):
         foreground_fraction = self._config.foreground_fraction
         minibatch_size = self._config.minibatch_size
         correct_foreground_number = np.floor(
-            foreground_fraction * minibatch_size)
+            foreground_fraction * minibatch_size
+        )
 
         foreground_number = proposals_label[proposals_label >= 1].shape[0]
         background_number = proposals_label[proposals_label == 0].shape[0]
@@ -136,11 +158,12 @@ class RCNNTargetTest(tf.test.TestCase):
         )
 
         self.assertLessEqual(
-            foreground_number, foreground_fraction * minibatch_size
+            foreground_number,
+            np.floor(foreground_fraction * minibatch_size)
         )
         self.assertLess(
             background_number,
-            (foreground_fraction * minibatch_size) + 1
+            np.ceil(foreground_fraction * minibatch_size)
         )
 
     def testMultipleOverlap(self):
@@ -148,19 +171,25 @@ class RCNNTargetTest(tf.test.TestCase):
         the same gt box.
         """
 
-        gt_boxes = tf.constant([(200, 300, 250, 390, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(200, 300, 250, 390, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 12, 70, 350, 540),  # noise
-            (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-            (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-            (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-            (self._batch_number, 0, 0, 400, 400),  # noise
-            (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-            (self._batch_number, 0, 0, 400, 400),  # noise
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 12, 70, 350, 540),  # noise
+                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
+                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
+                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
+                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+                (self._batch_number, 0, 0, 400, 400),  # noise
+                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
+                (self._batch_number, 0, 0, 400, 400),  # noise
+            ],
+            dtype=tf.float32
+        )
 
         proposals_label, bbox_targets = self._run_rcnn_target(
             self._shared_model, gt_boxes, proposed_boxes
@@ -202,21 +231,27 @@ class RCNNTargetTest(tf.test.TestCase):
 
         model = RCNNTarget(self._num_classes, config)
 
-        gt_boxes = tf.constant([(200, 300, 250, 390, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(200, 300, 250, 390, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 12, 70, 350, 540),  # noise
-            (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-            (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-            (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-            (self._batch_number, 0, 0, 400, 400),  # noise
-            (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-            (self._batch_number, 0, 0, 400, 400),  # noise
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 12, 70, 350, 540),  # noise
+                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
+                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
+                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
+                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+                (self._batch_number, 0, 0, 400, 400),  # noise
+                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
+                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+                (self._batch_number, 0, 0, 400, 400),  # noise
+            ],
+            dtype=tf.float32
+        )
 
         (proposals_label, bbox_targets) = self._run_rcnn_target(
             model,
@@ -231,11 +266,12 @@ class RCNNTargetTest(tf.test.TestCase):
         minibatch_size = config.minibatch_size
 
         self.assertLessEqual(
-            foreground_number, foreground_fraction * minibatch_size
+            foreground_number,
+            np.floor(foreground_fraction * minibatch_size)
         )
-        self.assertLess(
+        self.assertLessEqual(
             background_number,
-            (foreground_fraction * minibatch_size) + 1
+            np.ceil(foreground_fraction * minibatch_size)
         )
 
     def testBboxTargetConsistency(self):
@@ -257,19 +293,25 @@ class RCNNTargetTest(tf.test.TestCase):
 
         model = RCNNTarget(self._num_classes, config)
 
-        gt_boxes = tf.constant([(200, 300, 250, 390, self._placeholder_label)])
+        gt_boxes = tf.constant(
+            [(200, 300, 250, 390, self._placeholder_label)],
+            dtype=tf.float32
+        )
 
-        proposed_boxes = tf.constant([
-            (self._batch_number, 12, 70, 350, 540),  # noise
-            (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-            (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-            (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-            (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-            (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-            (self._batch_number, 0, 0, 400, 400),  # noise
-            (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-            (self._batch_number, 0, 0, 400, 400),  # noise
-        ])
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 12, 70, 350, 540),  # noise
+                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
+                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
+                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
+                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
+                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
+                (self._batch_number, 0, 0, 400, 400),  # noise
+                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
+                (self._batch_number, 0, 0, 400, 400),  # noise
+            ],
+            dtype=tf.float32
+        )
 
         (proposals_label, bbox_targets) = self._run_rcnn_target(
             model,
@@ -282,6 +324,57 @@ class RCNNTargetTest(tf.test.TestCase):
 
         self.assertAllEqual(
             foreground_idxs, non_empty_bbox_target_idxs
+        )
+
+    def testMultipleGtBoxes(self):
+        """Tests we're getting the right labels when there's several gt_boxes.
+        """
+
+        num_classes = 3
+        config = EasyDict({
+            'foreground_threshold': 0.5,
+            'background_threshold_high': 0.5,
+            'background_threshold_low': 0.1,
+            'foreground_fraction': 0.5,
+            # We change the minibatch_size the catch all our foregrounds
+            'minibatch_size': 18,
+        })
+        model = RCNNTarget(num_classes, config)
+
+        gt_boxes = tf.constant(
+            [
+                (10, 0, 398, 399, 0),
+                (200, 300, 250, 390, 1),
+                (185, 305, 235, 372, 2),
+            ],
+            dtype=tf.float32
+        )
+        proposed_boxes = tf.constant(
+            [
+                (self._batch_number, 12, 70, 350, 540),  # noise
+                (self._batch_number, 190, 310, 240, 370),  # 2
+                (self._batch_number, 197, 300, 252, 389),  # 1
+                (self._batch_number, 196, 300, 252, 389),  # 1
+                (self._batch_number, 197, 303, 252, 394),  # 1
+                (self._batch_number, 180, 310, 235, 370),  # 2
+                (self._batch_number, 0, 0, 400, 400),  # 0
+                (self._batch_number, 197, 302, 252, 389),  # 1
+                (self._batch_number, 0, 0, 400, 400),  # 0
+            ],
+            dtype=tf.float32
+        )
+
+        (proposals_label, bbox_targets) = self._run_rcnn_target(
+            model,
+            gt_boxes,
+            proposed_boxes
+        )
+        # We don't care much about the first value.
+        self.assertAllClose(
+            proposals_label[1:],
+            # We sum one to normalize for RCNNTarget's results.
+            np.add([2., 1., 1., 1., 2., 0., 1., 0.], 1),
+            self._equality_delta
         )
 
 
