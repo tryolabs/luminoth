@@ -64,9 +64,9 @@ class ROIPoolingTest(tf.test.TestCase):
             [2, 1, 6, 4, 9],  # Inside mat_C
             [3, 6, 6, 9, 9],  # Inside mat_D
         ])
-        pretrained = self.pretrained
 
-        results = self._run_roi_pooling(roi_proposals, pretrained, self.config)
+        results = self._run_roi_pooling(
+            roi_proposals, self.pretrained, self.config)
 
         # Check that crops has the correct shape. This is (4, 4, 4, 1)
         # because we have 4 proposals, 'pool size' = 2x2 then the
@@ -108,12 +108,12 @@ class ROIPoolingTest(tf.test.TestCase):
             np.ones((2, 2)) * self.multiplier_d
         )
 
-    def testMaxPooling(self):
+    def testMaxPoolingWithoutInterpolation(self):
         """
-        Test max pooling whit a little bit more complex 'roi_proposals'.
+        Test max pooling with a little bit more complex 'roi_proposals'.
         We have 4 'roi_proposals' and use a 'pool size'
         of 2x2 ('pooled_width': 2, 'pooled_height': 2), then we will get as
-        result a 'roi_pool' of 2x2.
+        result a 'roi_pool' of 2x2. with
         """
         roi_proposals = np.array([
             [0, 3, 1, 6, 4],  # Across mat_A and mat_B (half-half)
@@ -121,9 +121,13 @@ class ROIPoolingTest(tf.test.TestCase):
             [2, 5, 3, 9, 7],  # Inside mat_B and mat_D (half-half)
             [3, 3, 6, 6, 9],  # Inside mat_C and mat_D (half-half)
         ])
-        pretrained = self.pretrained
+        a = self.multiplier_a
+        b = self.multiplier_b
+        c = self.multiplier_c
+        d = self.multiplier_d
 
-        results = self._run_roi_pooling(roi_proposals, pretrained, self.config)
+        results = self._run_roi_pooling(
+            roi_proposals, self.pretrained, self.config)
 
         # Check that crops has the correct shape. This is (4, 4, 4, 1)
         # because we have 4 proposals, 'pool size' = 2x2 then the
@@ -145,29 +149,37 @@ class ROIPoolingTest(tf.test.TestCase):
         # a column of 'two'.
         self.assertAllEqual(
             results['roi_pool'][0],
-            np.array([[1, 2], [1, 2]])
+            np.array([[a, b], [a, b]])
         )
 
         # Check that max polling returns a row of 'one' and
         # a row of 'three'.
         self.assertAllEqual(
             results['roi_pool'][1],
-            np.array([[1, 1], [3, 3]])
+            np.array([[a, a], [c, c]])
         )
 
         # Check that max polling returns a row of 'one' and
         # a row of 'three'.
         self.assertAllEqual(
             results['roi_pool'][2],
-            np.array([[2, 2], [4, 4]])
+            np.array([[b, b], [d, d]])
         )
 
         # Check that max polling returns a column of 'three' and
         # a column of 'four'.
         self.assertAllEqual(
             results['roi_pool'][3],
-            np.array([[3, 4], [3, 4]])
+            np.array([[c, d], [c, d]])
         )
+
+    def testMaxPoolingWithInterpolation(self):
+        """
+        Test max pooling with bilinear interpolation.
+        We have 4 'roi_proposals' and use a 'pool size'
+        of 2x2 ('pooled_width': 2, 'pooled_height': 2), then we will get as
+        result a 'roi_pool' of 2x2.
+        """
 
         roi_proposals = np.array([
             [0, 4, 1, 7, 4],  # Across mat_A and mat_B (1/4 - 3/4)
@@ -175,36 +187,62 @@ class ROIPoolingTest(tf.test.TestCase):
             [2, 5, 4, 9, 8],  # Inside mat_B and mat_D (1/4 - 3/4)
             [3, 4, 6, 7, 9],  # Inside mat_C and mat_D (1/4 - 3/4)
         ])
+        a = self.multiplier_a
+        b = self.multiplier_b
+        c = self.multiplier_c
+        d = self.multiplier_d
 
-        results = self._run_roi_pooling(roi_proposals, pretrained, self.config)
+        results = self._run_roi_pooling(
+            roi_proposals, self.pretrained, self.config)
 
         results['roi_pool'] = np.squeeze(results['roi_pool'], axis=3)
-        # Check that max polling returns a column of '1.5' (bilinear
-        # interpolation) and a column of 'two'.
-        self.assertAllEqual(
-            results['roi_pool'][0],
-            np.array([[1.5, 2], [1.5, 2]])
+
+        # Check that max polling returns values greater or equal
+        # than 'a' and crops returns values lower or equal than 'b'
+        self.assertEqual(
+            np.greater_equal(results['roi_pool'][0], a).all(),
+            True
         )
 
-        # Check that max polling returns a row of '2.6' (bilinear
-        # interpolation) and a row of 'three'.
-        self.assertAllClose(
-            results['roi_pool'][1],
-            np.array([[2.6, 2.6], [3, 3]])
+        self.assertEqual(
+            np.less_equal(results['crops'][0], b).all(),
+            True
         )
 
-        # Check that max polling returns a row of '3.6' (bilinear
-        # interpolation) and a row of 'four'.
-        self.assertAllClose(
-            results['roi_pool'][2],
-            np.array([[3.6, 3.6], [4, 4]])
+        # Check that max polling returns values greater or equal
+        # than 'a' and crops returns values lower or equal than 'c'
+        self.assertEqual(
+            np.greater_equal(results['roi_pool'][1], a).all(),
+            True
         )
 
-        # Check that max polling returns a column of '3.5' (bilinear
-        # interpolation) and a column of 'four'.
-        self.assertAllClose(
-            results['roi_pool'][3],
-            np.array([[3.5, 4], [3.5, 4]])
+        self.assertEqual(
+            np.less_equal(results['crops'][1], c).all(),
+            True
+        )
+
+        # Check that max polling returns values greater or equal
+        # than 'b' and crops returns values lower or equal than 'd'
+        self.assertEqual(
+            np.greater_equal(results['roi_pool'][2], b).all(),
+            True
+        )
+
+        self.assertEqual(
+            np.less_equal(results['crops'][2], d).all(),
+            True
+        )
+
+        # Check that max polling returns values greater or equal
+        # than 'c' and crops returns values lower or equal than 'd'
+        self.assertEqual(
+            np.greater_equal(results['roi_pool'][3], c).all(),
+            True
+        )
+
+        self.assertEqual(
+            np.less_equal(results['crops'][3], d).all(),
+            True
         )
 
 
