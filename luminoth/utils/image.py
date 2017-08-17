@@ -38,7 +38,7 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
         min_dimension = tf.minimum(height, width)
         upscale_factor = tf.maximum(min_size / min_dimension, 1.)
     else:
-        upscale_factor = 1.
+        upscale_factor = tf.constant(1.)
 
     if max_size:
         # We do the same calculating the downscale factor, to end up with an
@@ -48,7 +48,7 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
         max_dimension = tf.maximum(height, width)
         downscale_factor = tf.minimum(max_size / max_dimension, 1.)
     else:
-        downscale_factor = 1.
+        downscale_factor = tf.constant(1.)
 
     scale_factor = upscale_factor * downscale_factor
 
@@ -91,3 +91,53 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
         'image': image,
         'scale_factor': scale_factor,
     }
+
+
+def flip_image(image, bboxes=None, left_right=True, up_down=False):
+    """Flips image on its axis for data augmentation.
+
+    Args:
+        image: Tensor with image of shape (H, W, 3).
+        bboxes: Optional Tensor with bounding boxes with shape
+            (total_bboxes, 5).
+        left_right: Boolean flag to flip the image horizontally
+            (left to right).
+        up_down: Boolean flag to flip the image vertically (upside down)
+    Returns:
+        image: Flipped image with the same shape.
+        bboxes: Tensor with the same shape.
+    """
+
+    image_shape = tf.to_float(tf.shape(image))
+    height = image_shape[0]
+    width = image_shape[1]
+
+    if left_right:
+        image = tf.image.flip_left_right(image)
+        if bboxes is not None:
+            x_min, y_min, x_max, y_max, label = tf.unstack(bboxes, axis=1)
+            new_x_min = width - x_max - 1.
+            new_y_min = y_min
+            new_x_max = new_x_min + (x_max - x_min)
+            new_y_max = y_max
+            bboxes = tf.stack(
+                [new_x_min, new_y_min, new_x_max, new_y_max, label], axis=1
+            )
+
+    if up_down:
+        image = tf.image.flip_up_down(image)
+        if bboxes is not None:
+            x_min, y_min, x_max, y_max, label = tf.unstack(bboxes, axis=1)
+            new_x_min = x_min
+            new_y_min = height - y_max - 1.
+            new_x_max = x_max
+            new_y_max = new_y_min + (y_max - y_min)
+            bboxes = tf.stack(
+                [new_x_min, new_y_min, new_x_max, new_y_max, label], axis=1
+            )
+
+    return_dict = {'image': image}
+    if bboxes is not None:
+        return_dict['bboxes'] = bboxes
+
+    return return_dict
