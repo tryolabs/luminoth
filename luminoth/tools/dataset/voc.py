@@ -14,7 +14,7 @@ def read_classes(root):
     path = os.path.join(root, 'ImageSets', 'Main')
 
     classes = set()
-    for entry in os.listdir(path):
+    for entry in tf.gfile.ListDirectory(path):
         if "_" not in entry:
             continue
         class_name, _ = entry.split('_')
@@ -184,7 +184,8 @@ def voc(data_dir, output_dir, splits, ignore_splits, only_filename,
         tf.logging.set_verbosity(tf.logging.INFO)
 
     tf.logging.info('Saving output_dir = {}'.format(output_dir))
-    os.makedirs(output_dir, exist_ok=True)
+    if not tf.gfile.Exists(output_dir):
+        tf.gfile.MakeDirs(output_dir)
 
     classes = read_classes(data_dir)
 
