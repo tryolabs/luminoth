@@ -42,6 +42,7 @@ git clone https://github.com/tryolabs/luminoth.git; cd luminoth;
 and then run
 
 ```
+pip install -r requirements.txt
 python setup.py install
 ```
 
