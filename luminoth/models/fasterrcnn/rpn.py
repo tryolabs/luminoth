@@ -82,9 +82,9 @@ class RPN(snt.AbstractModule):
                 should be
                 [feature_map_height * feature_map_width * total_anchors, 4]
             gt_boxes: A Tensor with the ground-truth boxes for the image.
-                Its dimensions should be `[total_gt_boxes, 4]`, and it should
-                consist of [x1, y1, x2, y2], being (x1, y1) -> top left point,
-                and (x2, y2) -> bottom right point of the bounding box.
+                Its dimensions should be `[total_gt_boxes, 5]`, and it should
+                consist of [x1, y1, x2, y2, label], being (x1, y1) -> top left
+                point, and (x2, y2) -> bottom right point of the bounding box.
 
         Returns:
             prediction_dict: A dict with the following keys:
