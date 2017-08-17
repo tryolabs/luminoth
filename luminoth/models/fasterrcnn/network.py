@@ -81,14 +81,10 @@ class FasterRCNN(snt.AbstractModule):
         Args:
             image: A tensor with the image.
                 Its shape should be `(1, height, width, 3)`.
-            pretrained_feature_map: A Tensor with the feature map for the image
-                Its shape should be `(feature_height, feature_width, 512)`.
-                The shape depends of the pretrained network in use.
             gt_boxes: A tensor with all the ground truth boxes of that image.
-                Its shape should be `(num_gt_boxes, 4)`
-                Where for each gt box we have (x1, y1, x2, y2), in that order.
-            is_training: A boolean passed onto submodules from which it depends
-                if targets for sub-minibatches are created or not.
+                Its shape should be `(num_gt_boxes, 5)`
+                Where for each gt box we have (x1, y1, x2, y2, label),
+                in that order.
 
         Returns:
             classification_prob: A tensor with the softmax probability for
@@ -98,6 +94,9 @@ class FasterRCNN(snt.AbstractModule):
                 It's shape should be: (num_bboxes, 4). For each of the bboxes
                 we have (x1, y1, x2, y2)
         """
+        # A Tensor with the feature map for the image,
+        # its shape should be `(feature_height, feature_width, 512)`.
+        # The shape depends of the pretrained network in use.
         pretrained_prediction = self.pretrained(image)
         pretrained_feature_map = pretrained_prediction['net']
 
@@ -238,7 +237,7 @@ class FasterRCNN(snt.AbstractModule):
 
         Args:
             feature_map: A Tensor of shape
-                `(feature_height, feature_width, 512)` using the VGG as
+                `(1, feature_height, feature_width, 512)` using the VGG as
                 pretrained.
 
         Returns:
