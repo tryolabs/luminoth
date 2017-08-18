@@ -223,10 +223,10 @@ class FasterRCNNetworkTest(tf.test.TestCase):
 
         feature_map = np.random.randint(low=0, high=255, size=(1, 32, 32, 1))
         config = self.config
-        config.anchors.base_size = 4
+        config.anchors.base_size = 16
         config.anchors.scales = [0.5, 1, 2]
         config.anchors.ratios = [0.5, 1, 2]
-        config.anchors.stride = 1
+        config.anchors.stride = 1  # image is 32 x 32
 
         anchors = self._gen_anchors(config, feature_map)
 
@@ -234,11 +234,49 @@ class FasterRCNNetworkTest(tf.test.TestCase):
         # 9216 = 32^2 * config.anchor.scales * config.anchor.ratios = 1024 * 9
         self.assertEqual(anchors.shape, (9216, 4))
 
-        # Check the anchors are well distributed, we sum the four coordinates
-        # and must variate at least between 4 = 0 + 0 + 2 + 2 and
-        # 124 = 30 + 30 + 32 + 32
-        self.assertTrue(
-            all([x in np.sum(anchors, axis=1) for x in range(4, 124)]))
+        anchor_widths = anchors[:, 2] - anchors[:, 0]
+        anchor_heights = anchors[:, 3] - anchors[:, 1]
+
+        # Since we are using equal scales and ratios, the set of unique heights
+        # and widths must be the same.
+        self.assertAllEqual(
+            np.unique(anchor_widths), np.unique(anchor_heights)
+        )
+
+        anchor_areas = anchor_widths * anchor_heights
+
+        # We have 9 possible anchors areas, minus 3 repeated ones. 6 unique.
+        self.assertAllEqual(np.unique(anchor_areas).shape[0], 6)
+
+        # Check the anchors cover all the image.
+        # TODO: Check with values calculated from config.
+        self.assertEqual(np.min(anchors[:, 0]), -14)
+        self.assertEqual(np.max(anchors[:, 0]), 36)
+
+        self.assertEqual(np.min(anchors[:, 1]), -14)
+        self.assertEqual(np.max(anchors[:, 1]), 36)
+
+        self.assertEqual(np.min(anchors[:, 2]), 9)
+        self.assertEqual(np.max(anchors[:, 2]), 60)
+
+        self.assertEqual(np.min(anchors[:, 3]), 9)
+        self.assertEqual(np.max(anchors[:, 3]), 60)
+
+        # Check values are sequential.
+        self._assert_sequential_values(anchors[:, 0], config.anchors.stride)
+        self._assert_sequential_values(anchors[:, 1], config.anchors.stride)
+        self._assert_sequential_values(anchors[:, 2], config.anchors.stride)
+        self._assert_sequential_values(anchors[:, 3], config.anchors.stride)
+
+    def _assert_sequential_values(self, values, delta=1):
+        unique_values = np.unique(values)
+        paired_values = np.column_stack(
+            (unique_values[:-1], unique_values[1:])
+        )
+        self.assertAllEqual(
+            paired_values[:, 1] - paired_values[:, 0],
+            np.ones((paired_values.shape[0], ), np.int)
+        )
 
 
 if __name__ == "__main__":
