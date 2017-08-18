@@ -85,6 +85,21 @@ class AnchorsTest(tf.test.TestCase):
             anchor_scales, [0.5, 1., 2., 0.5, 1., 2., 0.5, 1., 2.]
         )
 
+    def testInvalidValues(self):
+        base_size = 1
+        aspect_ratios = [0.5]
+        scales = [0.5]
+        try:
+            generate_anchors_reference(
+                base_size=base_size,
+                aspect_ratios=aspect_ratios,
+                scales=scales
+            )
+        except ValueError as e:
+            return
+
+        self.fail('Should have thrown an exception.')
+
 
 if __name__ == '__main__':
     tf.test.main()
