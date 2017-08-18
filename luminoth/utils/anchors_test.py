@@ -95,7 +95,7 @@ class AnchorsTest(tf.test.TestCase):
                 aspect_ratios=aspect_ratios,
                 scales=scales
             )
-        except ValueError as e:
+        except ValueError:
             return
 
         self.fail('Should have thrown an exception.')
