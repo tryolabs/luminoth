@@ -43,7 +43,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                 'layer_sizes': [4096, 4096],
                 'dropout_keep_prop': 1.0,
                 'activation_function': 'relu6',
-                'l2_regulalization_scale': 0.0005,
+                'l2_regularization_scale': 0.0005,
                 'initializer': {
                     'type': 'variance_scaling_initializer',
                     'factor': 1.0,
@@ -78,7 +78,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                  'stddev': 0.01,
                },
                'activation_function': 'relu6',
-               'l2_regulalization_scale': 0.0005,
+               'l2_regularization_scale': 0.0005,
                'proposals': {
                  'pre_nms_top_n': 12000,
                  'post_nms_top_n': 2000,
