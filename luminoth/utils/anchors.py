@@ -39,4 +39,14 @@ def generate_anchors_reference(base_size, aspect_ratios, scales):
         center_xy + (heights - 1) / 2,
     ])
 
+    real_heights = (anchors[:, 3] - anchors[:, 1]).astype(np.int)
+    real_widths = (anchors[:, 2] - anchors[:, 0]).astype(np.int)
+
+    if (real_widths == 0).any() or (real_heights == 0).any():
+        raise ValueError(
+            'base_size {} is too small for aspect_ratios and scales.'.format(
+                base_size
+            )
+        )
+
     return anchors
