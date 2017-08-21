@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 setup(
     name='luminoth',
     description='Deep Learning toolkit',
-    version='0.0.1',
+    version='0.0.1.dev0',
     license='BSD 3-Clause License',
     packages=find_packages(),
     url="https://github.com/tryolabs/luminoth",
