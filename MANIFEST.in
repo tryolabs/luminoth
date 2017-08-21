@@ -1,0 +1,3 @@
+include *.md *.txt LICENSE
+recursive-include src *.html
+recursive-include src *.yml
