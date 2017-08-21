@@ -1,0 +1,272 @@
+import tensorflow as tf
+import sonnet as snt
+import numpy as np
+
+from luminoth.utils.bbox_transform_tf import encode
+from luminoth.utils.bbox_overlap import bbox_overlap_tf
+
+
+class RCNNTarget(snt.AbstractModule):
+    """Generate RCNN target tensors for both probabilities and bounding boxes.
+
+    Targets for RCNN are based upon the results of the RPN, this can get tricky
+    in the sense that RPN results might not be the best and it might not be
+    possible to have the ideal amount of targets for all the available ground
+    truth boxes.
+
+    There are two types of targets, class targets and bounding box targets.
+
+    Class targets are used both for background and foreground, while bounding
+    box targets are only used for foreground (since it's not possible to create
+    a bounding box of "background objects").
+
+    A minibatch size determines how many targets are going to be generated and
+    how many are going to be ignored. RCNNTarget is responsable for choosing
+    which proposals and corresponding targets are included in the minibatch and
+    which ones are completly ignored.
+    """
+    def __init__(self, num_classes, config, debug=False, name='rcnn_proposal'):
+        """
+        Args:
+            num_classes: Number of possible classes.
+            config: Configuration object for RCNNTarget.
+        """
+        super(RCNNTarget, self).__init__(name=name)
+        self._num_classes = num_classes
+        # Ratio of foreground vs background for the minibatch.
+        self._foreground_fraction = config.foreground_fraction
+        self._minibatch_size = config.minibatch_size
+        # IoU lower threshold with a ground truth box to be considered that
+        # specific class.
+        self._foreground_threshold = config.foreground_threshold
+        # High and low treshold to be considered background.
+        self._background_threshold_high = config.background_threshold_high
+        self._background_threshold_low = config.background_threshold_low
+        self._debug = debug
+
+        if self._debug:
+            tf.logging.warning(
+                'Using RCNN Target in debug mode makes random seed '
+                'to be fixed at 0.')
+
+    def _build(self, proposals, gt_boxes):
+        """
+        Args:
+            proposals: A Tensor with the RPN bounding boxes proposals.
+                The shape of the Tensor is (num_proposals, 5), where the first
+                of the 5 values for each proposal is the batch number.
+            gt_boxes: A Tensor with the ground truth boxes for the image.
+                The shape of the Tensor is (num_gt, 5), having the truth label
+                as the last value for each box.
+        Returns:
+            proposals_label: Either a truth value of the proposals (a value
+                between 0 and num_classes, with 0 being background), or -1 when
+                the proposal is to be ignored in the minibatch.
+                The shape of the Tensor is (num_proposals, 1).
+            bbox_targets: A bounding box regression target for each of the
+                proposals that have and greater than zero label. For every
+                other proposal we return zeros.
+                The shape of the Tensor is (num_proposals, 4).
+        """
+
+        # TODO: revise casts to int64 in tf.sparse_to_dense and tf.scatter_nd
+        # calls.
+
+        # Remove batch id from proposals.
+        proposals = proposals[:, 1:]
+
+        overlaps = bbox_overlap_tf(proposals, gt_boxes[:, :4])
+        # overlaps now contains (num_proposals, num_gt_boxes) with the IoU of
+        # proposal P and ground truth box G in overlaps[P, G]
+
+        # We are going to label each proposal based on the IoU with
+        # `gt_boxes`. Start by filling the labels with -1, marking them as
+        # ignored.
+        proposals_label_shape = tf.gather(tf.shape(proposals), [0])
+        proposals_label = tf.fill(
+            dims=proposals_label_shape,
+            value=-1.
+        )
+        # For each overlap there is three possible outcomes for labelling:
+        #  if max(iou) < config.background_threshold_low then we ignore.
+        #  elif max(iou) <= config.background_threshold_high then we label
+        #      background.
+        #  elif max(iou) > config.foreground_threshold then we label with
+        #      the highest IoU in overlap.
+        #
+        # max_overlaps gets, for each proposal, the index in which we can
+        # find the gt_box with which it has the highest overlap.
+        max_overlaps = tf.reduce_max(overlaps, axis=[1])
+
+        iou_is_high_enough_for_bg = tf.greater(
+            max_overlaps, self._background_threshold_low
+        )
+        iou_is_not_too_high_for_bg = tf.less(
+            max_overlaps, self._background_threshold_high
+        )
+        bg_condition = tf.logical_and(
+            iou_is_high_enough_for_bg, iou_is_not_too_high_for_bg
+        )
+        proposals_label = tf.where(
+            condition=bg_condition,
+            x=tf.zeros_like(proposals_label, dtype=tf.float32),
+            y=proposals_label
+        )
+
+        # Get the index of the best gt_box for each proposal.
+        overlaps_best_gt_idxs = tf.argmax(overlaps, axis=1)
+        # Having the index of the gt bbox with the best label we need to get
+        # the label for each gt box and sum it one because 0 is used for
+        # background.
+        best_fg_labels_for_proposals = tf.add(
+            tf.gather(gt_boxes[:, 4], overlaps_best_gt_idxs),
+            1.
+        )
+        iou_is_fg = tf.greater_equal(
+            max_overlaps, self._foreground_threshold
+        )
+        best_proposals_idxs = tf.argmax(overlaps, axis=0)
+
+        # Set the indices in best_proposals_idxs to True, and the rest to
+        # false.
+        is_best_box = tf.sparse_to_dense(
+            sparse_indices=tf.unstack(best_proposals_idxs),
+            sparse_values=True, default_value=False,
+            output_shape=tf.cast(proposals_label_shape, tf.int64),
+            validate_indices=False
+        )
+
+        fg_condition = tf.logical_or(
+            iou_is_fg, is_best_box
+        )
+        # We update proposals_label with the value in
+        # best_fg_labels_for_proposals only when the box is foreground, or it
+        # is the best proposal for a certain gt_box.
+        proposals_label = tf.where(
+            condition=fg_condition,
+            x=best_fg_labels_for_proposals,
+            y=proposals_label
+        )
+
+        # proposals_label now has a value in [0, num_classes + 1] for
+        # proposals we are going to use and -1 for the ones we should ignore.
+        # But we still need to make sure we don't have a number of proposals
+        # higher than minibatch_size * foreground_fraction.
+        # TODO: perhaps don't respect minibatch_size when not training?
+        max_fg = int(self._foreground_fraction * self._minibatch_size)
+        fg_inds = tf.where(
+            condition=fg_condition
+        )
+
+        def disable_some_fgs():
+            # We want to delete a randomly-selected subset of fg_inds of
+            # size `fg_inds.shape[0] - max_fg`.
+            # We shuffle along the dimension 0 and then we get the first
+            # num_fg_inds - max_fg indices and we disable them.
+            if self._debug:
+                shuffled_inds = tf.random_shuffle(fg_inds, seed=0)
+            else:
+                shuffled_inds = tf.random_shuffle(fg_inds)
+            disable_place = (tf.shape(fg_inds)[0] - max_fg)
+            disable_inds = shuffled_inds[:disable_place]
+            is_disabled = tf.sparse_to_dense(
+                sparse_indices=disable_inds,
+                sparse_values=True, default_value=False,
+                output_shape=tf.cast(proposals_label_shape, tf.int64),
+                # We've shuffled them, so they may not be ordered.
+                validate_indices=False
+            )
+            return tf.where(
+                condition=is_disabled,
+                # We set it to -label for debugging purposes.
+                x=tf.negative(proposals_label),
+                y=proposals_label
+            )
+        # Disable some fgs if we have too many foregrounds.
+        proposals_label = tf.cond(
+            tf.greater(tf.shape(fg_inds)[0], max_fg),
+            true_fn=disable_some_fgs,
+            false_fn=lambda: proposals_label
+        )
+
+        # Now we want to do the same for backgrounds.
+        max_bg = np.ceil(self._foreground_fraction * self._minibatch_size)
+
+        bg_inds = tf.where(
+            condition=bg_condition,
+        )
+
+        def disable_some_bgs():
+            if self._debug:
+                shuffled_inds = tf.random_shuffle(bg_inds, seed=0)
+            else:
+                shuffled_inds = tf.random_shuffle(bg_inds)
+            disable_place = (tf.shape(bg_inds)[0] - max_bg)
+            disabled_inds = shuffled_inds[:disable_place]
+            is_disabled = tf.sparse_to_dense(
+                sparse_indices=disabled_inds,
+                sparse_values=True, default_value=False,
+                output_shape=tf.cast(proposals_label_shape, tf.int64),
+                validate_indices=False
+            )
+            return tf.where(
+                condition=is_disabled,
+                x=tf.fill(
+                    dims=proposals_label_shape,
+                    value=-1.
+                ),
+                y=proposals_label
+            )
+
+        proposals_label = tf.cond(
+            tf.greater_equal(tf.shape(bg_inds)[0], max_bg),
+            true_fn=disable_some_bgs,
+            false_fn=lambda: proposals_label
+        )
+
+        """
+        Next step is to calculate the proper targets for the proposals labeled
+        based on the values of the ground-truth boxes.
+        We have to use only the proposals labeled >= 1, each matching with
+        the proper gt_boxes
+        """
+
+        # Get the ids of the proposals that matter for bbox_target comparisson.
+        is_proposal_with_target = tf.greater(
+            proposals_label, 0
+        )
+        proposals_with_target_idx = tf.where(
+            condition=is_proposal_with_target
+        )
+        # Get the corresponding ground truth box only for the proposals with
+        # target.
+        gt_boxes_idxs = tf.gather(
+            overlaps_best_gt_idxs,
+            proposals_with_target_idx
+        )
+        # Get the values of the ground truth boxes.
+        proposals_gt_boxes = tf.gather_nd(
+            gt_boxes[:, :4], gt_boxes_idxs
+        )
+        # We create the same array but with the proposals
+        proposals_with_target = tf.gather_nd(
+            proposals,
+            proposals_with_target_idx
+        )
+        # We create our targets with bbox_transform
+        bbox_targets_nonzero = encode(
+            proposals_with_target,
+            proposals_gt_boxes,
+        )
+        # TODO: We should normalize it in order for bbox_targets to have zero
+        # mean and unit variance according to the paper.
+
+        # We unmap targets to proposal_labels (containing the length of
+        # proposals)
+        bbox_targets = tf.scatter_nd(
+            indices=proposals_with_target_idx,
+            updates=bbox_targets_nonzero,
+            shape=tf.cast(tf.shape(proposals), tf.int64)
+        )
+
+        return proposals_label, bbox_targets
