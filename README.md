@@ -1,7 +1,7 @@
 Luminoth
 ========
 
-![Test status](https://circleci.com/gh/tryolabs/luminoth.png?style=shield&circle-token=35724108fcaca8bd72e6042b9d32956974980b42)
+[![Build Status](https://travis-ci.org/tryolabs/luminoth.svg?branch=master)](https://travis-ci.org/tryolabs/luminoth)
 
 
 > The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
