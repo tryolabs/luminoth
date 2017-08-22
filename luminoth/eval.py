@@ -111,12 +111,16 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     # TODO: Get runname from model-dir
     summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
 
-    all_bboxes = []
-    all_classes = []
-    all_scores = []
-    all_gt_bboxes = []
-    all_gt_classes = []
-    all_filenames = []
+    # Output of the detector, per batch.
+    output_per_batch = {
+        'bboxes': [],  # Bounding boxes detected.
+        'classes': [],  # Class associated to each bounding box.
+        'scores': [],  # Score for each detection.
+        'gt_bboxes': [],  # Ground-truth bounding boxes for the batch.
+        'gt_classes': [],  # Ground-truth classes for each bounding box.
+        'filenames': [],  # Filenames. TODO: Remove.
+    }
+
     with tf.Session() as sess:
         sess.run(init_op)
         saver.restore(sess, config.train.checkpoint_file)
@@ -128,7 +132,6 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
 
         try:
             while not coord.should_stop():
-                # summary, _ = sess.run([summarizer, metric_ops])
                 (
                     _, batch_bboxes, batch_classes, batch_scores,
                     batch_filenames, batch_gt_objects,
@@ -137,12 +140,14 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
                     pred_objects_scores, train_filename, train_objects,
                 ])
 
-                all_gt_bboxes.append(batch_gt_objects[:, :4])
-                all_gt_classes.append(batch_gt_objects[:, 4])
-                all_bboxes.append(batch_bboxes)
-                all_classes.append(batch_classes)
-                all_scores.append(batch_scores)
-                all_filenames.append(batch_filenames)
+                output_per_batch['bboxes'].append(batch_bboxes)
+                output_per_batch['classes'].append(batch_classes)
+                output_per_batch['scores'].append(batch_scores)
+
+                output_per_batch['gt_bboxes'].append(batch_gt_objects[:, :4])
+                output_per_batch['gt_classes'].append(batch_gt_objects[:, 4])
+
+                output_per_batch['filenames'].append(batch_filenames)
 
                 val_loss = sess.run(total_loss)
                 print('val_loss = {:.2f}'.format(val_loss))
@@ -162,30 +167,66 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         # Wait for all threads to stop.
         coord.join(threads)
 
-    # Calculate mAP@iou with the results from running on the dataset.
-    iou_threshold = 0.5
 
+def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
+    """Calculates mAP@iou_threshold from the detector's output.
+
+    The procedure for calculating the average precision for class ``C`` is as
+    follows:
+
+    Start by ranking all the predictions (for a given image and said class) in
+    order of confidence.  Each of these predictions is marked as correct (true
+    positive, when it has a IoU-threshold greater or equal to `iou_threshold`)
+    or incorrect (false positive, in the other case).  This matching is
+    performed greedily over the confidence scores, so a higher-confidence
+    prediction will be matched over another lower-confidence one even if the
+    latter has better IoU.  Also, each prediction is matched at most once, so
+    repeated detections are counted as false positives.
+
+    We then integrate over the interpolated PR curve (see `Interpolated
+    Precision-Recall Curve`_), thus obtaining the value for the class' average
+    precision
+
+    Average the result among all the classes to obtain the final, ``mAP``,
+    value.
+
+    Args:
+        output_per_batch (dict): Output of the detector to calculate mAP.
+            Expects the following keys: ``bboxes``, ``classes``, ``scores``,
+            ``gt_bboxes``, ``gt_classes``, ``filenames``.  Under each key,
+            there should be a list of the results per batch as returned by the
+            detector.
+        num_classes (int): Number of classes on the dataset.
+        threshold (float): IoU threshold for considering a match.
+
+    Todo:
+        * Use VOC2012-style for integrating the curve, instead of a fixed
+          number of points.
+
+    .. _Interpolated Precision-Recall Curve:
+        http://host.robots.ox.ac.uk/pascal/VOC/pubs/everingham10.pdf
+    """
     # For each image, order predictions by score and classify as TP or FP.
-    # TODO: Ignore difficult examples.
     # TODO: Use authoritative source of examples count.
 
-    # List; first by class, then by example. Object is tuple of ndarrays of
-    # size (D_{c,i},), for tp/fp labels and for score, where D_{c,i} is the
+    # List; first by class, then by example. Each entry is a tuple of ndarrays
+    # of size (D_{c,i},), for tp/fp labels and for score, where D_{c,i} is the
     # number of detected boxes for class `c` on image `i`.
-    # TODO: Get number of classes from here or somewhere else?
-    tp_fp_labels_by_class = [[] for _ in range(config.network.num_classes)]
-    num_examples_per_class = [0 for _ in range(config.network.num_classes)]
+    tp_fp_labels_by_class = [[] for _ in range(num_classes)]
+    num_examples_per_class = [0 for _ in range(num_classes)]
 
-    for idx in range(len(all_bboxes)):
+    num_batches = len(output_per_batch['bboxes'])
+    for idx in range(num_batches):
 
-        classes = all_classes[idx]  # D_{i}, number of detected for ith image.
-        bboxes = all_bboxes[idx]  # (D_{i}, 4).
-        scores = all_scores[idx]
-        gt_bboxes = all_gt_bboxes[idx]
-        gt_classes = all_gt_classes[idx]
+        classes = output_per_batch['classes'][idx]  # D_{i}, number of detected for ith image.
+        bboxes = output_per_batch['bboxes'][idx]  # (D_{i}, 4).
+        scores = output_per_batch['scores'][idx]
+
+        gt_bboxes = output_per_batch['gt_bboxes'][idx]
+        gt_classes = output_per_batch['gt_classes'][idx]
 
         # Analysis must be made per-class.
-        for cls in range(config.network.num_classes):
+        for cls in range(num_classes):
             cls_bboxes = bboxes[classes == cls, :]
             cls_scores = scores[classes == cls]
             cls_gt_bboxes = gt_bboxes[gt_classes == cls, :]
@@ -222,8 +263,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
             )
 
     # Calculate AP per class.
-    ap_per_class = np.zeros(config.network.num_classes)
-    for cls in range(config.network.num_classes):
+    ap_per_class = np.zeros(num_classes)
+    for cls in range(num_classes):
         tp_fp_labels = tp_fp_labels_by_class[cls]
         num_examples = num_examples_per_class[cls]
 
