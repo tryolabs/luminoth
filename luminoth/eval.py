@@ -40,7 +40,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         override_config = parse_override(override_params)
         config = merge_into(override_config, config)
 
-    # Override default dataset split
+    # Build the dataset tensors, overriding the default dataset split.
     config.dataset.split = dataset_split
 
     model = model_class(config)
@@ -61,6 +61,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
 
+    # Build the graph of the model to evaluate, retrieving required
+    # intermediate tensors.
     pretrained_dict = pretrained(train_image, is_training=False)
     prediction_dict = model(
         train_image, pretrained_dict['net'], train_objects, is_training=False
@@ -70,24 +72,32 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     pred_objects_classes = prediction_dict['classification_prediction']['objects_labels']
     pred_objects_scores = prediction_dict['classification_prediction']['objects_labels_prob']
 
-    # metrics(pred_objects, pred_objects_classes, train_objects)
-
+    # TODO: What about the rest of the losses?
     batch_loss = model.loss(prediction_dict)
     total_loss, _ = tf.metrics.mean(
         batch_loss, name='loss',
         metrics_collections='metrics',
         updates_collections='metric_ops',
     )
-    # tf.summary.scalar('loss', total_loss)
 
-    metric_ops = tf.get_collection('metric_ops')
+    # TODO: Do I need it? Are model losses added here?
     metrics = tf.get_collection('metrics')
+    metric_ops = tf.get_collection('metric_ops')
 
+    init_op = tf.group(
+        tf.global_variables_initializer(),
+        tf.local_variables_initializer()
+    )
+
+    # TODO: Need anything else from the model's summary?
     # summarizer = tf.summary.merge([
     #     tf.summary.merge_all(),
     #     model.summary,
     # ])
 
+    saver = get_saver((model, pretrained, ))
+
+    # Get the last checkpoint and create the saver to restore it.
     last_checkpoint = tf.train.get_checkpoint_state(model_dir)
     if not last_checkpoint or not last_checkpoint.model_checkpoint_path:
         raise ValueError('Could not find checkpoint in {}.'.format(model_dir))
@@ -95,6 +105,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     config.train.run_name = os.path.split(
         os.path.dirname(last_checkpoint.model_checkpoint_path))[-1]
 
+    # TODO: Any other way to get it from?
     global_step = int(last_checkpoint.model_checkpoint_path.split('-')[-1])
     tf.logging.info('Evaluating global_step {}'.format(global_step))
 
@@ -102,15 +113,37 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint_path))
     config.train.checkpoint_file = last_checkpoint_path
 
-    init_op = tf.group(
-        tf.global_variables_initializer(),
-        tf.local_variables_initializer()
-    )
-    saver = get_saver((model, pretrained, ))
+    # Aggregate the required ops to evaluate.
+    ops = {
+        'init_op': init_op,
+        'metric_ops': metric_ops,
+        'pred_objects': pred_objects,
+        'pred_objects_classes': pred_objects_classes,
+        'pred_objects_scores': pred_objects_scores,
+        'train_filename': train_filename,
+        'train_objects': train_objects,
+        'total_loss': total_loss,
+    }
 
-    # TODO: Get runname from model-dir
-    summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
+    evaluate_once(config, saver, ops, global_step)
 
+
+def evaluate_once(config, saver, ops, global_step):
+    """Run the evaluation once.
+
+    # TODO: Also creates saver.
+    Create a new session with the previously-built graph, run it through the
+    dataset, calculate the evaluation metrics and write the corresponding
+    summaries.
+
+    Args:
+        config: Config object for the model.
+        ops (dict): All the operations needed to successfully run the model.
+            Expects the following keys: ``init_op``, ``metric_ops``,
+            ``pred_objects``, ``pred_objects_classes``,
+            ``pred_objects_scores``, ``train_filename``, ``train_objects``,
+            ``total_loss`.
+    """
     # Output of the detector, per batch.
     output_per_batch = {
         'bboxes': [],  # Bounding boxes detected.
@@ -121,8 +154,11 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'filenames': [],  # Filenames. TODO: Remove.
     }
 
+    # TODO: Get runname from model-dir
+    summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
+
     with tf.Session() as sess:
-        sess.run(init_op)
+        sess.run(ops['init_op'])
         saver.restore(sess, config.train.checkpoint_file)
 
         writer = tf.summary.FileWriter(summary_dir, sess.graph)
@@ -136,8 +172,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
                     _, batch_bboxes, batch_classes, batch_scores,
                     batch_filenames, batch_gt_objects,
                 ) = sess.run([
-                    metric_ops, pred_objects, pred_objects_classes,
-                    pred_objects_scores, train_filename, train_objects,
+                    ops['metric_ops'], ops['pred_objects'], ops['pred_objects_classes'],
+                    ops['pred_objects_scores'], ops['train_filename'], ops['train_objects'],
                 ])
 
                 output_per_batch['bboxes'].append(batch_bboxes)
@@ -149,15 +185,23 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
 
                 output_per_batch['filenames'].append(batch_filenames)
 
-                val_loss = sess.run(total_loss)
-                print('val_loss = {:.2f}'.format(val_loss))
+                val_loss = sess.run(ops['total_loss'])
+                print('streaming_val_loss = {:.2f}'.format(val_loss))
 
         except tf.errors.OutOfRangeError:
 
             # TODO: Do we want *everything* on the summaries or just
             # val_loss/mAP?
+            map_0_3, _ = calculate_map(output_per_batch, config.network.num_classes, 0.3)
+            map_0_5, _ = calculate_map(output_per_batch, config.network.num_classes, 0.5)
+            map_0_8, _ = calculate_map(output_per_batch, config.network.num_classes, 0.8)
+            # TODO: Per class too, any way to make it automatically? I.e. write the array directly.
+
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag='val_loss', simple_value=val_loss),
+                tf.Summary.Value(tag='mAP@0.3', simple_value=map_0_3),
+                tf.Summary.Value(tag='mAP@0.5', simple_value=map_0_5),
+                tf.Summary.Value(tag='mAP@0.8', simple_value=map_0_8),
             ])
             writer.add_summary(summary, global_step)
 
@@ -185,7 +229,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
 
     We then integrate over the interpolated PR curve, thus obtaining the value
     for the class' average precision.  This interpolation makes sure the
-    precision curve is monotonically increasing; for this, at each recall point
+    precision curve is monotonically decreasing; for this, at each recall point
     ``r``, the precision is the maximum precision value among all recalls
     higher than ``r``.  The integration is performed over 11 fixed points over
     the curve (``[0.0, 0.1, ..., 1.0]``).
@@ -313,9 +357,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
             if not np.any(recall >= t):
                 # Recall is never higher than `t`, continue.
                 continue
-
-            prec = np.max(precision[recall > t])  # Interpolated.
-            ap += prec / 11
+            ap += np.max(precision[recall >= t]) / 11  # Interpolated.
 
         ap_per_class[cls] = ap
 
