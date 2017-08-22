@@ -8,7 +8,7 @@ __uri__ = 'http://luminoth.ai'
 __doc__ = __description__ + ' <' + __uri__ + '>'
 
 __author__ = 'Tryolabs'
-__email__ = 'hello@tryolabs.com'
+__email__ = 'luminoth@tryolabs.com'
 
 __license__ = 'BSD 3-Clause License'
 __copyright__ = 'Copyright (c) 2017 Tryolabs S.A.'
