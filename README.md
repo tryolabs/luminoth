@@ -34,8 +34,6 @@ Luminoth currently supports Python 2.7 and 3.4–3.6.
 
 If [TensorFlow](https://www.tensorflow.org) and [Sonnet](https://github.com/deepmind/sonnet) are already installed, Luminoth will use those versions.
 
-You can check the installation is working by running `lumi --help`.
-
 ## Install with CPU support
 Just run:
 ```bash
@@ -65,6 +63,10 @@ $ git clone https://github.com/tryolabs/luminoth.git
 $ cd luminoth
 $ pip install -e .
 ```
+
+## Check that the installation worked
+
+Simply run `lumi --help`.
 
 # Supported models
 
