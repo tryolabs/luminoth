@@ -10,7 +10,10 @@ from setuptools import find_packages, setup
 NAME = 'luminoth'
 PACKAGES = find_packages()
 META_PATH = os.path.join('luminoth', '__init__.py')
-KEYWORDS = ['tensorflow', 'computer vision', 'object detection', 'rcnn', 'faster rcnn']
+KEYWORDS = [
+    'tensorflow', 'computer vision', 'object detection', 'toolkit', 'deep learning',
+    'faster rcnn'
+]
 CLASSIFIERS = [
     'Development Status :: 2 - Pre-Alpha',
     'Intended Audience :: Developers',
@@ -22,7 +25,7 @@ CLASSIFIERS = [
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: Software Development :: Libraries',
     'Programming Language :: Python',
-    'Programming Language :: Python :: 2.6',
+    'Programming Language :: Python :: 2',
     'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.4',
