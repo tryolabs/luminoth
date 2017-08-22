@@ -172,7 +172,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     """Calculates mAP@iou_threshold from the detector's output.
 
     The procedure for calculating the average precision for class ``C`` is as
-    follows:
+    follows (see `VOC mAP metric`_ for more details):
 
     Start by ranking all the predictions (for a given image and said class) in
     order of confidence.  Each of these predictions is marked as correct (true
@@ -183,9 +183,12 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     latter has better IoU.  Also, each prediction is matched at most once, so
     repeated detections are counted as false positives.
 
-    We then integrate over the interpolated PR curve (see `Interpolated
-    Precision-Recall Curve`_), thus obtaining the value for the class' average
-    precision
+    We then integrate over the interpolated PR curve, thus obtaining the value
+    for the class' average precision.  This interpolation makes sure the
+    precision curve is monotonically increasing; for this, at each recall point
+    ``r``, the precision is the maximum precision value among all recalls
+    higher than ``r``.  The integration is performed over 11 fixed points over
+    the curve (``[0.0, 0.1, ..., 1.0]``).
 
     Average the result among all the classes to obtain the final, ``mAP``,
     value.
@@ -199,34 +202,43 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
         num_classes (int): Number of classes on the dataset.
         threshold (float): IoU threshold for considering a match.
 
-    Todo:
-        * Use VOC2012-style for integrating the curve, instead of a fixed
-          number of points.
+    Returns:
+        (``np.float``, ``ndarray``) tuple. The first value is the mAP, while
+        the second is an array of size (`num_classes`,), with the AP value per
+        class.
 
-    .. _Interpolated Precision-Recall Curve:
+    Note:
+        The "difficult example" flag of VOC dataset is being ignored.
+
+    Todo:
+        * Use VOC2012-style for integrating the curve. That is, use all recall
+          points instead of a fixed number of points like in VOC2007.
+
+    .. _VOC mAP metric:
         http://host.robots.ox.ac.uk/pascal/VOC/pubs/everingham10.pdf
     """
-    # For each image, order predictions by score and classify as TP or FP.
-    # TODO: Use authoritative source of examples count.
-
     # List; first by class, then by example. Each entry is a tuple of ndarrays
     # of size (D_{c,i},), for tp/fp labels and for score, where D_{c,i} is the
     # number of detected boxes for class `c` on image `i`.
     tp_fp_labels_by_class = [[] for _ in range(num_classes)]
     num_examples_per_class = [0 for _ in range(num_classes)]
 
+    # For each image, order predictions by score and classify each as a true
+    # positive or a false positive.
     num_batches = len(output_per_batch['bboxes'])
     for idx in range(num_batches):
 
-        classes = output_per_batch['classes'][idx]  # D_{i}, number of detected for ith image.
-        bboxes = output_per_batch['bboxes'][idx]  # (D_{i}, 4).
-        scores = output_per_batch['scores'][idx]
+        # Get the results of the batch.
+        classes = output_per_batch['classes'][idx]  # (D_{c,i},)
+        bboxes = output_per_batch['bboxes'][idx]  # (D_{c,i}, 4)
+        scores = output_per_batch['scores'][idx]  # (D_{c,i},)
 
-        gt_bboxes = output_per_batch['gt_bboxes'][idx]
         gt_classes = output_per_batch['gt_classes'][idx]
+        gt_bboxes = output_per_batch['gt_bboxes'][idx]
 
         # Analysis must be made per-class.
         for cls in range(num_classes):
+            # Get the bounding boxes of `cls` only.
             cls_bboxes = bboxes[classes == cls, :]
             cls_scores = scores[classes == cls]
             cls_gt_bboxes = gt_bboxes[gt_classes == cls, :]
@@ -234,27 +246,34 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
             num_gt = cls_gt_bboxes.shape[0]
             num_examples_per_class[cls] += num_gt
 
-            sorted_indices = np.argsort(-cls_scores)  # Sort by score, descending.
-            is_detected = np.zeros(num_gt)  # Has been previously detected.
-            tp_fp_labels = np.zeros(len(sorted_indices))  # Labels for bboxes of class, image.
+            # Sort by score descending, so we prioritize higher-confidence
+            # results when matching.
+            sorted_indices = np.argsort(-cls_scores)
+
+            # Whether the ground-truth has been previously detected.
+            is_detected = np.zeros(num_gt)
+
+            # TP/FP labels for detected bboxes of (class, image).
+            tp_fp_labels = np.zeros(len(sorted_indices))
 
             if num_gt == 0:
-                # If no ground truth examples for class, all flase positives.
+                # If no ground truth examples for class, all predictions must
+                # be false positives.
                 tp_fp_labels_by_class[cls].append(
                     (tp_fp_labels, cls_scores[sorted_indices])
                 )
                 continue
 
-            # Get the IOUs for the classes bboxes.
+            # Get the IoUs for the class' bboxes.
             ious = bbox_overlaps(cls_bboxes, cls_gt_bboxes)
 
             # Greedily assign bboxes to ground truths (highest score first).
             for bbox_idx in sorted_indices:
                 gt_match = np.argmax(ious[bbox_idx, :])
                 if ious[bbox_idx, gt_match] >= iou_threshold:
-                    # TODO: Check `is_difficult` for image too.
+                    # Over IoU threshold.
                     if not is_detected[gt_match]:
-                        # First detection, it's a true positive.
+                        # And first detection: it's a true positive.
                         tp_fp_labels[bbox_idx] = True
                         is_detected[gt_match] = True
 
@@ -262,18 +281,19 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
                 (tp_fp_labels, cls_scores[sorted_indices])
             )
 
-    # Calculate AP per class.
+    # Calculate average precision per class.
     ap_per_class = np.zeros(num_classes)
     for cls in range(num_classes):
         tp_fp_labels = tp_fp_labels_by_class[cls]
         num_examples = num_examples_per_class[cls]
 
-        # Flatten and sort the tp/fp by score.
+        # Flatten the tp/fp labels into a single ndarray.
         labels, scores = zip(*tp_fp_labels)
         labels = np.concatenate(labels)
         scores = np.concatenate(scores)
 
-        # Calculate precision and recall.
+        # Sort the tp/fp labels by decreasing confidence score and calculate
+        # precision and recall at every position of this ranked output.
         sorted_indices = np.argsort(-scores)
         true_positives = labels[sorted_indices]
         false_positives = 1 - true_positives
@@ -287,9 +307,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
             cum_true_positives + cum_false_positives
         )
 
-        # Find AP by "integrating" over PR curve, with interpolated precision.
-        # TODO: This is VOC2007 AP; 2012 uses *all* recall points.
-        # TODO: See https://github.com/tensorflow/models/blob/a6df5573/object_detection/utils/metrics.py#L117 for the other way.
+        # Find AP by integrating over PR curve, with interpolated precision.
         ap = 0
         for t in np.linspace(0, 1, 11):
             if not np.any(recall >= t):
@@ -302,6 +320,6 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
         ap_per_class[cls] = ap
 
     # Finally, mAP.
-    mean_ap = np.mean(np.array(ap_per_class))
+    mean_ap = np.mean(ap_per_class)
 
-    from IPython import embed; embed(display_banner=False)
+    return mean_ap, ap_per_class
