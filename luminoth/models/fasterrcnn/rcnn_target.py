@@ -129,8 +129,12 @@ class RCNNTarget(snt.AbstractModule):
 
         # Set the indices in best_proposals_idxs to True, and the rest to
         # false.
+        # tf.sparse_to_dense is used because we know the set of indices which
+        # we want to set to True, and we know the rest of the indices
+        # should be set to False. That's exactly the use case of
+        # tf.sparse_to_dense.
         is_best_box = tf.sparse_to_dense(
-            sparse_indices=tf.unstack(best_proposals_idxs),
+            sparse_indices=tf.reshape(best_proposals_idxs, [-1]),
             sparse_values=True, default_value=False,
             output_shape=tf.cast(proposals_label_shape, tf.int64),
             validate_indices=False
@@ -152,7 +156,6 @@ class RCNNTarget(snt.AbstractModule):
         # proposals we are going to use and -1 for the ones we should ignore.
         # But we still need to make sure we don't have a number of proposals
         # higher than minibatch_size * foreground_fraction.
-        # TODO: perhaps don't respect minibatch_size when not training?
         max_fg = int(self._foreground_fraction * self._minibatch_size)
         fg_inds = tf.where(
             condition=fg_condition
