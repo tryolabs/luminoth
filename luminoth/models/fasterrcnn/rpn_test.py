@@ -175,8 +175,78 @@ class RPNTest(tf.test.TestCase):
             self.config.target.foreground_fraction
         )
 
+    def testTypes(self):
+        """Tests that return types are the expected ones.
+        """
+        # We repeat testBasic's setup.
+        model = RPN(
+            self.num_anchors, self.config, debug=True
+        )
+        pretrained_output_shape = (1, 32, 32, 512)
+        pretrained_output = tf.placeholder(
+            tf.float32, shape=pretrained_output_shape)
+
+        image_shape_val = (
+            int(pretrained_output_shape[1] * self.stride),
+            int(pretrained_output_shape[2] * self.stride),
+        )
+
+        gt_boxes_shape = (4, 4)
+        gt_boxes = tf.placeholder(tf.float32, shape=gt_boxes_shape)
+        image_shape_shape = (2,)
+        image_shape = tf.placeholder(tf.float32, shape=image_shape_shape)
+
+        total_anchors = (
+            pretrained_output_shape[1] * pretrained_output_shape[2] *
+            self.num_anchors
+        )
+        all_anchors_shape = (total_anchors, 4)
+        all_anchors = tf.placeholder(tf.float32, shape=all_anchors_shape)
+        layers = model(
+            pretrained_output, image_shape, all_anchors, gt_boxes=gt_boxes
+        )
+
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            layers_inst = sess.run(layers, feed_dict={
+                pretrained_output: np.random.rand(
+                    *pretrained_output_shape
+                ),
+                gt_boxes: generate_gt_boxes(
+                    gt_boxes_shape[0], image_shape_val
+                ),
+                all_anchors: generate_anchors(
+                    generate_anchors_reference(
+                        self.base_size, self.ratios, self.scales
+                    ),
+                    16,
+                    pretrained_output_shape[1:3]
+                ),
+                image_shape: image_shape_val,
+            })
+
+        # Assertions
+        proposals = layers_inst['proposals']
+        scores = layers_inst['scores']
+        rpn_cls_prob = layers_inst['rpn_cls_prob']
+        rpn_cls_score = layers_inst['rpn_cls_score']
+        rpn_bbox_pred = layers_inst['rpn_bbox_pred']
+        rpn_cls_target = layers_inst['rpn_cls_target']
+        rpn_bbox_target = layers_inst['rpn_bbox_target']
+        # Everything should have dtype=tf.float32
+        self.assertAllEqual(
+            # We have 7 values we want to compare to tf.float32.
+            [tf.float32] * 7,
+            [
+                proposals.dtype, scores.dtype, rpn_cls_prob.dtype,
+                rpn_cls_score.dtype, rpn_bbox_pred.dtype,
+                rpn_cls_target.dtype, rpn_bbox_target.dtype,
+            ]
+
+        )
+
     def testLoss(self):
-        """Test that loss returns reasonable values in simple cases.
+        """Tests that loss returns reasonable values in simple cases.
         """
         model = RPN(
             self.num_anchors, self.config, debug=True
