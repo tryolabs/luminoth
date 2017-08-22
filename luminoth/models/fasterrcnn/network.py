@@ -94,6 +94,8 @@ class FasterRCNN(snt.AbstractModule):
                 It's shape should be: (num_bboxes, 4). For each of the bboxes
                 we have (x1, y1, x2, y2)
         """
+        if gt_boxes is not None:
+            gt_boxes = tf.cast(gt_boxes, tf.float32)
         # A Tensor with the feature map for the image,
         # its shape should be `(feature_height, feature_width, 512)`.
         # The shape depends of the pretrained network in use.
