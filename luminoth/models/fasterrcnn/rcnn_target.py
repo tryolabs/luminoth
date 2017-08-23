@@ -96,7 +96,7 @@ class RCNNTarget(snt.AbstractModule):
         #
         # max_overlaps gets, for each proposal, the index in which we can
         # find the gt_box with which it has the highest overlap.
-        max_overlaps = tf.reduce_max(overlaps, axis=[1])
+        max_overlaps = tf.reduce_max(overlaps, axis=1)
 
         iou_is_high_enough_for_bg = tf.greater(
             max_overlaps, self._background_threshold_low
@@ -171,7 +171,14 @@ class RCNNTarget(snt.AbstractModule):
             else:
                 shuffled_inds = tf.random_shuffle(fg_inds)
             disable_place = (tf.shape(fg_inds)[0] - max_fg)
-            disable_inds = shuffled_inds[:disable_place]
+            # This function should never run if num_fg_inds <= max_fg, so we
+            # add an assertion to catch the wrong behaviour if it happens.
+            integrity_assertion = tf.assert_positive(
+                disable_place,
+                message="disable_place in disable_some_fgs is negative."
+            )
+            with tf.control_dependencies([integrity_assertion]):
+                disable_inds = shuffled_inds[:disable_place]
             is_disabled = tf.sparse_to_dense(
                 sparse_indices=disable_inds,
                 sparse_values=True, default_value=False,
@@ -200,12 +207,18 @@ class RCNNTarget(snt.AbstractModule):
         )
 
         def disable_some_bgs():
+            # Mutatis mutandis, all comments from disable_some_fgs apply.
             if self._debug:
                 shuffled_inds = tf.random_shuffle(bg_inds, seed=0)
             else:
                 shuffled_inds = tf.random_shuffle(bg_inds)
             disable_place = (tf.shape(bg_inds)[0] - max_bg)
-            disabled_inds = shuffled_inds[:disable_place]
+            integrity_assertion = tf.assert_non_negative(
+                disable_place,
+                message="disable_place in disable_some_bgs is negative."
+            )
+            with tf.control_dependencies([integrity_assertion]):
+                disabled_inds = shuffled_inds[:disable_place]
             is_disabled = tf.sparse_to_dense(
                 sparse_indices=disabled_inds,
                 sparse_values=True, default_value=False,
