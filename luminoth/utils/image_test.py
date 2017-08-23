@@ -39,13 +39,13 @@ class ImageTest(tf.test.TestCase):
             )
 
     def _flip_image(self, image_array, boxes_array=None, left_right=False,
-                    up_down=False):
+                    up_down=False, bboxes_dtype=tf.int32):
         image = tf.placeholder(tf.float32, image_array.shape)
         feed_dict = {
             image: image_array,
         }
         if boxes_array is not None:
-            boxes = tf.placeholder(tf.float32, boxes_array.shape)
+            boxes = tf.placeholder(bboxes_dtype, boxes_array.shape)
             feed_dict[boxes] = boxes_array
         else:
             boxes = None
@@ -241,6 +241,24 @@ class ImageTest(tf.test.TestCase):
         # Check that sum of columns is not modified, just the order.
         self.assertAllClose(
             np.array([[89.,  89.,  99.,  99.,  -1.]]), flipped_boxes
+        )
+
+    def testFlipBboxesDiffDtype(self):
+        image = self._gen_image(100, 100, 3)
+        boxes = np.array([[25, 14, 63, 41, -1]])
+        _, flipped_boxes_float = self._flip_image(
+            image, boxes, up_down=True, left_right=True,
+            bboxes_dtype=tf.float32
+        )
+
+        _, flipped_boxes_int = self._flip_image(
+            image, boxes, up_down=True, left_right=True,
+            bboxes_dtype=tf.int32
+        )
+
+        # Check that using different types is exactly the same.
+        self.assertAllClose(
+            flipped_boxes_float, flipped_boxes_int
         )
 
 
