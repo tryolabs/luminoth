@@ -18,9 +18,10 @@ from .utils.bbox import bbox_overlaps
 @click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
 @click.option('--model-dir', required=True, help='Directory from where to read saved models.')
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
+@click.option('--all-checkpoints', is_flag=True, default=False, help='Whether to evaluate all or last checkpoint.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
-             override_params):
+             all_checkpoints, override_params):
     """
     Evaluate models using dataset.
     """
@@ -95,25 +96,10 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     #     model.summary,
     # ])
 
+    # Get the saver required to load model parameters.
     saver = get_saver((model, pretrained, ))
 
-    # Get the last checkpoint and create the saver to restore it.
-    last_checkpoint = tf.train.get_checkpoint_state(model_dir)
-    if not last_checkpoint or not last_checkpoint.model_checkpoint_path:
-        raise ValueError('Could not find checkpoint in {}.'.format(model_dir))
-
-    config.train.run_name = os.path.split(
-        os.path.dirname(last_checkpoint.model_checkpoint_path))[-1]
-
-    # TODO: Any other way to get it from?
-    global_step = int(last_checkpoint.model_checkpoint_path.split('-')[-1])
-    tf.logging.info('Evaluating global_step {}'.format(global_step))
-
-    last_checkpoint_path = last_checkpoint.model_checkpoint_path
-    tf.logging.info('Using checkpoint "{}"'.format(last_checkpoint_path))
-    config.train.checkpoint_file = last_checkpoint_path
-
-    # Aggregate the required ops to evaluate.
+    # Aggregate the required ops to evaluate into a dict..
     ops = {
         'init_op': init_op,
         'metric_ops': metric_ops,
@@ -125,10 +111,41 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'total_loss': total_loss,
     }
 
-    evaluate_once(config, saver, ops, global_step)
+    # Get the checkpoint files to evaluate. The latest checkpoint file should
+    # be the last item of `all_model_checkpoint_paths`, according to the
+    # CheckpointState protobuf definition.
+    ckpt = tf.train.get_checkpoint_state(model_dir)
+    if not ckpt or not ckpt.all_model_checkpoint_paths:
+        raise ValueError('Could not find checkpoint in {}.'.format(model_dir))
+
+    # TODO: Any other way to get the global_step?
+    checkpoints = [
+        {'global_step': int(path.split('-')[-1]), 'file': path}
+        for path in ckpt.all_model_checkpoint_paths
+    ]
+
+    tf.logging.info(
+        'Found {} checkpoints in model_dir'.format(len(checkpoints))
+    )
+
+    # Get the run name from the checkpoint path.
+    config.train.run_name = os.path.split(
+        os.path.dirname(checkpoints[0]['file'])
+    )[-1]
+
+    if not all_checkpoints:
+        # Only last checkpoint was requested.
+        checkpoints = [checkpoints[-1]]
+
+    for checkpoint in checkpoints:
+        tf.logging.info(
+            'Evaluating global_step {}'.format(checkpoint['global_step'])
+        )
+        tf.logging.info('Using checkpoint "{}"'.format(checkpoint['file']))
+        evaluate_once(config, saver, ops, checkpoint)
 
 
-def evaluate_once(config, saver, ops, global_step):
+def evaluate_once(config, saver, ops, checkpoint):
     """Run the evaluation once.
 
     # TODO: Also creates saver.
@@ -138,11 +155,14 @@ def evaluate_once(config, saver, ops, global_step):
 
     Args:
         config: Config object for the model.
+        saver: Saver object to restore checkpoint parameters.
         ops (dict): All the operations needed to successfully run the model.
             Expects the following keys: ``init_op``, ``metric_ops``,
             ``pred_objects``, ``pred_objects_classes``,
             ``pred_objects_scores``, ``train_filename``, ``train_objects``,
             ``total_loss`.
+        checkpoint (dict): Checkpoint-related data.
+            Expects the following keys: ``global_step``, ``file``.
     """
     # Output of the detector, per batch.
     output_per_batch = {
@@ -159,7 +179,7 @@ def evaluate_once(config, saver, ops, global_step):
 
     with tf.Session() as sess:
         sess.run(ops['init_op'])
-        saver.restore(sess, config.train.checkpoint_file)
+        saver.restore(sess, checkpoint['file'])
 
         writer = tf.summary.FileWriter(summary_dir, sess.graph)
 
@@ -203,7 +223,7 @@ def evaluate_once(config, saver, ops, global_step):
                 tf.Summary.Value(tag='mAP@0.5', simple_value=map_0_5),
                 tf.Summary.Value(tag='mAP@0.8', simple_value=map_0_8),
             ])
-            writer.add_summary(summary, global_step)
+            writer.add_summary(summary, checkpoint['global_step'])
 
         finally:
             coord.request_stop()
