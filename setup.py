@@ -32,6 +32,10 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
 ]
+
+MIN_TENSORFLOW_VERSION = '1.3.0'
+MIN_SONNET_VERSION = '1.10'
+
 INSTALL_REQUIRES = [
     'numpy',
     'Pillow',
@@ -84,12 +88,12 @@ def find_meta(meta):
 try:
     import tensorflow
 except ImportError:
-    INSTALL_REQUIRES += ['tensorflow>=1.2.1']
+    INSTALL_REQUIRES += ['tensorflow>={}'.format(MIN_TENSORFLOW_VERSION)]
 
 try:
     import sonnet
 except ImportError:
-    INSTALL_REQUIRES += ['dm-sonnet>=1.10']
+    INSTALL_REQUIRES += ['dm-sonnet>={}'.format(MIN_SONNET_VERSION)]
 
 
 setup(
@@ -111,8 +115,8 @@ setup(
     test_requires=TEST_REQUIRES,
     extras_require={
         'gpu support': [
-            'tensorflow-gpu>=1.2.1',
-            'dm-sonnet-gpu>=1.10',
+            'tensorflow-gpu>={}'.format(MIN_TENSORFLOW_VERSION),
+            'dm-sonnet-gpu>={}'.format(MIN_SONNET_VERSION),
         ],
     },
     entry_points="""
