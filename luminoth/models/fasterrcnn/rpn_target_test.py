@@ -26,12 +26,12 @@ class RPNTargetTest(tf.test.TestCase):
         im_size = tf.placeholder(tf.float32, shape=(2,))
         all_anchors = tf.placeholder(tf.float32, shape=anchors.shape)
 
-        model = RPNTarget(anchors.shape[0], config)
+        model = RPNTarget(anchors.shape[0], config, debug=True)
         labels, bbox_targets, max_overlaps = model(
-            all_anchors, gt_boxes, im_size
-        )
+            all_anchors, gt_boxes, im_size)
 
         with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
             labels_val, bbox_targets_val, max_overlaps_val = sess.run(
                 [labels, bbox_targets, max_overlaps], feed_dict={
                     gt_boxes: self.gt_boxes,
@@ -48,7 +48,7 @@ class RPNTargetTest(tf.test.TestCase):
             [200, 100, 400, 400],  # foreground
             [300, 300, 400, 400],  # background
             [200, 380, 300, 500],  # background
-        ])
+        ], dtype=np.float32)
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
             all_anchors, self.config
         )
@@ -58,7 +58,7 @@ class RPNTargetTest(tf.test.TestCase):
         # correct order
         self.assertAllEqual(
             labels,
-            np.array([1, -1, 0])
+            np.array([1, 0, -1])
         )
 
         # Check max_overlaps shape
@@ -79,41 +79,6 @@ class RPNTargetTest(tf.test.TestCase):
         self.assertEqual(
             np.less_equal(max_overlaps[1:], 0.3).all(),
             True
-        )
-
-    def testWithNoClearMatch(self):
-        """
-        Tests that despite a foreground doesn't exist, an anchor is always
-        assigned.
-        Also tests the positive clobbering behaviour setting.
-        """
-        all_anchors = np.array([
-            [300, 300, 400, 400],  # background
-            [200, 380, 300, 500],  # background
-        ])
-
-        labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, self.config
-        )
-
-        # Check we get only one foreground anchor.
-        self.assertAllEqual(
-            labels,
-            np.array([1, 0])
-        )
-
-        config = self.config
-        config['clobber_positives'] = True
-
-        labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, config
-        )
-
-        # Check we don't get a foreground anchor because of possitive
-        # clobbering enabled.
-        self.assertAllEqual(
-            labels,
-            np.array([0, 0])
         )
 
     def testBorderOutsiders(self):
@@ -153,7 +118,42 @@ class RPNTargetTest(tf.test.TestCase):
         # the image.
         self.assertAllEqual(
             labels,
-            np.array([-1, 0, 0, -1, 1])
+            np.array([1, 0, 0, -1, -1])
+        )
+
+    def testWithNoClearMatch(self):
+        """
+        Tests that despite a foreground doesn't exist, an anchor is always
+        assigned.
+        Also tests the positive clobbering behaviour setting.
+        """
+        all_anchors = np.array([
+            [300, 300, 400, 400],  # background
+            [200, 380, 300, 500],  # background
+        ])
+
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
+            all_anchors, self.config
+        )
+
+        # Check we get only one foreground anchor.
+        self.assertAllEqual(
+            labels,
+            np.array([1, 0])
+        )
+
+        config = self.config
+        config['clobber_positives'] = True
+
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
+            all_anchors, config
+        )
+
+        # Check we don't get a foreground anchor because of possitive
+        # clobbering enabled.
+        self.assertAllEqual(
+            labels,
+            np.array([0, 0])
         )
 
 
