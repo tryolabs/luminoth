@@ -1,8 +1,8 @@
 Luminoth
 ========
 
-![Test status](https://circleci.com/gh/tryolabs/luminoth.png?style=shield&circle-token=35724108fcaca8bd72e6042b9d32956974980b42)
-
+[![Build Status](https://travis-ci.org/tryolabs/luminoth.svg?branch=master)](https://travis-ci.org/tryolabs/luminoth)
+[![codecov](https://codecov.io/gh/tryolabs/luminoth/branch/master/graph/badge.svg)](https://codecov.io/gh/tryolabs/luminoth)
 
 > The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
 >
@@ -30,29 +30,43 @@ It is indisputable that TensorFlow is currently the most mature Deep Learning fr
 [Sonnet](https://deepmind.github.io/sonnet/) fits perfectly with our mission to build code that is easy to follow and to extend. It is tricky to build a computation graph that is abstract and low-level at the same time to allows us to build complex models, and luckily Sonnet is a library that provides just that.
 
 # Installation
+Luminoth currently supports Python 2.7 and 3.4–3.6.
 
-Luminoth currently supports for both Python3 and Python2.7.
+If [TensorFlow](https://www.tensorflow.org) and [Sonnet](https://github.com/deepmind/sonnet) are already installed, Luminoth will use those versions.
 
-To install clone the repo on your machine:
-
-```
-git clone https://github.com/tryolabs/luminoth.git; cd luminoth;
-```
-
-and then run
-
-```
-pip install -r requirements.txt
-python setup.py install
+## Install with CPU support
+Just run:
+```bash
+$ pip install luminoth
 ```
 
-This should install all required dependencies.
+This will install the CPU versions of TensorFlow & Sonnet if you don't have them.
 
-You can check if it's working by running
+## Install with GPU support
+
+1. [Install TensorFlow](https://www.tensorflow.org/install/) with GPU support.
+2. [Install Sonnet](https://github.com/deepmind/sonnet#installation) with GPU support:
+    ```bash
+    $ pip install dm-sonnet-gpu
+    ```
+3. Install Luminoth from PyPI:
+    ```bash
+    $ pip install luminoth
+    ```
+
+## Install from source
+
+First, clone the repo on your machine and then install with `pip`:
 
 ```
-lumi --help
+$ git clone https://github.com/tryolabs/luminoth.git
+$ cd luminoth
+$ pip install -e .
 ```
+
+## Check that the installation worked
+
+Simply run `lumi --help`.
 
 # Supported models
 
