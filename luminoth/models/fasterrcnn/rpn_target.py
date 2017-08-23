@@ -1,16 +1,15 @@
 import sonnet as snt
 import tensorflow as tf
-import numpy as np
 
-from luminoth.utils.bbox_overlap import bbox_overlap
-from luminoth.utils.bbox_transform import encode, unmap
+from luminoth.utils.bbox_overlap import bbox_overlap_tf
+from luminoth.utils.bbox_transform_tf import encode as encode_tf
 
 
 class RPNTarget(snt.AbstractModule):
     """RPNTarget: Get RPN's classification and regression targets.
 
-    RPNTarget is responsible for calculating the correct values for both
-    classification and regression problems. It is also responsible for defining
+    RPNTarget is responsable for calculating the correct values for both
+    classification and regression problems. It is also responsable for defining
     which anchors and target values are going to be used for the RPN minibatch.
 
     For calculating the correct values for classification, being classification
@@ -27,7 +26,7 @@ class RPNTarget(snt.AbstractModule):
     to the ground truth box) only applies to some of the anchors, the ones that
     we consider to be foreground.
 
-    RPNTarget is also responsible for selecting which ones of the anchors
+    RPNTarget is also responsable for selecting which ones of the anchors
     are going to be used for the minibatch. This is a random process with some
     restrictions on the ratio between foreground and background samples.
 
@@ -90,10 +89,6 @@ class RPNTarget(snt.AbstractModule):
         in the original Caffe implementation by Ross Girshick. Ideally we
         should migrate this code to pure Tensorflow tensor-based graph.
 
-        TODO: Tensorflow limitations for the migration.
-            Using random.
-        TODO: Performance impact of current use of py_func.
-
         Returns:
             Tuple of the tensors of:
                 labels: (1, 0, -1) for each anchor.
@@ -103,139 +98,183 @@ class RPNTarget(snt.AbstractModule):
                 max_overlaps: Max IoU overlap with ground truth boxes.
                     Shape (num_anchors, 1)
         """
-
-        (
-            labels, bbox_targets, max_overlaps
-        ) = tf.py_func(
-            self._anchor_target_layer_np,
-            [all_anchors, gt_boxes, im_size],
-            [tf.float32, tf.float32, tf.float32],
-            stateful=False,
-            name='anchor_target_layer_np'
-
-        )
-
-        return labels, bbox_targets, max_overlaps
-
-    def _anchor_target_layer(self, all_anchors, gt_boxes, im_size):
-        """
-        Function working with Tensors instead of instances for proper
-        computing in the Tensorflow graph.
-        """
-        raise NotImplemented()
-
-    def _anchor_target_layer_np(self, all_anchors, gt_boxes, im_size):
-
-        if self._debug:
-            np.random.seed(0)
-
-        """
-        Function to be executed with tf.py_func
-        """
-        # We have "W x H x k" anchors
-        total_anchors = all_anchors.shape[0]
-
-        # only keep anchors inside the image
+        # Only keep anchors inside the image.
         # TODO: We should do this when anchors are original generated in
         # network or does it fuck with our dimensions.
-        inds_inside = np.where(
-            (all_anchors[:, 0] >= -self._allowed_border) &
-            (all_anchors[:, 1] >= -self._allowed_border) &
-            (all_anchors[:, 2] < im_size[1] + self._allowed_border) &  # width
-            (all_anchors[:, 3] < im_size[0] + self._allowed_border)    # height
-        )[0]
+        (x_min_anchor, y_min_anchor,
+         x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
 
-        # keep only inside anchors
-        anchors = all_anchors[inds_inside, :]
+        anchor_filter = tf.logical_and(
+            tf.logical_and(
+                tf.greater_equal(x_min_anchor, -self._allowed_border),
+                tf.greater_equal(y_min_anchor, -self._allowed_border)
+            ),
+            tf.logical_and(
+                tf.less(x_max_anchor, im_size[1] + self._allowed_border),
+                tf.less(y_max_anchor, im_size[0] + self._allowed_border)
+            )
+        )
 
+        # We (force) reshape the filter so that we can use it as a boolean mask
+        anchor_filter = tf.reshape(anchor_filter, [-1])
+        # Filter anchors.
+        anchors = tf.boolean_mask(
+            all_anchors, anchor_filter, name='filter_anchors')
         # Start by ignoring all anchors by default and then pick the ones
         # we care about for training.
-        labels = np.empty((len(inds_inside), ), dtype=np.float32)
-        labels.fill(-1)
+        labels = tf.zeros(all_anchors.shape[0])
+        labels = tf.fill((labels.shape), -1.0)
+        labels = tf.boolean_mask(labels, anchor_filter, name='filter_labels')
 
-        # intersection over union (IoU) overlap between the anchors and the
+        # Intersection over union (IoU) overlap between the anchors and the
         # ground truth boxes.
-        overlaps = bbox_overlap(anchors, gt_boxes)
-
-        # Find the closest gt box for each anchor.
-        argmax_overlaps = overlaps.argmax(axis=1)
+        overlaps = bbox_overlap_tf(anchors, gt_boxes)
 
         # Generate array with the IoU value of the closest GT box for each
         # anchor.
-        max_overlaps = overlaps[np.arange(len(inds_inside)), argmax_overlaps]
+        max_overlaps = tf.reduce_max(overlaps, axis=1)
 
-        # Get the closest anchor for each gt box.
-        gt_argmax_overlaps = overlaps.argmax(axis=0)
         # Get the value of the max IoU for the closest anchor for each gt.
-        gt_max_overlaps = overlaps[gt_argmax_overlaps,
-                                   np.arange(overlaps.shape[1])]
-        # Find all the indices that match (at least one, but could be more).
-        gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
+        gt_max_overlaps = tf.reduce_max(overlaps, axis=0)
+        # Find all the indices that match
+        gt_argmax_overlaps = tf.squeeze(tf.equal(overlaps, gt_max_overlaps))
 
         if not self._clobber_positives:
-            # assign bg labels first so that positive labels can clobber them
-            labels[max_overlaps < self._negative_overlap] = 0
+            # Assign bg labels first so that positive labels can clobber them.
+            # First we get an array with True where IoU is less than
+            # self._negative_overlap
+            negative_overlap_nonzero = tf.less(
+                max_overlaps, self._negative_overlap)
 
-        # foreground label: for each ground-truth, anchor with highest overlap
-        # When the armax is many items we use all of them (for consistency).
-        labels[gt_argmax_overlaps] = 1
+            # Finally we set 0 at True indices
+            labels = tf.where(
+                condition=negative_overlap_nonzero,
+                x=tf.zeros(tf.shape(labels)), y=labels)
 
-        # foreground label: above threshold Intersection over Union (IoU)
-        labels[max_overlaps >= self._positive_overlap] = 1
+        # Foreground label: for each ground-truth, anchor with highest overlap.
+        # When the argmax is many items we use all of them (for consistency).
+        # We set 1 at gt_argmax_overlaps indices
+        labels = tf.where(
+            condition=gt_argmax_overlaps,
+            x=tf.ones(tf.shape(labels)), y=labels)
+
+        # Foreground label: above threshold Intersection over Union (IoU)
+        # First we get an array with True where IoU is greater or equal than
+        # self._positive_overlap
+        positive_overlap_inds = tf.greater_equal(
+            max_overlaps, self._positive_overlap)
+        # Finally we set 1 at True indices
+        labels = tf.where(
+            condition=positive_overlap_inds,
+            x=tf.ones(tf.shape(labels)), y=labels)
 
         if self._clobber_positives:
-            # assign background labels last so that negative labels can clobber
-            # positives
-            labels[max_overlaps < self._negative_overlap] = 0
+            # Assign background labels last so that negative labels can clobber
+            # positives. First we get an array with True where IoU is less than
+            # self._negative_overlap
+            negative_overlap_nonzero = tf.less(
+                max_overlaps, self._negative_overlap)
+            # Finally we set 0 at True indices
+            labels = tf.where(
+                condition=negative_overlap_nonzero,
+                x=tf.zeros(tf.shape(labels)), y=labels)
 
-        # subsample positive labels if we have too many
+        # Subsample positive labels if we have too many
+        def subsample_positive():
+            if self._debug:
+                disable_fg_inds = tf.random_shuffle(fg_inds, seed=0)
+            else:
+                disable_fg_inds = tf.random_shuffle(fg_inds)
+            disable_place = (tf.shape(fg_inds)[0] - num_fg)
+            disable_fg_inds = disable_fg_inds[:disable_place]
+            disable_fg_inds = tf.sparse_to_dense(disable_fg_inds, tf.shape(
+                labels, out_type=tf.int64), True, default_value=False)
+            return tf.where(
+                condition=tf.squeeze(disable_fg_inds),
+                x=tf.scalar_mul(-1, tf.ones(tf.shape(labels))), y=labels)
+
         num_fg = int(self._foreground_fraction * self._minibatch_size)
-        fg_inds = np.where(labels == 1)[0]
-        if len(fg_inds) > num_fg:
-            disable_inds = np.random.choice(
-                fg_inds, size=(len(fg_inds) - num_fg), replace=False)
-            labels[disable_inds] = -1
+        # Get foreground indices, get True in the indices where we have a one.
+        fg_inds = tf.equal(labels, 1)
+        # We get only the indices where we have True.
+        fg_inds = tf.squeeze(tf.where(fg_inds), axis=1)
+        fg_inds_size = tf.size(fg_inds)
+        # Condition for check if we have too many positive labels.
+        subsample_positive_cond = tf.to_int32(fg_inds_size) > \
+            tf.to_int32(num_fg)
+        # Check the condition and subsample positive labels.
+        labels = tf.cond(
+            subsample_positive_cond,
+            true_fn=subsample_positive, false_fn=lambda: labels)
 
-        # subsample negative labels if we have too many
-        num_bg = self._minibatch_size - np.sum(labels == 1)
-        bg_inds = np.where(labels == 0)[0]
-        if len(bg_inds) > num_bg:
-            disable_inds = np.random.choice(
-                bg_inds, size=(len(bg_inds) - num_bg), replace=False)
-            labels[disable_inds] = -1
+        # Subsample negative labels if we have too many
+        def subsample_negative():
+            if self._debug:
+                disable_bg_inds = tf.random_shuffle(bg_inds, seed=0)
+            else:
+                disable_bg_inds = tf.random_shuffle(bg_inds)
+            disable_place = (tf.shape(bg_inds)[0] - num_bg)
+            disable_bg_inds = disable_bg_inds[:disable_place]
+            disable_bg_inds = tf.sparse_to_dense(disable_bg_inds, tf.shape(
+                labels, out_type=tf.int64), True, default_value=False)
 
-        # Returns bbox targets with shape (len(inds_inside), 4)
-        bbox_targets = self._compute_targets(
-            anchors, gt_boxes[argmax_overlaps, :]).astype(np.float32)
+            return tf.where(
+                condition=tf.squeeze(disable_bg_inds),
+                x=tf.scalar_mul(-1, tf.ones(tf.shape(labels))), y=labels)
 
+        num_bg = self._minibatch_size - fg_inds_size
+        # Get background indices, get True in the indices where we have a cero.
+        bg_inds = tf.equal(labels, 0)
+        # We get only the indices where we have True.
+        bg_inds = tf.squeeze(tf.where(bg_inds), axis=1)
+        bg_inds_size = tf.size(bg_inds)
+        # Condition for check if we have too many positive labels.
+        subsample_negative_cond = tf.to_int32(bg_inds_size) > \
+            tf.to_int32(num_bg)
+        # Check the condition and subsample positive labels.
+        labels = tf.cond(
+            subsample_negative_cond,
+            true_fn=subsample_negative, false_fn=lambda: labels)
+
+        # Returns bbox targets with shape (anchors.shape[0], 4)
+
+        # Find the closest gt box for each anchor.
+        argmax_overlaps = tf.argmax(overlaps, axis=1)
+        # Eliminate duplicates.
+        argmax_overlaps_unique, _ = tf.unique(argmax_overlaps)
+        # Construct a boolean mask.
+        gt_boxes_filter = tf.sparse_to_dense(argmax_overlaps_unique, [tf.shape(
+            gt_boxes, out_type=tf.int64)[0]], True, default_value=False)
+        # Filter the gt_boxes.
+        gt_boxes = tf.boolean_mask(gt_boxes, gt_boxes_filter)
+
+        bbox_targets = encode_tf(anchors, gt_boxes[:, :4])
         # We unroll "inside anchors" value for all anchors (for shape
-        # compatibility)
-        labels = unmap(labels, total_anchors, inds_inside, fill=-1)
-        bbox_targets = unmap(bbox_targets, total_anchors, inds_inside, fill=0)
-        max_overlaps = unmap(max_overlaps, total_anchors, inds_inside, fill=0)
+        # compatibility).
+        # We get only the indices where we have "inside anchors".
+        anchor_filter_inds = tf.where(anchor_filter)
 
-        # TODO: Decide what to do with weights
+        # We complete the missed indices with zeros
+        # (because scatter_nd has zeros as default).
+        bbox_targets = tf.scatter_nd(
+            indices=anchor_filter_inds,
+            updates=bbox_targets,
+            shape=all_anchors.shape
+        )
 
-        return labels, bbox_targets, max_overlaps
+        labels_scatter = tf.scatter_nd(
+            indices=anchor_filter_inds,
+            updates=labels,
+            shape=[tf.cast(tf.shape(all_anchors)[0], tf.int64)]
+        )
+        labels = tf.where(
+            condition=anchor_filter, x=labels_scatter,
+            y=tf.scalar_mul(-1, tf.ones(tf.shape(labels_scatter))))
 
-    def _compute_targets(self, boxes, groundtruth_boxes):
-        """Compute bounding-box regression targets for an image.
+        max_overlaps = tf.scatter_nd(
+            indices=anchor_filter_inds,
+            updates=max_overlaps,
+            shape=[tf.cast(tf.shape(all_anchors)[0], tf.int64)]
+        )
 
-        Regression targets are the needed adjustments to transform the bounding
-        boxes of the anchors to each respective ground truth box.
-
-        For details on how this adjustment is implemented look a the
-        `bbox_transform` module.
-
-        Args:
-            boxes: Numpy array with the anchors bounding boxes.
-                Its shape should be (total_bboxes, 4) where total_bboxes
-                is the number of anchors available in the batch.
-            groundtruth_boxes: Numpy array with the groundtruth_boxes.
-                Its shape should be (total_bboxes, 4) or (total_bboxes, 5)
-                depending if the label is included or not. Either way, we don't
-                need it.
-        """
-        return encode(
-            boxes, groundtruth_boxes[:, :4]
-        ).astype(np.float32, copy=False)
+        return labels, anchors, max_overlaps
