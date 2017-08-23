@@ -103,6 +103,7 @@ setup(
     long_description=read('README.md'),
     license=find_meta('license'),
     author=find_meta('author'),
+    author_email=find_meta('email'),
     maintainer=find_meta('author'),
     maintainer_email=find_meta('email'),
     url=find_meta('uri'),
