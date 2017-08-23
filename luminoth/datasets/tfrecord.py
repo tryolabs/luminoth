@@ -1,10 +1,10 @@
 import os
 import tensorflow as tf
 
-from .dataset import Dataset
+from .object_detection_dataset import ObjectDetectionDataset
 
 
-class TFRecordDataset(Dataset):
+class TFRecordDataset(ObjectDetectionDataset):
     """
     Attributes:
         context_features (dict): Context features used to parse fixed sized
@@ -97,10 +97,15 @@ class TFRecordDataset(Dataset):
         # Resize images (if needed)
         image, bboxes, scale_factor = self._resize_image(image, bboxes)
 
+        image, bboxes, applied_augmentations = self._augment(image, bboxes)
+
         filename = tf.cast(context_example['filename'], tf.string)
 
-        queue_dtypes = [tf.float32, tf.int32, tf.string, tf.float32]
-        queue_names = ['image', 'bboxes', 'filename', 'scale_factor']
+        # TODO: Send additional metadata through the queue (scale_factor,
+        # applied_augmentations)
+
+        queue_dtypes = [tf.float32, tf.int32, tf.string]
+        queue_names = ['image', 'bboxes', 'filename']
 
         if self._random_shuffle:
             queue = tf.RandomShuffleQueue(
@@ -123,7 +128,6 @@ class TFRecordDataset(Dataset):
             'image': image,
             'bboxes': bboxes,
             'filename': filename,
-            'scale_factor': scale_factor,
         })] * 20
 
         tf.train.add_queue_runner(tf.train.QueueRunner(queue, enqueue_ops))
