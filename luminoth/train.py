@@ -2,7 +2,7 @@ import click
 import os
 import tensorflow as tf
 
-from luminoth.dataset import TFRecordDataset
+from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
 from luminoth.utils.config import (
     load_config, merge_into, kwargs_to_config, parse_override
