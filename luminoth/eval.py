@@ -69,9 +69,10 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         train_image, pretrained_dict['net'], train_objects, is_training=False
     )
 
-    pred_objects = prediction_dict['classification_prediction']['objects']
-    pred_objects_classes = prediction_dict['classification_prediction']['objects_labels']
-    pred_objects_scores = prediction_dict['classification_prediction']['objects_labels_prob']
+    pred = prediction_dict['classification_prediction']
+    pred_objects = pred['objects']
+    pred_objects_classes = pred['objects_labels']
+    pred_objects_scores = pred['objects_labels_prob']
 
     # TODO: What about the rest of the losses?
     batch_loss = model.loss(prediction_dict)
@@ -82,7 +83,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     )
 
     # TODO: Do I need it? Are model losses added here?
-    metrics = tf.get_collection('metrics')
+    # metrics = tf.get_collection('metrics')
     metric_ops = tf.get_collection('metric_ops')
 
     init_op = tf.group(
@@ -192,8 +193,9 @@ def evaluate_once(config, saver, ops, checkpoint):
                     _, batch_bboxes, batch_classes, batch_scores,
                     batch_filenames, batch_gt_objects,
                 ) = sess.run([
-                    ops['metric_ops'], ops['pred_objects'], ops['pred_objects_classes'],
-                    ops['pred_objects_scores'], ops['train_filename'], ops['train_objects'],
+                    ops['metric_ops'], ops['pred_objects'],
+                    ops['pred_objects_classes'], ops['pred_objects_scores'],
+                    ops['train_filename'], ops['train_objects'],
                 ])
 
                 output_per_batch['bboxes'].append(batch_bboxes)
@@ -210,20 +212,50 @@ def evaluate_once(config, saver, ops, checkpoint):
 
         except tf.errors.OutOfRangeError:
 
+            # Save final evaluation stats into summary under the checkpoint's
+            # global step.
+
             # TODO: Do we want *everything* on the summaries or just
             # val_loss/mAP?
-            map_0_3, _ = calculate_map(output_per_batch, config.network.num_classes, 0.3)
-            map_0_5, _ = calculate_map(output_per_batch, config.network.num_classes, 0.5)
-            map_0_8, _ = calculate_map(output_per_batch, config.network.num_classes, 0.8)
-            # TODO: Per class too, any way to make it automatically? I.e. write the array directly.
+            map_0_3, per_class_0_3 = calculate_map(
+                output_per_batch, config.network.num_classes, 0.3
+            )
+            map_0_5, per_class_0_5 = calculate_map(
+                output_per_batch, config.network.num_classes, 0.5
+            )
+            map_0_8, per_class_0_8 = calculate_map(
+                output_per_batch, config.network.num_classes, 0.8
+            )
 
-            summary = tf.Summary(value=[
+            # TODO: Find a way to generate these summaries automatically, or
+            # less manually.
+            summary = [
                 tf.Summary.Value(tag='val_loss', simple_value=val_loss),
                 tf.Summary.Value(tag='mAP@0.3', simple_value=map_0_3),
                 tf.Summary.Value(tag='mAP@0.5', simple_value=map_0_5),
                 tf.Summary.Value(tag='mAP@0.8', simple_value=map_0_8),
-            ])
-            writer.add_summary(summary, checkpoint['global_step'])
+            ]
+
+            for idx, val in enumerate(per_class_0_3):
+                summary.append(tf.Summary.Value(
+                    tag='AP@0.3/{}'.format(idx),
+                    simple_value=val
+                ))
+            for idx, val in enumerate(per_class_0_5):
+                summary.append(tf.Summary.Value(
+                    tag='AP@0.5/{}'.format(idx),
+                    simple_value=val
+                ))
+            for idx, val in enumerate(per_class_0_8):
+                summary.append(tf.Summary.Value(
+                    tag='AP@0.8/{}'.format(idx),
+                    simple_value=val
+                ))
+
+            writer.add_summary(
+                tf.Summary(value=summary),
+                checkpoint['global_step']
+            )
 
         finally:
             coord.request_stop()
