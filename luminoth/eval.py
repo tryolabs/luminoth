@@ -74,28 +74,25 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     pred_objects_classes = pred['objects_labels']
     pred_objects_scores = pred['objects_labels_prob']
 
-    # TODO: What about the rest of the losses?
-    batch_loss = model.loss(prediction_dict)
-    total_loss, _ = tf.metrics.mean(
-        batch_loss, name='loss',
-        metrics_collections='metrics',
-        updates_collections='metric_ops',
-    )
+    # Retrieve *all* the losses from the model and calculate their streaming
+    # means, so we get the loss over the whole dataset.
+    batch_losses = model.loss(prediction_dict, return_all=True)
+    losses = {}
+    for loss_name, loss_tensor in batch_losses.items():
+        loss_mean, _ = tf.metrics.mean(
+            loss_tensor, name=loss_name,
+            metrics_collections='metrics',
+            updates_collections='metric_ops',
+        )
+        full_loss_name = 'val_losses/{}'.format(loss_name)
+        losses[full_loss_name] = loss_mean
 
-    # TODO: Do I need it? Are model losses added here?
-    # metrics = tf.get_collection('metrics')
     metric_ops = tf.get_collection('metric_ops')
 
     init_op = tf.group(
         tf.global_variables_initializer(),
         tf.local_variables_initializer()
     )
-
-    # TODO: Need anything else from the model's summary?
-    # summarizer = tf.summary.merge([
-    #     tf.summary.merge_all(),
-    #     model.summary,
-    # ])
 
     # Get the saver required to load model parameters.
     saver = get_saver((model, pretrained, ))
@@ -109,7 +106,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'pred_objects_scores': pred_objects_scores,
         'train_filename': train_filename,
         'train_objects': train_objects,
-        'total_loss': total_loss,
+        'losses': losses,
     }
 
     # Get the checkpoint files to evaluate. The latest checkpoint file should
@@ -161,7 +158,7 @@ def evaluate_once(config, saver, ops, checkpoint):
             Expects the following keys: ``init_op``, ``metric_ops``,
             ``pred_objects``, ``pred_objects_classes``,
             ``pred_objects_scores``, ``train_filename``, ``train_objects``,
-            ``total_loss`.
+            ``losses`.
         checkpoint (dict): Checkpoint-related data.
             Expects the following keys: ``global_step``, ``file``.
     """
@@ -207,48 +204,31 @@ def evaluate_once(config, saver, ops, checkpoint):
 
                 output_per_batch['filenames'].append(batch_filenames)
 
-                val_loss = sess.run(ops['total_loss'])
-                print('streaming_val_loss = {:.2f}'.format(val_loss))
+                val_losses = sess.run(ops['losses'])
 
         except tf.errors.OutOfRangeError:
 
             # Save final evaluation stats into summary under the checkpoint's
             # global step.
-
-            # TODO: Do we want *everything* on the summaries or just
-            # val_loss/mAP?
-            map_0_3, per_class_0_3 = calculate_map(
-                output_per_batch, config.network.num_classes, 0.3
-            )
             map_0_5, per_class_0_5 = calculate_map(
                 output_per_batch, config.network.num_classes, 0.5
-            )
-            map_0_8, per_class_0_8 = calculate_map(
-                output_per_batch, config.network.num_classes, 0.8
             )
 
             # TODO: Find a way to generate these summaries automatically, or
             # less manually.
             summary = [
-                tf.Summary.Value(tag='val_loss', simple_value=val_loss),
-                tf.Summary.Value(tag='mAP@0.3', simple_value=map_0_3),
-                tf.Summary.Value(tag='mAP@0.5', simple_value=map_0_5),
-                tf.Summary.Value(tag='mAP@0.8', simple_value=map_0_8),
+                tf.Summary.Value(tag='metrics/mAP@0.5', simple_value=map_0_5),
             ]
 
-            for idx, val in enumerate(per_class_0_3):
+            for loss_name, loss_value in val_losses.items():
                 summary.append(tf.Summary.Value(
-                    tag='AP@0.3/{}'.format(idx),
-                    simple_value=val
+                    tag=loss_name,
+                    simple_value=loss_value
                 ))
+
             for idx, val in enumerate(per_class_0_5):
                 summary.append(tf.Summary.Value(
-                    tag='AP@0.5/{}'.format(idx),
-                    simple_value=val
-                ))
-            for idx, val in enumerate(per_class_0_8):
-                summary.append(tf.Summary.Value(
-                    tag='AP@0.8/{}'.format(idx),
+                    tag='metrics/AP@0.5/{}'.format(idx),
                     simple_value=val
                 ))
 

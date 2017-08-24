@@ -142,7 +142,7 @@ class FasterRCNN(snt.AbstractModule):
 
         return prediction_dict
 
-    def loss(self, prediction_dict):
+    def loss(self, prediction_dict, return_all=False):
         """Compute the joint training loss for Faster RCNN.
 
         Args:
@@ -153,6 +153,11 @@ class FasterRCNN(snt.AbstractModule):
                     RPN.
                 classification_prediction: A dictionary with the output Tensors
                     from the RCNN.
+
+        Returns:
+            If `return_all` is False, a tensor for the total loss. If True, a
+            dict with all the internal losses (RPN's, RCNN's, regularization
+            and total loss).
         """
 
         with tf.name_scope('losses'):
@@ -187,9 +192,9 @@ class FasterRCNN(snt.AbstractModule):
             else:
                 rcnn_loss_dict = {}
 
-            all_loses_items = (
+            all_losses_items = (
                 list(rpn_loss_dict.items()) + list(rcnn_loss_dict.items()))
-            for loss_name, loss_tensor in all_loses_items:
+            for loss_name, loss_tensor in all_losses_items:
                 tf.summary.scalar(
                     loss_name, loss_tensor,
                     collections=self._losses_collections
@@ -220,6 +225,18 @@ class FasterRCNN(snt.AbstractModule):
                 'regularization_loss', regularization_loss,
                 collections=self._losses_collections
             )
+
+            if return_all:
+                loss_dict = {
+                    'total_loss': total_loss,
+                    'no_reg_loss': no_reg_loss,
+                    'regularization_loss': regularization_loss,
+                }
+
+                for loss_name, loss_tensor in all_losses_items:
+                    loss_dict[loss_name] = loss_tensor
+
+                return loss_dict
 
             # We return the total loss, which includes:
             # - rpn loss
