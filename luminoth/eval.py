@@ -2,6 +2,7 @@ import click
 import numpy as np
 import os
 import tensorflow as tf
+import time
 
 from .dataset import TFRecordDataset
 from .models import MODELS, PRETRAINED_MODELS
@@ -19,9 +20,10 @@ from .utils.bbox import bbox_overlaps
 @click.option('--model-dir', required=True, help='Directory from where to read saved models.')
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
 @click.option('--all-checkpoints', is_flag=True, default=False, help='Whether to evaluate all or last checkpoint.')
+@click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
-             all_checkpoints, override_params):
+             all_checkpoints, watch, override_params):
     """
     Evaluate models using dataset.
     """
@@ -109,12 +111,58 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'losses': losses,
     }
 
-    # Get the checkpoint files to evaluate. The latest checkpoint file should
-    # be the last item of `all_model_checkpoint_paths`, according to the
-    # CheckpointState protobuf definition.
-    ckpt = tf.train.get_checkpoint_state(model_dir)
+    last_global_step = None
+    while True:
+        # Get the checkpoint files to evaluate.
+        checkpoints = get_checkpoints(config, last_global_step)
+
+        # TODO: Change parameter to `from_global_step`.
+        # We only want to filter on the first iteration.
+        if last_global_step is not None and not all_checkpoints:
+            checkpoints = [checkpoints[-1]] if checkpoints else []
+
+        for checkpoint in checkpoints:
+            # Always returned in order, so it's safe to assign directly.
+            tf.logging.info(
+                'Evaluating global_step %s using checkpoint \'%s\'',
+                checkpoint['global_step'], checkpoint['file']
+            )
+            last_global_step = checkpoint['global_step']
+            evaluate_once(config, saver, ops, checkpoint)
+
+        # If no watching was requested, finish the execution.
+        if not watch:
+            return
+
+        # Sleep for a minute and check for new checkpoints.
+        time.sleep(5 * 60)
+
+
+def get_checkpoints(config, from_global_step=None):
+    """Return all available checkpoints.
+
+    Args:
+        config: Run configuration file, where the checkpoint dir is present.
+        from_global_step (int): Only return checkpoints after this global step.
+            The comparison is *strict*. If ``None``, returns all available
+            checkpoints.
+
+    Returns:
+        List of dicts (with keys ``global_step``, ``file``) with all the
+        checkpoints found.
+
+    Raises:
+        ValueError: If there are no checkpoints on the ``train.model_dir`` key
+            of `config`.
+    """
+    # The latest checkpoint file should be the last item of
+    # `all_model_checkpoint_paths`, according to the CheckpointState protobuf
+    # definition.
+    ckpt = tf.train.get_checkpoint_state(config.train.model_dir)
     if not ckpt or not ckpt.all_model_checkpoint_paths:
-        raise ValueError('Could not find checkpoint in {}.'.format(model_dir))
+        raise ValueError('Could not find checkpoint in {}.'.format(
+            config.train.model_dir
+        ))
 
     # TODO: Any other way to get the global_step?
     checkpoints = [
@@ -122,25 +170,30 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         for path in ckpt.all_model_checkpoint_paths
     ]
 
-    tf.logging.info(
-        'Found {} checkpoints in model_dir'.format(len(checkpoints))
-    )
-
-    # Get the run name from the checkpoint path.
+    # Get the run name from the checkpoint path. Do it before filtering the
+    # list, as it may end up empty.
+    # TODO: Can't it be set somewhere else?
     config.train.run_name = os.path.split(
         os.path.dirname(checkpoints[0]['file'])
     )[-1]
 
-    if not all_checkpoints:
-        # Only last checkpoint was requested.
-        checkpoints = [checkpoints[-1]]
+    if from_global_step is not None:
+        checkpoints = [
+            ckpt for ckpt in checkpoints
+            if ckpt['global_step'] > from_global_step
+        ]
 
-    for checkpoint in checkpoints:
         tf.logging.info(
-            'Evaluating global_step {}'.format(checkpoint['global_step'])
+            'Found %s checkpoints in model_dir with global_step > %s',
+            len(checkpoints), from_global_step,
         )
-        tf.logging.info('Using checkpoint "{}"'.format(checkpoint['file']))
-        evaluate_once(config, saver, ops, checkpoint)
+
+    else:
+        tf.logging.info(
+            'Found {} checkpoints in model_dir'.format(len(checkpoints))
+        )
+
+    return checkpoints
 
 
 def evaluate_once(config, saver, ops, checkpoint):
