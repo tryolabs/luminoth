@@ -16,12 +16,12 @@ from .utils.bbox import bbox_overlaps
 @click.command(help='Evaluate trained (or training) models')
 @click.argument('model-type', type=click.Choice(MODELS.keys()))
 @click.argument('dataset-split', default='val')
-@click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
-@click.option('--model-dir', required=True, help='Directory from where to read saved models.')
+@click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')  # noqa
+@click.option('--model-dir', required=True, help='Directory from where to read saved models.')  # noqa
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
-@click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')
-@click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')
-@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
+@click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
+@click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
+@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
              watch, from_global_step, override_params):
     """
@@ -183,8 +183,8 @@ def get_checkpoints(config, from_global_step=None):
 
     if from_global_step is not None:
         checkpoints = [
-            ckpt for ckpt in checkpoints
-            if ckpt['global_step'] > from_global_step
+            c for c in checkpoints
+            if c['global_step'] > from_global_step
         ]
 
         tf.logging.info(
