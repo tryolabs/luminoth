@@ -14,8 +14,8 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 
 
 @click.command(help='Evaluate trained (or training) models')
-@click.argument('model-type', type=click.Choice(MODELS.keys()))
-@click.argument('dataset-split', default='val')
+@click.option('model_type', '--model', required=True, default='fasterrcnn')
+@click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')  # noqa
 @click.option('--model-dir', required=True, help='Directory from where to read saved models.')  # noqa
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
@@ -61,7 +61,6 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     train_dataset = dataset()
 
     train_image = train_dataset['image']
-    train_filename = train_dataset['filename']
     train_objects = train_dataset['bboxes']
 
     # TODO: This is not the best place to configure rank? Why is rank not
@@ -113,7 +112,6 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'pred_objects': pred_objects,
         'pred_objects_classes': pred_objects_classes,
         'pred_objects_scores': pred_objects_scores,
-        'train_filename': train_filename,
         'train_objects': train_objects,
         'losses': losses,
     }
@@ -202,7 +200,6 @@ def get_checkpoints(config, from_global_step=None):
 def evaluate_once(config, saver, ops, checkpoint):
     """Run the evaluation once.
 
-    # TODO: Also creates saver.
     Create a new session with the previously-built graph, run it through the
     dataset, calculate the evaluation metrics and write the corresponding
     summaries.
@@ -213,8 +210,7 @@ def evaluate_once(config, saver, ops, checkpoint):
         ops (dict): All the operations needed to successfully run the model.
             Expects the following keys: ``init_op``, ``metric_ops``,
             ``pred_objects``, ``pred_objects_classes``,
-            ``pred_objects_scores``, ``train_filename``, ``train_objects``,
-            ``losses`.
+            ``pred_objects_scores``, ``train_objects``, ``losses`.
         checkpoint (dict): Checkpoint-related data.
             Expects the following keys: ``global_step``, ``file``.
     """
@@ -225,7 +221,6 @@ def evaluate_once(config, saver, ops, checkpoint):
         'scores': [],  # Score for each detection.
         'gt_bboxes': [],  # Ground-truth bounding boxes for the batch.
         'gt_classes': [],  # Ground-truth classes for each bounding box.
-        'filenames': [],  # Filenames. TODO: Remove.
     }
 
     # TODO: Get runname from model-dir
@@ -244,11 +239,11 @@ def evaluate_once(config, saver, ops, checkpoint):
             while not coord.should_stop():
                 (
                     _, batch_bboxes, batch_classes, batch_scores,
-                    batch_filenames, batch_gt_objects,
+                    batch_gt_objects,
                 ) = sess.run([
                     ops['metric_ops'], ops['pred_objects'],
                     ops['pred_objects_classes'], ops['pred_objects_scores'],
-                    ops['train_filename'], ops['train_objects'],
+                    ops['train_objects'],
                 ])
 
                 output_per_batch['bboxes'].append(batch_bboxes)
@@ -257,8 +252,6 @@ def evaluate_once(config, saver, ops, checkpoint):
 
                 output_per_batch['gt_bboxes'].append(batch_gt_objects[:, :4])
                 output_per_batch['gt_classes'].append(batch_gt_objects[:, 4])
-
-                output_per_batch['filenames'].append(batch_filenames)
 
                 val_losses = sess.run(ops['losses'])
 
@@ -328,9 +321,8 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     Args:
         output_per_batch (dict): Output of the detector to calculate mAP.
             Expects the following keys: ``bboxes``, ``classes``, ``scores``,
-            ``gt_bboxes``, ``gt_classes``, ``filenames``.  Under each key,
-            there should be a list of the results per batch as returned by the
-            detector.
+            ``gt_bboxes``, ``gt_classes``. Under each key, there should be a
+            list of the results per batch as returned by the detector.
         num_classes (int): Number of classes on the dataset.
         threshold (float): IoU threshold for considering a match.
 
