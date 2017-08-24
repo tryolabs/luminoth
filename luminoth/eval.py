@@ -4,13 +4,13 @@ import os
 import tensorflow as tf
 import time
 
-from .dataset import TFRecordDataset
-from .models import MODELS, PRETRAINED_MODELS
-from .utils.config import (
+from luminoth.datasets import TFRecordDataset
+from luminoth.models import get_model
+from luminoth.utils.config import (
     load_config, merge_into, parse_override
 )
-from .utils.vars import get_saver
-from .utils.bbox import bbox_overlaps
+from luminoth.utils.vars import get_saver
+from luminoth.utils.bbox_overlap import bbox_overlap
 
 
 @click.command(help='Evaluate trained (or training) models')
@@ -27,8 +27,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     """
     Evaluate models using dataset.
     """
-    model_class = MODELS[model_type.lower()]
-    config = model_class.base_config
+    model_cls = get_model(model_type)
+    config = model_cls.base_config
 
     if config_file:
         # If we have a custom config file overwritting default settings
@@ -54,10 +54,9 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
 
-    model = model_class(config)
-    pretrained = PRETRAINED_MODELS[config.pretrained.net](
-        config.pretrained
-    )
+    model = model_cls(config)
+    pretrained_cls = get_model(config.pretrained.net)
+    pretrained = pretrained_cls(config.pretrained)
     dataset = TFRecordDataset(config)
     train_dataset = dataset()
 
@@ -398,7 +397,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
                 continue
 
             # Get the IoUs for the class' bboxes.
-            ious = bbox_overlaps(cls_bboxes, cls_gt_bboxes)
+            ious = bbox_overlap(cls_bboxes, cls_gt_bboxes)
 
             # Greedily assign bboxes to ground truths (highest score first).
             for bbox_idx in sorted_indices:

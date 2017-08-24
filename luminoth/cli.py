@@ -11,9 +11,9 @@ It's base subcommands are:
 
 import click
 
-from .tools import cloud, dataset, server
-from .train import train
-from .eval import evaluate
+from luminoth.tools import cloud, dataset, server
+from luminoth.train import train
+from luminoth.eval import evaluate
 
 
 @click.group()
