@@ -19,11 +19,11 @@ from .utils.bbox import bbox_overlaps
 @click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')
 @click.option('--model-dir', required=True, help='Directory from where to read saved models.')
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
-@click.option('--all-checkpoints', is_flag=True, default=False, help='Whether to evaluate all or last checkpoint.')
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')
+@click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')
 def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
-             all_checkpoints, watch, override_params):
+             watch, from_global_step, override_params):
     """
     Evaluate models using dataset.
     """
@@ -42,6 +42,11 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     if override_params:
         override_config = parse_override(override_params)
         config = merge_into(override_config, config)
+
+    if config.train.debug or config.train.tf_debug:
+        tf.logging.set_verbosity(tf.logging.DEBUG)
+    else:
+        tf.logging.set_verbosity(tf.logging.INFO)
 
     # Build the dataset tensors, overriding the default dataset split.
     config.dataset.split = dataset_split
@@ -114,15 +119,10 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'losses': losses,
     }
 
-    last_global_step = None
+    last_global_step = from_global_step
     while True:
         # Get the checkpoint files to evaluate.
         checkpoints = get_checkpoints(config, last_global_step)
-
-        # TODO: Change parameter to `from_global_step`.
-        # We only want to filter on the first iteration.
-        if last_global_step is not None and not all_checkpoints:
-            checkpoints = [checkpoints[-1]] if checkpoints else []
 
         for checkpoint in checkpoints:
             # Always returned in order, so it's safe to assign directly.
@@ -138,7 +138,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
             return
 
         # Sleep for a minute and check for new checkpoints.
-        time.sleep(5 * 60)
+        tf.logging.info('All checkpoints evaluated; sleeping for a minute')
+        time.sleep(60)
 
 
 def get_checkpoints(config, from_global_step=None):
