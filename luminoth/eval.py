@@ -46,6 +46,9 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     # Build the dataset tensors, overriding the default dataset split.
     config.dataset.split = dataset_split
 
+    # Only a single run over the dataset to calculate metrics.
+    config.train.num_epochs = 1
+
     model = model_class(config)
     pretrained = PRETRAINED_MODELS[config.pretrained.net](
         config.pretrained
