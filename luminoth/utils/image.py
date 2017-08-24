@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+from utils.bbox_transform_tf import clip_boxes
+
 
 def resize_image(image, bboxes=None, min_size=None, max_size=None):
     """
@@ -146,4 +148,161 @@ def flip_image(image, bboxes=None, left_right=True, up_down=False):
     if bboxes is not None:
         return_dict['bboxes'] = bboxes
 
+    return return_dict
+
+
+def random_patch(image, bboxes=None, debug=False):
+    """Gets a random patch from an image.
+
+    Args:
+        image: Tensor with shape (H, W, 3).
+        bboxes: Tensor with the ground-truth boxes. Shaped (total_boxes, 5).
+            The last element in each box is the category label.
+
+    Returns:
+        image: Tensor with shape (H', W', 3), with H' <= H and W' <= W. A
+            random patch of the input image.
+        bboxes: Tensor with shape (new_total_boxes, 5), where we keep
+            bboxes that have their center inside the patch, cropping
+            them to the patch boundaries.
+    """
+    if debug:
+        seed = 0
+    else:
+        seed = None
+    # See the documentation on tf.crop_to_bounding_box for the meaning of
+    # these variables.
+    offset_width = tf.random_uniform(
+        shape=[],
+        minval=0,
+        maxval=tf.subtract(
+            tf.shape(image)[1],
+            1
+        ),
+        dtype=tf.int32,
+        seed=seed
+    )
+    offset_height = tf.random_uniform(
+        shape=[],
+        minval=0,
+        maxval=tf.subtract(
+            tf.shape(image)[0],
+            1
+        ),
+        dtype=tf.int32,
+        seed=seed
+    )
+    target_width = tf.random_uniform(
+        shape=[],
+        minval=1,
+        maxval=tf.subtract(
+            tf.shape(image)[1],
+            offset_width
+        ),
+        dtype=tf.int32,
+        seed=seed
+    )
+    target_height = tf.random_uniform(
+        shape=[],
+        minval=1,
+        maxval=tf.subtract(
+            tf.shape(image)[0],
+            offset_height
+        ),
+        dtype=tf.int32,
+        seed=seed
+    )
+    new_image = tf.image.crop_to_bounding_box(
+        image,
+        offset_height, offset_width,
+        target_height, target_width
+    )
+
+    return_dict = {'image': new_image}
+
+    # Return if we didn't have bboxes.
+    if bboxes is None:
+        return_dict['bboxes'] = tf.constant(-1.)
+        return return_dict
+
+    # Now we will remove all bboxes whose centers are not inside the cropped
+    # image.
+
+    # First get the x  and y coordinates of the center of each of the
+    # bboxes.
+    bboxes_center_x = tf.reduce_mean(
+        tf.concat(
+            [
+                # bboxes[:, 0] gets a Tensor with shape (20,).
+                # We do this to get a Tensor with shape (20, 1).
+                bboxes[:, 0:1],
+                bboxes[:, 2:3]
+            ],
+            axis=1
+        )
+    )
+    bboxes_center_y = tf.reduce_mean(
+        tf.concat(
+            [
+                bboxes[:, 1:2],
+                bboxes[:, 3:4]
+            ],
+            axis=1
+        ),
+        axis=1
+    )
+
+    # Now we get a boolean tensor holding for each of the bboxes' centers
+    # wheter they are inside the patch.
+    center_x_is_inside = tf.logical_and(
+        tf.greater(
+            bboxes_center_x,
+            offset_width
+        ),
+        tf.less(
+            bboxes_center_x,
+            tf.add(target_width, offset_width)
+        )
+    )
+    center_y_is_inside = tf.logical_and(
+        tf.greater(
+            bboxes_center_y,
+            offset_height
+        ),
+        tf.less(
+            bboxes_center_y,
+            tf.add(target_height, offset_height)
+        )
+    )
+    center_is_inside = tf.logical_and(
+        center_x_is_inside,
+        center_y_is_inside
+    )
+
+    # Now we mask the bboxes, removing all those whose centers are outside
+    # the patch.
+    masked_bboxes = tf.boolean_mask(bboxes, center_is_inside)
+    # We move the bboxes to the right place, clipping them if
+    # necessary.
+    new_bboxes_unclipped = tf.concat(
+        [
+            tf.subtract(masked_bboxes[:, 0:1], offset_width),
+            tf.subtract(masked_bboxes[:, 1:2], offset_height),
+            tf.subtract(masked_bboxes[:, 2:3], offset_width),
+            tf.subtract(masked_bboxes[:, 3:4], offset_height),
+        ],
+        axis=1,
+    )
+    # Finally, we clip the boxes and add back the labels.
+    new_bboxes = tf.concat(
+        [
+            clip_boxes(
+                new_bboxes_unclipped[:, :4],
+                imshape=tf.shape(new_image)[:2]
+            ),
+            tf.cast(masked_bboxes[:, 4:], tf.float32)
+        ],
+        axis=1
+    )
+    return_dict['bboxes'] = new_bboxes
     return return_dict
