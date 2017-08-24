@@ -98,6 +98,9 @@ class RPNTarget(snt.AbstractModule):
                 max_overlaps: Max IoU overlap with ground truth boxes.
                     Shape (num_anchors, 1)
         """
+        # Keep only the coordinates of gt_boxes
+        gt_boxes = gt_boxes[:, :4]
+        all_anchors = all_anchors[:, :4]
         # Only keep anchors inside the image.
         # TODO: We should do this when anchors are original generated in
         # network or does it fuck with our dimensions.
@@ -122,13 +125,14 @@ class RPNTarget(snt.AbstractModule):
             all_anchors, anchor_filter, name='filter_anchors')
         # Start by ignoring all anchors by default and then pick the ones
         # we care about for training.
-        labels = tf.zeros(all_anchors.shape[0])
-        labels = tf.fill((labels.shape), -1.0)
+        labels = tf.zeros(tf.gather(tf.shape(all_anchors), [0]))
+        labels = tf.fill(tf.gather((tf.shape(labels)), [0]), -1.0)
         labels = tf.boolean_mask(labels, anchor_filter, name='filter_labels')
 
         # Intersection over union (IoU) overlap between the anchors and the
         # ground truth boxes.
-        overlaps = bbox_overlap_tf(anchors, gt_boxes)
+        overlaps = bbox_overlap_tf(
+            tf.cast(anchors, tf.float32), tf.cast(gt_boxes, tf.float32))
 
         # Generate array with the IoU value of the closest GT box for each
         # anchor.
@@ -136,8 +140,16 @@ class RPNTarget(snt.AbstractModule):
 
         # Get the value of the max IoU for the closest anchor for each gt.
         gt_max_overlaps = tf.reduce_max(overlaps, axis=0)
-        # Find all the indices that match
+
+        # Find all the indices that match (at least one, but could be more).
         gt_argmax_overlaps = tf.squeeze(tf.equal(overlaps, gt_max_overlaps))
+        gt_argmax_overlaps = tf.where(gt_argmax_overlaps)[0]
+        # Eliminate duplicates indices.
+        gt_argmax_overlaps, _ = tf.unique(gt_argmax_overlaps)
+        # Order the indices for sparse_to_dense compatibility
+        gt_argmax_overlaps, _ = tf.nn.top_k(
+            gt_argmax_overlaps, k=tf.shape(gt_argmax_overlaps)[-1])
+        gt_argmax_overlaps = tf.reverse(gt_argmax_overlaps, [0])
 
         if not self._clobber_positives:
             # Assign bg labels first so that positive labels can clobber them.
@@ -153,9 +165,12 @@ class RPNTarget(snt.AbstractModule):
 
         # Foreground label: for each ground-truth, anchor with highest overlap.
         # When the argmax is many items we use all of them (for consistency).
-        # We set 1 at gt_argmax_overlaps indices
+        # We set 1 at gt_argmax_overlaps_cond indices
+        gt_argmax_overlaps_cond = tf.sparse_to_dense(
+            gt_argmax_overlaps, tf.shape(
+                labels, out_type=tf.int64), True, default_value=False)
         labels = tf.where(
-            condition=gt_argmax_overlaps,
+            condition=gt_argmax_overlaps_cond,
             x=tf.ones(tf.shape(labels)), y=labels)
 
         # Foreground label: above threshold Intersection over Union (IoU)
@@ -187,6 +202,10 @@ class RPNTarget(snt.AbstractModule):
                 disable_fg_inds = tf.random_shuffle(fg_inds)
             disable_place = (tf.shape(fg_inds)[0] - num_fg)
             disable_fg_inds = disable_fg_inds[:disable_place]
+            # Order the indices for sparse_to_dense compatibility
+            disable_fg_inds, _ = tf.nn.top_k(
+                disable_fg_inds, k=tf.shape(disable_fg_inds)[-1])
+            disable_fg_inds = tf.reverse(disable_fg_inds, [0])
             disable_fg_inds = tf.sparse_to_dense(disable_fg_inds, tf.shape(
                 labels, out_type=tf.int64), True, default_value=False)
             return tf.where(
@@ -215,6 +234,10 @@ class RPNTarget(snt.AbstractModule):
                 disable_bg_inds = tf.random_shuffle(bg_inds)
             disable_place = (tf.shape(bg_inds)[0] - num_bg)
             disable_bg_inds = disable_bg_inds[:disable_place]
+            # Order the indices for sparse_to_dense compatibility
+            disable_bg_inds, _ = tf.nn.top_k(
+                disable_bg_inds, k=tf.shape(disable_bg_inds)[-1])
+            disable_bg_inds = tf.reverse(disable_bg_inds, [0])
             disable_bg_inds = tf.sparse_to_dense(disable_bg_inds, tf.shape(
                 labels, out_type=tf.int64), True, default_value=False)
 
@@ -242,24 +265,22 @@ class RPNTarget(snt.AbstractModule):
         argmax_overlaps = tf.argmax(overlaps, axis=1)
         # Eliminate duplicates.
         argmax_overlaps_unique, _ = tf.unique(argmax_overlaps)
-        # Construct a boolean mask.
-        gt_boxes_filter = tf.sparse_to_dense(argmax_overlaps_unique, [tf.shape(
-            gt_boxes, out_type=tf.int64)[0]], True, default_value=False)
         # Filter the gt_boxes.
-        gt_boxes = tf.boolean_mask(gt_boxes, gt_boxes_filter)
-
-        bbox_targets = encode_tf(anchors, gt_boxes[:, :4])
-        # We unroll "inside anchors" value for all anchors (for shape
-        # compatibility).
         # We get only the indices where we have "inside anchors".
         anchor_filter_inds = tf.where(anchor_filter)
+        gt_boxes = tf.gather(gt_boxes, argmax_overlaps)
+
+        bbox_targets = encode_tf(anchors, gt_boxes)
+
+        # We unroll "inside anchors" value for all anchors (for shape
+        # compatibility).
 
         # We complete the missed indices with zeros
         # (because scatter_nd has zeros as default).
         bbox_targets = tf.scatter_nd(
             indices=anchor_filter_inds,
             updates=bbox_targets,
-            shape=all_anchors.shape
+            shape=tf.cast(tf.shape(all_anchors), tf.int64)
         )
 
         labels_scatter = tf.scatter_nd(
@@ -277,4 +298,4 @@ class RPNTarget(snt.AbstractModule):
             shape=[tf.cast(tf.shape(all_anchors)[0], tf.int64)]
         )
 
-        return labels, anchors, max_overlaps
+        return labels, tf.cast(bbox_targets, tf.float32), max_overlaps
