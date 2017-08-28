@@ -7,7 +7,6 @@ from luminoth.utils.image import (
 
 DATA_AUGMENTATION_STRATEGIES = {
     'flip': flip_image,
-    'flop': flip_image
 }
 
 
@@ -73,7 +72,7 @@ class ObjectDetectionDataset(snt.AbstractModule):
             image: A Tensor of shape (height, width, 3).
             bboxes: A Tensor of shape (total_bboxes, 5) of type tf.int32.
         """
-        applied_data_augmentation = {}
+        applied_data_augmentation = []
         for aug_config in self._data_augmentation:
             if len(aug_config.keys()) != 1:
                 raise ValueError(
@@ -100,7 +99,7 @@ class ObjectDetectionDataset(snt.AbstractModule):
                 lambda: {'image': image, 'bboxes': bboxes}
             )
 
-            applied_data_augmentation[aug_type] = apply_aug_strategy
+            applied_data_augmentation.append({aug_type: apply_aug_strategy})
 
             image = augmented['image']
             bboxes = augmented['bboxes']
