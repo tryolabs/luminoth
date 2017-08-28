@@ -86,12 +86,12 @@ def parse_config_value(value):
 
     try:
         return int(value)
-    except:
+    except ValueError:
         pass
 
     try:
         return float(value)
-    except:
+    except ValueError:
         pass
 
     return value
