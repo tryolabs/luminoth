@@ -7,6 +7,7 @@ from luminoth.utils.image import (
 
 DATA_AUGMENTATION_STRATEGIES = {
     'flip': flip_image,
+    'flop': flip_image
 }
 
 
@@ -48,6 +49,9 @@ class ObjectDetectionDataset(snt.AbstractModule):
         self._random_shuffle = config.train.random_shuffle
         self._data_augmentation = config.dataset.data_augmentation
 
+    def _build():
+        pass
+
     def _augment(self, image, bboxes, default_prob=0.5):
         """Applies different data augmentation techniques.
 
@@ -63,11 +67,11 @@ class ObjectDetectionDataset(snt.AbstractModule):
 
         Args:
             image: A Tensor of shape (height, width, 3).
-            bboxes: A Tensor of shape (total_bboxes, 4).
+            bboxes: A Tensor of shape (total_bboxes, 5).
 
         Returns:
             image: A Tensor of shape (height, width, 3).
-            bboxes: A Tensor of shape (total_bboxes, 4) of type tf.int32.
+            bboxes: A Tensor of shape (total_bboxes, 5) of type tf.int32.
         """
         applied_data_augmentation = {}
         for aug_config in self._data_augmentation:
