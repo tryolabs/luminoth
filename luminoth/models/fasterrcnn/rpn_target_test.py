@@ -61,6 +61,15 @@ class RPNTargetTest(tf.test.TestCase):
             np.array([1, 0, -1])
         )
 
+        # Assert bbox targets we are ignoring are zero.
+        self.assertAllEqual(
+            bbox_targets[1:],
+            [[0, 0, 0, 0], [0, 0, 0, 0]]
+        )
+
+        # Assert bbox target is not zero
+        self.assertTrue((bbox_targets[0] != 0).all())
+
         # Check max_overlaps shape
         self.assertEqual(
             max_overlaps.shape,
@@ -107,6 +116,20 @@ class RPNTargetTest(tf.test.TestCase):
             np.array([1, 0, 0, -1, 1])
         )
 
+        # Check that foreground bbox targets are partially zero because
+        # the X1 and width are already the same
+        self.assertEqual(bbox_targets[0][0], 0)
+        self.assertEqual(bbox_targets[0][2], 0)
+        self.assertNotEqual(bbox_targets[0][1], 0)
+        self.assertNotEqual(bbox_targets[0][3], 0)
+        self.assertAllEqual(bbox_targets[0], bbox_targets[-1])
+
+        # Assert bbox targets we are ignoring are zero.
+        self.assertAllEqual(
+            bbox_targets[1:4],
+            np.zeros((3, 4))
+        )
+
         # Test with a different foreground_fraction value.
         config['foreground_fraction'] = 0.2
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
@@ -119,6 +142,12 @@ class RPNTargetTest(tf.test.TestCase):
         self.assertAllEqual(
             labels,
             np.array([1, 0, 0, -1, -1])
+        )
+
+        # Assert bbox targets we are ignoring are zero.
+        self.assertAllEqual(
+            bbox_targets[1:],
+            np.zeros((4, 4))
         )
 
     def testWithNoClearMatch(self):
@@ -141,6 +170,8 @@ class RPNTargetTest(tf.test.TestCase):
             labels,
             np.array([1, 0])
         )
+        self.assertTrue((bbox_targets[0] != 0).all())
+        self.assertAllEqual(bbox_targets[1], np.zeros(4))
 
         config = self.config
         config['clobber_positives'] = True
@@ -155,6 +186,7 @@ class RPNTargetTest(tf.test.TestCase):
             labels,
             np.array([0, 0])
         )
+        self.assertAllEqual(bbox_targets, np.zeros((2, 4)))
 
 
 if __name__ == "__main__":
