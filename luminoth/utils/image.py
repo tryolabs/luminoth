@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from utils.bbox_transform_tf import clip_boxes
+from luminoth.utils.bbox_transform_tf import clip_boxes
 
 
 def resize_image(image, bboxes=None, min_size=None, max_size=None):
