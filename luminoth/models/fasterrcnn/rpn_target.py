@@ -227,6 +227,7 @@ class RPNTarget(snt.AbstractModule):
                 condition=tf.squeeze(disable_fg_inds),
                 x=tf.to_float(tf.fill(tf.shape(labels), -1)), y=labels
             )
+
         num_fg = int(self._foreground_fraction * self._minibatch_size)
         # Get foreground indices, get True in the indices where we have a one.
         fg_inds = tf.equal(labels, 1)
