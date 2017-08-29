@@ -25,30 +25,30 @@ class ObjectDetectionDatasetTest(tf.test.TestCase):
             }
         })
 
-    def _run_augment(self, augment_config):
+    def _run_augment(self, augment_config, image, bboxes):
         self.base_config['dataset']['data_augmentation'] = augment_config
 
-        bboxes = tf.placeholder(tf.int32, shape=self.bboxes.shape)
-        image = tf.placeholder(tf.int32, shape=self.image.shape)
+        bboxes_tf = tf.placeholder(tf.int32, shape=bboxes.shape)
+        image_tf = tf.placeholder(tf.int32, shape=image.shape)
 
         model = ObjectDetectionDataset(self.base_config)
-        image, bboxes, applied_data_augmentation = model._augment(
-            image, bboxes)
+        image_aug, bboxes_aug, applied_data_augmentation = model._augment(
+            image_tf, bboxes_tf)
 
         with self.test_session() as sess:
-            image, bboxes, applied_data_augmentation = sess.run(
-                [image, bboxes, applied_data_augmentation], feed_dict={
-                    bboxes: self.bboxes,
-                    image: self.image,
+            image_aug, bboxes_aug, applied_data_augmentation = sess.run(
+                [image_aug, bboxes_aug, applied_data_augmentation], feed_dict={
+                    bboxes_tf: bboxes,
+                    image_tf: image,
                 })
-            return image, bboxes, applied_data_augmentation
+            return image_aug, bboxes_aug, applied_data_augmentation
 
     def testSortedAugmentation(self):
         """
         Tests that the augmentation is applied in order
         """
-        self.image = np.random.randint(low=0, high=255, size=(600, 800, 3))
-        self.bboxes = np.array([
+        image = np.random.randint(low=0, high=255, size=(600, 800, 3))
+        bboxes = np.array([
             [10, 10, 26, 28, 1],
             [10, 10, 20, 22, 1],
             [10, 11, 20, 21, 1],
@@ -56,13 +56,13 @@ class ObjectDetectionDatasetTest(tf.test.TestCase):
         ])
         config = [{'flip': {'prob': 0}}, {'flip': {'prob': 1}}]
 
-        image, bboxes, aug = self._run_augment(config)
+        image_aug, bboxes_aug, aug = self._run_augment(config, image, bboxes)
         self.assertEqual(aug[0], {'flip': False})
         self.assertEqual(aug[1], {'flip': True})
 
         config = [{'flip': {'prob': 1}}, {'flip': {'prob': 0}}]
 
-        image, bboxes, aug = self._run_augment(config)
+        image_aug, bboxes_aug, aug = self._run_augment(config, image, bboxes)
         self.assertEqual(aug[0], {'flip': True})
         self.assertEqual(aug[1], {'flip': False})
 
@@ -71,19 +71,19 @@ class ObjectDetectionDatasetTest(tf.test.TestCase):
         Tests that to apply flip twice to an image and bboxes returns the same
         image and bboxes
         """
-        self.image = np.random.randint(low=0, high=255, size=(600, 800, 3))
-        self.bboxes = np.array([
+        image = np.random.randint(low=0, high=255, size=(600, 800, 3))
+        bboxes = np.array([
             [10, 10, 26, 28, 1],
             [19, 30, 31, 33, 1],
         ])
         config = [{'flip': {'prob': 1}}, {'flip': {'prob': 1}}]
 
-        image, bboxes, aug = self._run_augment(config)
+        image_aug, bboxes_aug, aug = self._run_augment(config, image, bboxes)
         self.assertEqual(aug[0], {'flip': True})
         self.assertEqual(aug[1], {'flip': True})
 
-        self.assertAllEqual(self.image, image)
-        self.assertAllEqual(self.bboxes, bboxes)
+        self.assertAllEqual(image, image_aug)
+        self.assertAllEqual(bboxes, bboxes_aug)
 
 
 if __name__ == '__main__':
