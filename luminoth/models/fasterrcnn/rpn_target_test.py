@@ -21,20 +21,20 @@ class RPNTargetTest(tf.test.TestCase):
             'minibatch_size': 2
         })
 
-    def _run_rpn_target(self, anchors, config):
-        gt_boxes = tf.placeholder(tf.float32, shape=self.gt_boxes.shape)
+    def _run_rpn_target(self, anchors, gt_boxes, config):
+        gt_boxes_tf = tf.placeholder(tf.float32, shape=gt_boxes.shape)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         all_anchors = tf.placeholder(tf.float32, shape=anchors.shape)
 
         model = RPNTarget(anchors.shape[0], config, debug=True)
         labels, bbox_targets, max_overlaps = model(
-            all_anchors, gt_boxes, im_size)
+            all_anchors, gt_boxes_tf, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             labels_val, bbox_targets_val, max_overlaps_val = sess.run(
                 [labels, bbox_targets, max_overlaps], feed_dict={
-                    gt_boxes: self.gt_boxes,
+                    gt_boxes_tf: gt_boxes,
                     im_size: self.im_size,
                     all_anchors: anchors,
                 })
@@ -50,7 +50,7 @@ class RPNTargetTest(tf.test.TestCase):
             [200, 380, 300, 500],  # background
         ], dtype=np.float32)
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, self.config
+            all_anchors, self.gt_boxes, self.config
         )
 
         # Check we get exactly a foreground, an ignored background (because of
@@ -68,7 +68,7 @@ class RPNTargetTest(tf.test.TestCase):
         )
 
         # Assert bbox target is not zero
-        self.assertTrue((bbox_targets[0] != 0).all())
+        self.assertTrue((bbox_targets[0] != 0).any())
 
         # Check max_overlaps shape
         self.assertEqual(
@@ -105,7 +105,7 @@ class RPNTargetTest(tf.test.TestCase):
         config = self.config
         config['minibatch_size'] = 5
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, config
+            all_anchors, self.gt_boxes, config
         )
 
         # Checks that the order of labels for anchors is correct.
@@ -133,7 +133,7 @@ class RPNTargetTest(tf.test.TestCase):
         # Test with a different foreground_fraction value.
         config['foreground_fraction'] = 0.2
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, config
+            all_anchors, self.gt_boxes, config
         )
 
         # Checks that the order of labels for anchors is correct.
@@ -162,7 +162,7 @@ class RPNTargetTest(tf.test.TestCase):
         ])
 
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, self.config
+            all_anchors, self.gt_boxes, self.config
         )
 
         # Check we get only one foreground anchor.
@@ -177,7 +177,7 @@ class RPNTargetTest(tf.test.TestCase):
         config['clobber_positives'] = True
 
         labels, bbox_targets, max_overlaps = self._run_rpn_target(
-            all_anchors, config
+            all_anchors, self.gt_boxes, config
         )
 
         # Check we don't get a foreground anchor because of possitive
@@ -187,6 +187,53 @@ class RPNTargetTest(tf.test.TestCase):
             np.array([0, 0])
         )
         self.assertAllEqual(bbox_targets, np.zeros((2, 4)))
+
+    def testWithMultipleGTBoxes(self):
+        """
+        Tests a basic case that includes two gt_boxes. What is going to happen
+        is that for each gt_box its fixed at least a foreground. After if there
+        are too many foreground, some of them will be disabled.
+        """
+        all_anchors = np.array([
+            [300, 300, 400, 390],  # background IoU < 0.3
+            [300, 300, 400, 400],  # foreground for the first gt_box
+            [100, 310, 120, 380],  # foreground for the second gt_box
+        ], dtype=np.float32)
+        config = self.config
+        config['minibatch_size'] = 3
+
+        gt_boxes = np.array([[200, 0, 400, 400], [100, 300, 120, 375]])
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
+            all_anchors, gt_boxes, config
+        )
+
+        # Check we get exactly a foreground, in this case the first one,
+        # an ignored background and an ignored foreground.
+        # Also checks they are in the correct order.
+        self.assertAllEqual(
+            labels,
+            np.array([-1, 1, -1])
+        )
+
+        # Assert bbox targets we are ignoring are zero.
+        self.assertAllEqual(
+            bbox_targets[0],
+            [0, 0, 0, 0]
+        )
+
+        self.assertAllEqual(
+             bbox_targets[2],
+             [0, 0, 0, 0]
+         )
+
+        # Assert bbox target is not zero
+        self.assertTrue((bbox_targets[1] != 0).any())
+
+        # Check max_overlaps shape
+        self.assertEqual(
+            max_overlaps.shape,
+            (3,)
+        )
 
 
 if __name__ == "__main__":

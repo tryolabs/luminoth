@@ -228,15 +228,14 @@ class RPNTarget(snt.AbstractModule):
                 x=tf.to_float(tf.fill(tf.shape(labels), -1)), y=labels
             )
 
-        num_fg = int(self._foreground_fraction * self._minibatch_size)
+        num_fg = tf.to_int32(self._foreground_fraction * self._minibatch_size)
         # Get foreground indices, get True in the indices where we have a one.
         fg_inds = tf.equal(labels, 1)
         # We get only the indices where we have True.
         fg_inds = tf.squeeze(tf.where(fg_inds), axis=1)
         fg_inds_size = tf.size(fg_inds)
         # Condition for check if we have too many positive labels.
-        subsample_positive_cond = (
-            tf.to_int32(fg_inds_size) > tf.to_int32(num_fg))
+        subsample_positive_cond = fg_inds_size > num_fg
         # Check the condition and subsample positive labels.
         labels = tf.cond(
             subsample_positive_cond,
@@ -269,15 +268,14 @@ class RPNTarget(snt.AbstractModule):
                 x=tf.to_float(tf.fill(tf.shape(labels), -1)), y=labels
             )
 
-        num_bg = self._minibatch_size - fg_inds_size
+        num_bg = tf.to_int32(self._minibatch_size - fg_inds_size)
         # Get background indices, get True in the indices where we have a cero.
         bg_inds = tf.equal(labels, 0)
         # We get only the indices where we have True.
         bg_inds = tf.squeeze(tf.where(bg_inds), axis=1)
         bg_inds_size = tf.size(bg_inds)
         # Condition for check if we have too many positive labels.
-        subsample_negative_cond = (
-            tf.to_int32(bg_inds_size) > tf.to_int32(num_bg))
+        subsample_negative_cond = bg_inds_size > num_bg
         # Check the condition and subsample positive labels.
         labels = tf.cond(
             subsample_negative_cond,
@@ -296,6 +294,13 @@ class RPNTarget(snt.AbstractModule):
         gt_boxes = tf.gather(gt_boxes, argmax_overlaps)
 
         bbox_targets = encode_tf(anchors, gt_boxes)
+
+        # For the anchors that arent foreground, we ignore the bbox_targets
+        anchor_foreground_filter = tf.equal(labels, 1)
+        bbox_targets = tf.where(
+            condition=anchor_foreground_filter,
+            x=bbox_targets, y=tf.zeros_like(bbox_targets)
+        )
 
         # We unroll "inside anchors" value for all anchors (for shape
         # compatibility).
