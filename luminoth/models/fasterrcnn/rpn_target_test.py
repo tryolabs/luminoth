@@ -235,6 +235,46 @@ class RPNTargetTest(tf.test.TestCase):
             (3,)
         )
 
+    def testWithManyGTBoxes(self):
+        all_anchors = np.array([
+            # Foregrounds
+            [0, 0, 10, 10],
+            [0, 0, 10, 10],
+            [10, 10, 20, 20],
+            [10, 10, 20, 20],
+            [20, 20, 30, 30],
+            [20, 20, 30, 30],
+            [30, 30, 40, 40],
+            [30, 30, 40, 40],
+            # Backgrounds
+            [100, 100, 110, 110],
+            [100, 100, 120, 120],
+            [110, 110, 120, 120],
+            [110, 110, 130, 130],
+            [110, 110, 120, 120],
+            [110, 110, 130, 130],
+            [110, 110, 120, 120],
+            [110, 110, 130, 130],
+        ], dtype=np.float32)
+        config = self.config
+        config['minibatch_size'] = 8  # 4 foregrounds and 4 backgrounds
+
+        gt_boxes = np.array([
+            [2, 2, 8, 8], [12, 12, 18, 18], [22, 22, 28, 28], [32, 32, 38, 38]
+        ])
+        labels, bbox_targets, max_overlaps = self._run_rpn_target(
+            all_anchors, gt_boxes, config
+        )
+
+        # 4 foreground
+        self.assertEqual(labels[labels == 1].shape[0], 4)
+        # 4 background
+        self.assertEqual(labels[labels == 0].shape[0], 4)
+
+        # Check all 4 foregrounds are in the first 8 places of the label.
+        # TODO: Ideally it should be one for each GT.
+        self.assertTrue((labels.argsort()[-4:] < 8).all())
+
 
 if __name__ == "__main__":
     tf.test.main()
