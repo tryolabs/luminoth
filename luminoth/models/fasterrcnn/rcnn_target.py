@@ -21,7 +21,7 @@ class RCNNTarget(snt.AbstractModule):
     a bounding box of "background objects").
 
     A minibatch size determines how many targets are going to be generated and
-    how many are going to be ignored. RCNNTarget is responsable for choosing
+    how many are going to be ignored. RCNNTarget is responsible for choosing
     which proposals and corresponding targets are included in the minibatch and
     which ones are completly ignored.
     """

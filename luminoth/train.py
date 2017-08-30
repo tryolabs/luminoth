@@ -53,7 +53,7 @@ def train(model_type, config_file, override_params, continue_training,
     config.train = merge_into(kwargs_to_config(kwargs), config.train)
 
     if config_file:
-        # If we have a custom config file overwritting default settings
+        # If we have a custom config file overwriting default settings
         # then we merge those values to the base_config.
         custom_config = load_config(config_file)
         config = merge_into(custom_config, config)

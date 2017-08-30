@@ -17,7 +17,7 @@ class FasterRCNN(snt.AbstractModule):
     Calculates the total loss of the model based on the different losses by
     each of the submodules.
 
-    It is also responsable for building the anchor reference which is used in
+    It is also responsible for building the anchor reference which is used in
     graph for generating the dynamic anchors.
 
     """
@@ -147,7 +147,7 @@ class FasterRCNN(snt.AbstractModule):
 
         Args:
             prediction_dict: The output dictionary of the _build method from
-                which we use to different main keys:
+                which we use two different main keys:
 
                 rpn_prediction: A dictionary with the output Tensors from the
                     RPN.

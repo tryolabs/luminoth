@@ -9,8 +9,8 @@ from luminoth.utils.bbox_transform import encode, unmap
 class RPNTarget(snt.AbstractModule):
     """RPNTarget: Get RPN's classification and regression targets.
 
-    RPNTarget is responsable for calculating the correct values for both
-    classification and regression problems. It is also responsable for defining
+    RPNTarget is responsible for calculating the correct values for both
+    classification and regression problems. It is also responsible for defining
     which anchors and target values are going to be used for the RPN minibatch.
 
     For calculating the correct values for classification, being classification
@@ -27,7 +27,7 @@ class RPNTarget(snt.AbstractModule):
     to the ground truth box) only applies to some of the anchors, the ones that
     we consider to be foreground.
 
-    RPNTarget is also responsable for selecting which ones of the anchors
+    RPNTarget is also responsible for selecting which ones of the anchors
     are going to be used for the minibatch. This is a random process with some
     restrictions on the ratio between foreground and background samples.
 
