@@ -208,11 +208,11 @@ class RPNTargetTest(tf.test.TestCase):
         )
 
         # Check we get exactly a foreground, in this case the first one,
-        # an ignored background and an ignored foreground.
+        # a background and an ignored foreground.
         # Also checks they are in the correct order.
         self.assertAllEqual(
             labels,
-            np.array([-1, 1, -1])
+            np.array([0, 1, -1])
         )
 
         # Assert bbox targets we are ignoring are zero.

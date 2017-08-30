@@ -140,7 +140,6 @@ class RPNTarget(snt.AbstractModule):
         # Generate array with the IoU value of the closest GT box for each
         # anchor.
         max_overlaps = tf.reduce_max(overlaps, axis=1)
-
         if not self._clobber_positives:
             # Assign bg labels first so that positive labels can clobber them.
             # First we get an array with True where IoU is less than
@@ -153,13 +152,12 @@ class RPNTarget(snt.AbstractModule):
                 condition=negative_overlap_nonzero,
                 x=tf.zeros(tf.shape(labels)), y=tf.to_float(labels)
             )
-
         # Get the value of the max IoU for the closest anchor for each gt.
         gt_max_overlaps = tf.reduce_max(overlaps, axis=0)
 
         # Find all the indices that match (at least one, but could be more).
         gt_argmax_overlaps = tf.squeeze(tf.equal(overlaps, gt_max_overlaps))
-        gt_argmax_overlaps = tf.where(gt_argmax_overlaps)[0]
+        gt_argmax_overlaps = tf.where(gt_argmax_overlaps)[:, 0]
         # Eliminate duplicates indices.
         gt_argmax_overlaps, _ = tf.unique(gt_argmax_overlaps)
         # Order the indices for sparse_to_dense compatibility
@@ -174,6 +172,7 @@ class RPNTarget(snt.AbstractModule):
             gt_argmax_overlaps, tf.shape(labels, out_type=tf.int64),
             True, default_value=False
         )
+        # import ipdb; ipdb.set_trace()
         labels = tf.where(
             condition=gt_argmax_overlaps_cond,
             x=tf.ones(tf.shape(labels)), y=tf.to_float(labels)
@@ -267,6 +266,14 @@ class RPNTarget(snt.AbstractModule):
                 condition=tf.squeeze(disable_bg_inds),
                 x=tf.to_float(tf.fill(tf.shape(labels), -1)), y=labels
             )
+
+        # Recalculate the foreground indices after (maybe) disable some of them
+
+        # Get foreground indices, get True in the indices where we have a one.
+        fg_inds = tf.equal(labels, 1)
+        # We get only the indices where we have True.
+        fg_inds = tf.squeeze(tf.where(fg_inds), axis=1)
+        fg_inds_size = tf.size(fg_inds)
 
         num_bg = tf.to_int32(self._minibatch_size - fg_inds_size)
         # Get background indices, get True in the indices where we have a cero.
