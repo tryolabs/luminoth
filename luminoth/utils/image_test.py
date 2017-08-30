@@ -1,11 +1,21 @@
 import numpy as np
 import tensorflow as tf
 
-from luminoth.utils.image import resize_image, flip_image
+from easydict import EasyDict
+
+from luminoth.utils.image import (
+    resize_image, flip_image, random_patch
+)
 from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
 
 class ImageTest(tf.test.TestCase):
+    def setUp(self):
+        self._random_patch_config = EasyDict({
+            'min_height': 400,
+            'min_width': 400,
+        })
+
     def _gen_image(self, *shape):
         return np.random.rand(*shape)
 
@@ -44,17 +54,29 @@ class ImageTest(tf.test.TestCase):
         feed_dict = {
             image: image_array,
         }
+        config = EasyDict({
+            'left_right': left_right,
+            'up_down': up_down,
+        })
         if boxes_array is not None:
             boxes = tf.placeholder(bboxes_dtype, boxes_array.shape)
             feed_dict[boxes] = boxes_array
         else:
             boxes = None
         flipped = flip_image(
-            image, bboxes=boxes, left_right=left_right, up_down=up_down
+            image, config, bboxes=boxes,
         )
         with self.test_session() as sess:
             flipped_dict = sess.run(flipped, feed_dict=feed_dict)
             return flipped_dict['image'], flipped_dict.get('bboxes')
+
+    def _random_patch(self, image, config, bboxes=None):
+        with self.test_session() as sess:
+            # passing bboxes=None throws an error.
+            patch = random_patch(image, config, bboxes=bboxes, debug=True)
+            return_dict = sess.run(patch)
+            ret_bboxes = return_dict.get('bboxes')
+            return return_dict['image'], ret_bboxes
 
     def testResizeOnlyImage(self):
         # No min or max size, it doesn't change the image.
@@ -260,6 +282,48 @@ class ImageTest(tf.test.TestCase):
         self.assertAllClose(
             flipped_boxes_float, flipped_boxes_int
         )
+
+    def testRandomPatchImageBboxes(self):
+        """Tests the integrity of the return values of random_patch
+
+        When bboxes is not None.
+        """
+        im_shape = (800, 600, 3)
+        total_boxes = 20
+        # We don't care about the label
+        label = 3
+        # First test case, we use randomly generated image and bboxes.
+        image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
+        # Add a label to each bbox.
+        bboxes_w_label = tf.concat(
+            [
+                bboxes,
+                tf.fill((bboxes.shape[0], 1), label)
+            ],
+            axis=1
+        )
+        config = self._random_patch_config
+        ret_image, ret_bboxes = self._random_patch(
+            image, config, bboxes_w_label
+        )
+        # Assertions
+        self.assertLessEqual(ret_bboxes.shape[0], total_boxes)
+        self.assertTrue(np.all(ret_bboxes >= 0))
+        self.assertTrue(np.all(ret_bboxes[:, :4] <= ret_image.shape[1]))
+        self.assertTrue(np.all(ret_image.shape <= im_shape))
+
+    def testRandomPatchOnlyImage(self):
+        """Tests the integrity of the return values of random_patch
+
+        When bboxes is None.
+        """
+        im_shape = (600, 800, 3)
+        image = self._gen_image(*im_shape)
+        config = self._random_patch_config
+        ret_image, ret_bboxes = self._random_patch(image, config)
+        # Assertions
+        self.assertTrue(np.all(ret_image.shape <= im_shape))
+        self.assertIs(ret_bboxes, None)
 
 
 if __name__ == '__main__':
