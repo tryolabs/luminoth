@@ -183,7 +183,7 @@ class RCNNTarget(snt.AbstractModule):
                 sparse_indices=disable_inds,
                 sparse_values=True, default_value=False,
                 output_shape=tf.cast(proposals_label_shape, tf.int64),
-                # We've shuffled them, so they may not be ordered.
+                # We are shuffling the indices, so they may not be ordered.
                 validate_indices=False
             )
             return tf.where(
@@ -202,8 +202,9 @@ class RCNNTarget(snt.AbstractModule):
         # Now we want to do the same for backgrounds.
         max_bg = np.ceil(self._foreground_fraction * self._minibatch_size)
 
+        bg_mask = tf.equal(proposals_label, 0)
         bg_inds = tf.where(
-            condition=bg_condition,
+            condition=bg_mask,
         )
 
         def disable_some_bgs():
@@ -218,9 +219,9 @@ class RCNNTarget(snt.AbstractModule):
                 message="disable_place in disable_some_bgs is negative."
             )
             with tf.control_dependencies([integrity_assertion]):
-                disabled_inds = shuffled_inds[:disable_place]
+                disable_inds = shuffled_inds[:disable_place]
             is_disabled = tf.sparse_to_dense(
-                sparse_indices=disabled_inds,
+                sparse_indices=disable_inds,
                 sparse_values=True, default_value=False,
                 output_shape=tf.cast(proposals_label_shape, tf.int64),
                 validate_indices=False
