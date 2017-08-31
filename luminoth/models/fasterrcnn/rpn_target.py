@@ -172,7 +172,7 @@ class RPNTarget(snt.AbstractModule):
             gt_argmax_overlaps, tf.shape(labels, out_type=tf.int64),
             True, default_value=False
         )
-        # import ipdb; ipdb.set_trace()
+
         labels = tf.where(
             condition=gt_argmax_overlaps_cond,
             x=tf.ones(tf.shape(labels)), y=tf.to_float(labels)
@@ -276,7 +276,7 @@ class RPNTarget(snt.AbstractModule):
         fg_inds_size = tf.size(fg_inds)
 
         num_bg = tf.to_int32(self._minibatch_size - fg_inds_size)
-        # Get background indices, get True in the indices where we have a cero.
+        # Get background indices, get True in the indices where we have a zero.
         bg_inds = tf.equal(labels, 0)
         # We get only the indices where we have True.
         bg_inds = tf.squeeze(tf.where(bg_inds), axis=1)
@@ -289,7 +289,7 @@ class RPNTarget(snt.AbstractModule):
             true_fn=subsample_negative, false_fn=lambda: labels
         )
 
-        # Returns bbox targets with shape (anchors.shape[0], 4)
+        # Return bbox targets with shape (anchors.shape[0], 4).
 
         # Find the closest gt box for each anchor.
         argmax_overlaps = tf.argmax(overlaps, axis=1)
@@ -302,7 +302,7 @@ class RPNTarget(snt.AbstractModule):
 
         bbox_targets = encode_tf(anchors, gt_boxes)
 
-        # For the anchors that arent foreground, we ignore the bbox_targets
+        # For the anchors that arent foreground, we ignore the bbox_targets.
         anchor_foreground_filter = tf.equal(labels, 1)
         bbox_targets = tf.where(
             condition=anchor_foreground_filter,
