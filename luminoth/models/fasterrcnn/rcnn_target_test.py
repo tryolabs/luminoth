@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from easydict import EasyDict
 from luminoth.models.fasterrcnn.rcnn_target import RCNNTarget
+from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
 
 class RCNNTargetTest(tf.test.TestCase):
@@ -27,7 +28,9 @@ class RCNNTargetTest(tf.test.TestCase):
         # instead of checking for exact equality.
         self._equality_delta = 1e-03
 
-        self._shared_model = RCNNTarget(self._num_classes, self._config)
+        self._shared_model = RCNNTarget(
+            self._num_classes, self._config, debug=True
+        )
 
     def _run_rcnn_target(self, model, gt_boxes, proposed_boxes):
         """Runs an instance of RCNNTarget
@@ -145,18 +148,11 @@ class RCNNTargetTest(tf.test.TestCase):
         )
         foreground_fraction = self._config.foreground_fraction
         minibatch_size = self._config.minibatch_size
-        correct_foreground_number = np.floor(
-            foreground_fraction * minibatch_size
-        )
 
         foreground_number = proposals_label[proposals_label >= 1].shape[0]
         background_number = proposals_label[proposals_label == 0].shape[0]
 
-        self.assertAlmostEqual(
-            foreground_number, correct_foreground_number,
-            delta=self._equality_delta
-        )
-
+        self.assertGreater(foreground_number, 0)
         self.assertLessEqual(
             foreground_number,
             np.floor(foreground_fraction * minibatch_size)
@@ -269,6 +265,7 @@ class RCNNTargetTest(tf.test.TestCase):
             foreground_number,
             np.floor(foreground_fraction * minibatch_size)
         )
+        self.assertGreater(foreground_number, 0)
         self.assertLessEqual(
             background_number,
             np.ceil(foreground_fraction * minibatch_size)
@@ -325,6 +322,7 @@ class RCNNTargetTest(tf.test.TestCase):
         self.assertAllEqual(
             foreground_idxs, non_empty_bbox_target_idxs
         )
+        self.assertGreater(proposals_label[proposals_label >= 1].shape[0], 0)
 
     def testMultipleGtBoxes(self):
         """Tests we're getting the right labels when there's several gt_boxes.
@@ -376,6 +374,48 @@ class RCNNTargetTest(tf.test.TestCase):
             np.add([2., 1., 1., 1., 2., 0., 1., 0.], 1),
             self._equality_delta
         )
+
+    def testNonZeroForegrounds(self):
+        """Tests we never get zero foregrounds.
+
+        We're doing iterations with random gt_boxes and proposals under
+        conditions that make it likely we would get zero foregrounds if there
+        is a bug in the code. (Very few gt_boxes and a small minibatch_size).
+        """
+        number_of_iterations = 50
+        for _ in range(number_of_iterations):
+            im_shape = np.random.randint(
+                low=600, high=980, size=2, dtype=np.int32
+            )
+            total_boxes = np.random.randint(
+                low=1, high=4, dtype=np.int32
+            )
+            total_proposals = np.random.randint(
+                low=4, high=8, dtype=np.int32
+            )
+            # Generate gt_boxes and then add a label.
+            gt_boxes = generate_gt_boxes(
+                total_boxes, im_shape
+            )
+            gt_boxes_w_label = np.concatenate(
+                [gt_boxes, [[self._placeholder_label]] * total_boxes],
+                axis=1
+            ).astype(np.float32)
+            # Generate the proposals and add the batch number.
+            proposed_boxes = generate_gt_boxes(
+                total_proposals, im_shape
+            )
+            proposed_boxes_w_batch = np.concatenate(
+                [[[self._batch_number]] * total_proposals, proposed_boxes],
+                axis=1
+            ).astype(np.float32)
+            # Run RCNNTarget.
+            (proposals_label, _) = self._run_rcnn_target(
+                self._shared_model, gt_boxes_w_label, proposed_boxes_w_batch
+            )
+            # Assertion
+            foreground_number = proposals_label[proposals_label > 0].shape[0]
+            self.assertGreater(foreground_number, 0)
 
 
 if __name__ == '__main__':
