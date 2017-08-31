@@ -62,7 +62,7 @@ class RPNProposal(snt.AbstractModule):
         """
         # Scores are extracted from the second scalar of the cls probability.
         # cls_probability is a softmax of (background, foreground).
-        scores = tf.slice(rpn_cls_prob, [0, 1], [-1, -1])
+        scores = rpn_cls_prob[:, 1]
         # Force flatten the scores (it should be already be flatten).
         scores = tf.reshape(scores, [-1])
 
