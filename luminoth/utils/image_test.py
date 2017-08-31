@@ -4,17 +4,37 @@ import tensorflow as tf
 from easydict import EasyDict
 
 from luminoth.utils.image import (
-    resize_image, flip_image, random_patch
+    resize_image, flip_image, random_patch, random_resize, random_distortion
 )
 from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
 
 class ImageTest(tf.test.TestCase):
     def setUp(self):
+        self._random_resize_config = EasyDict({
+            'min_size': 400,
+            'max_size': 980,
+        })
+        self._random_distort_config = EasyDict({
+            'brightness': {
+                'enable': True,
+                'max_delta': 0.3,
+            },
+            'contrast': {
+                'enable': True,
+                'lower': 0.4,
+                'upper': 0.8,
+            },
+            'hue': {
+                'enable': True,
+                'max_delta': 0.2,
+            }
+        })
         self._random_patch_config = EasyDict({
             'min_height': 400,
             'min_width': 400,
         })
+        self._equality_delta = 1e-03
 
     def _gen_image(self, *shape):
         return np.random.rand(*shape)
@@ -64,7 +84,7 @@ class ImageTest(tf.test.TestCase):
         else:
             boxes = None
         flipped = flip_image(
-            image, config, bboxes=boxes,
+            image, bboxes=boxes, **config
         )
         with self.test_session() as sess:
             flipped_dict = sess.run(flipped, feed_dict=feed_dict)
@@ -72,9 +92,25 @@ class ImageTest(tf.test.TestCase):
 
     def _random_patch(self, image, config, bboxes=None):
         with self.test_session() as sess:
-            # passing bboxes=None throws an error.
-            patch = random_patch(image, config, bboxes=bboxes, debug=True)
+            patch = random_patch(image, bboxes=bboxes, debug=True, **config)
             return_dict = sess.run(patch)
+            ret_bboxes = return_dict.get('bboxes')
+            return return_dict['image'], ret_bboxes
+
+    def _random_resize(self, image, config, bboxes=None):
+        config = self._random_resize_config
+        with self.test_session() as sess:
+            resize = random_resize(image, bboxes=bboxes, debug=True, **config)
+            return_dict = sess.run(resize)
+            ret_bboxes = return_dict.get('bboxes')
+            return return_dict['image'], ret_bboxes
+
+    def _random_distort(self, image, config, bboxes=None):
+        with self.test_session() as sess:
+            distort = random_distortion(
+                image, bboxes=bboxes, debug=True, **config
+            )
+            return_dict = sess.run(distort)
             ret_bboxes = return_dict.get('bboxes')
             return return_dict['image'], ret_bboxes
 
@@ -323,7 +359,85 @@ class ImageTest(tf.test.TestCase):
         ret_image, ret_bboxes = self._random_patch(image, config)
         # Assertions
         self.assertTrue(np.all(ret_image.shape <= im_shape))
+        # We ran return_dict.get('bboxes') on the dict returned by
+        # random_patch. That's why we should get a None in this case.
         self.assertIs(ret_bboxes, None)
+
+    def testRandomResizeImageBboxes(self):
+        """Tests the integrity of the return values of random_resize
+
+        This tests the case when bboxes is not None.
+        """
+        im_shape = (600, 800, 3)
+        config = self._random_resize_config
+        total_boxes = 35
+        label = 3
+
+        image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
+        # Add a label to each bbox.
+        bboxes_w_label = tf.concat(
+            [
+                bboxes,
+                tf.fill((bboxes.shape[0], 1), label)
+            ],
+            axis=1
+        )
+        ret_image, ret_bboxes = self._random_resize(
+            image, config, bboxes_w_label
+        )
+        # Assertions
+        self.assertEqual(ret_bboxes.shape[0], total_boxes)
+        self.assertTrue(np.all(
+            np.asarray(ret_image.shape[:2]) >= config.min_size
+        ))
+        self.assertTrue(np.all(
+            np.asarray(ret_image.shape[:2]) <= config.max_size
+        ))
+
+    def testRandomResizeOnlyImage(self):
+        """Tests the integrity of the return values of random_resize
+
+        This tests the case when bboxes is None.
+        """
+        im_shape = (600, 800, 3)
+        image = self._gen_image(*im_shape)
+        config = self._random_resize_config
+        ret_image, ret_bboxes = self._random_resize(image, config)
+        # Assertions
+        self.assertEqual(ret_bboxes, None)
+        self.assertTrue(np.all(
+            np.asarray(ret_image.shape[:2]) >= config.min_size
+        ))
+        self.assertTrue(np.all(
+            np.asarray(ret_image.shape[:2]) <= config.max_size
+        ))
+
+    def testRandomDistort(self):
+        """Tests the integrity of the return values of random_distortion.
+        """
+        im_shape = (600, 900, 3)
+        config = self._random_distort_config
+        total_boxes = 5
+        label = 3
+
+        image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
+        # Add a label to each bbox.
+        bboxes_w_label = tf.concat(
+            [
+                bboxes,
+                tf.fill((bboxes.shape[0], 1), label)
+            ],
+            axis=1
+        )
+
+        ret_image, ret_bboxes = self._random_distort(
+            image, config, bboxes_w_label
+        )
+        # Assertions
+        self.assertEqual(im_shape, ret_image.shape)
+        self.assertAllClose(
+            bboxes, ret_bboxes[:, :4], atol=self._equality_delta
+        )
 
 
 if __name__ == '__main__':

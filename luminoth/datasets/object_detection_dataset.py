@@ -2,12 +2,13 @@ import sonnet as snt
 import tensorflow as tf
 
 from luminoth.utils.image import (
-    resize_image, flip_image, random_patch
+    resize_image, flip_image, random_patch, random_resize, random_distortion
 )
-
 DATA_AUGMENTATION_STRATEGIES = {
     'flip': flip_image,
     'patch': random_patch,
+    'resize': random_resize,
+    'distortion': random_distortion
 }
 
 
@@ -96,29 +97,11 @@ class ObjectDetectionDataset(snt.AbstractModule):
 
             augmented = tf.cond(
                 apply_aug_strategy,
-                lambda: aug_fn(image, aug_config, bboxes),
+                lambda: aug_fn(image, bboxes, **aug_config),
                 lambda: {'image': image, 'bboxes': bboxes}
             )
-
-            update_condition = tf.greater(
-                tf.gather(tf.shape(augmented['bboxes']), 0),
-                0
-            )
-            image = tf.cond(
-                update_condition,
-                lambda: augmented['image'],
-                lambda: image
-            )
-            # Hot fix. This works because bboxes is either always or never
-            # None in a single training session.
-            if bboxes is not None:
-                bboxes = tf.cond(
-                    update_condition,
-                    # TODO: find out why we're sometimes getting float
-                    # bboxes.
-                    lambda: tf.to_int32(augmented['bboxes']),
-                    lambda: bboxes
-                )
+            image = augmented['image']
+            bboxes = augmented.get('bboxes')
 
             applied_data_augmentation.append({aug_type: apply_aug_strategy})
 

@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+from easydict import EasyDict
+
 from luminoth.utils.bbox_transform_tf import clip_boxes
 
 
@@ -114,7 +116,7 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
     }
 
 
-def flip_image(image, config, bboxes=None):
+def flip_image(image, bboxes=None, left_right=True, up_down=False):
     """Flips image on its axis for data augmentation.
 
     Args:
@@ -129,13 +131,6 @@ def flip_image(image, config, bboxes=None):
         image: Flipped image with the same shape.
         bboxes: Tensor with the same shape.
     """
-    if 'left_right' not in config:
-        config.left_right = True
-    if 'up_down' not in config:
-        config.up_down = False
-    left_right = config.left_right
-    up_down = config.up_down
-
     image_shape = tf.shape(image)
     height = image_shape[0]
     width = image_shape[1]
@@ -177,7 +172,8 @@ def flip_image(image, config, bboxes=None):
     return return_dict
 
 
-def random_patch(image, config, bboxes=None, debug=False):
+def random_patch(image, bboxes=None, debug=False, min_height=400,
+                 min_width=400):
     """Gets a random patch from an image.
 
     Args:
@@ -197,12 +193,6 @@ def random_patch(image, config, bboxes=None, debug=False):
             them to the patch boundaries. If we didn't get any bboxes, then
             it's set as -1.
     """
-    # Get default values if not set.
-    if 'min_height' not in config:
-        config.min_height = 400
-    if 'min_width' not in config:
-        config.min_width = 400
-
     if debug:
         seed = 0
     else:
@@ -214,7 +204,7 @@ def random_patch(image, config, bboxes=None, debug=False):
         minval=0,
         maxval=tf.subtract(
             tf.shape(image)[1],
-            config.min_width
+            min_width
         ),
         dtype=tf.int32,
         seed=seed
@@ -224,14 +214,14 @@ def random_patch(image, config, bboxes=None, debug=False):
         minval=0,
         maxval=tf.subtract(
             tf.shape(image)[0],
-            config.min_height
+            min_height
         ),
         dtype=tf.int32,
         seed=seed
     )
     target_width = tf.random_uniform(
         shape=[],
-        minval=config.min_width,
+        minval=min_width,
         maxval=tf.subtract(
             tf.shape(image)[1],
             offset_width
@@ -241,7 +231,7 @@ def random_patch(image, config, bboxes=None, debug=False):
     )
     target_height = tf.random_uniform(
         shape=[],
-        minval=config.min_height,
+        minval=min_height,
         maxval=tf.subtract(
             tf.shape(image)[0],
             offset_height
@@ -255,10 +245,9 @@ def random_patch(image, config, bboxes=None, debug=False):
         target_height=target_height, target_width=target_width
     )
 
-    return_dict = {'image': new_image}
-
     # Return if we didn't have bboxes.
     if bboxes is None:
+        return_dict = {'image': new_image}
         return return_dict
 
     # Now we will remove all bboxes whose centers are not inside the cropped
@@ -342,5 +331,145 @@ def random_patch(image, config, bboxes=None, debug=False):
         ],
         axis=1
     )
+    update_condition = tf.greater(
+        tf.gather(tf.shape(new_bboxes), 0),
+        0
+    )
+    return_dict = {}
+    return_dict['image'] = tf.cond(
+        update_condition,
+        lambda: new_image,
+        lambda: image
+    )
+    return_dict['bboxes'] = tf.cond(
+        update_condition,
+        lambda: new_bboxes,
+        lambda: bboxes
+    )
     return_dict['bboxes'] = new_bboxes
+    return return_dict
+
+
+def random_resize(image, bboxes=None, debug=False, min_size=400,
+                  max_size=980):
+    """Randomly resizes an image within limits.
+
+    Args:
+        image: Tensor with shape (H, W, 3)
+        config: EasyDict
+            min_size: minimum side-size of the resized image.
+            max_size: maximum side-size of the resized image.
+        bboxes: Tensor with the ground-truth boxes. Shaped (total_boxes, 5).
+            The last element in each box is the category label.
+        debug: Boolean. If True, random seeds will be set to 0.
+
+    Returns:
+        image: Tensor with shape (H', W', 3), satisfying the following.
+            min_size <= H' <= H
+            min_size <= W' <= W
+        bboxes: Tensor with the same shape as the input bboxes. Or -1 if we
+            didn't pass any bboxes.
+        scale_factor: Scale factor used to modify the image.
+    """
+    if debug:
+        seed = 0
+    else:
+        seed = None
+    im_shape = tf.to_float(tf.shape(image))
+    new_size = tf.random_uniform(
+        shape=[2],
+        minval=min_size,
+        maxval=max_size,
+        dtype=tf.int32,
+        seed=seed,
+    )
+    image = tf.image.resize_images(
+        image, new_size,
+        method=tf.image.ResizeMethod.BILINEAR
+    )
+    # Our returned dict needs to have a fixed size. So we can't
+    # return the scale_factor that resize_image returns.
+    if bboxes is not None:
+        new_size = tf.to_float(new_size)
+        bboxes = adjust_bboxes(
+            bboxes,
+            old_height=im_shape[0], old_width=im_shape[1],
+            new_height=new_size[0], new_width=new_size[1]
+        )
+        return_dict = {
+            'image': image,
+            'bboxes': bboxes
+        }
+    else:
+        return_dict = {'image': image}
+    return return_dict
+
+
+def random_distortion(image, bboxes=None, debug=False, brightness=None,
+                      contrast=None, hue=None):
+    """Photometrically distorts an image.
+
+    This includes changing the brightness, contrast and hue.
+
+    Args:
+        image: Tensor with shape (H, W, 3)
+        config: EasyDict with
+            brightness:
+                enable: Boolean
+                max_delta: non-negative float
+            contrast:
+                enable: Boolean
+                lower: non-negative float
+                upper: non-negative float
+            hue:
+                enable: Boolean
+                max_delta: float in [0, 0.5]
+        debug: Boolean. If True, random seeds will be set to 0.
+
+    Returns:
+        image: Distorted image with the same shape as the input image.
+        bboxes: Unchanged bboxes.
+    """
+    # Get default values if not set.
+    if brightness is None:
+        brightness = EasyDict({
+            'enable': True,
+            'max_delta': 0.3,
+        })
+    if contrast is None:
+        contrast = EasyDict({
+            'enable': True,
+            'lower': 0.4,
+            'upper': 0.8,
+        })
+    if hue is None:
+        hue = EasyDict({
+            'enable': True,
+            'max_delta': 0.2,
+        })
+    if debug:
+        seed = 0
+    else:
+        seed = None
+
+    if brightness.enable:
+        image = tf.image.random_brightness(
+            image, max_delta=brightness.max_delta, seed=seed
+        )
+    if contrast.enable:
+        image = tf.image.random_contrast(
+            image, lower=contrast.lower, upper=contrast.upper,
+            seed=seed
+        )
+    if hue.enable:
+        image = tf.image.random_hue(
+            image, max_delta=hue.max_delta, seed=seed
+        )
+    if bboxes is None:
+        return_dict = {'image': image}
+    else:
+        return_dict = {
+            'image': image,
+            'bboxes': bboxes,
+        }
     return return_dict
