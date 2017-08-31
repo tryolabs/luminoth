@@ -49,6 +49,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                     'factor': 1.0,
                     'uniform': 'True',
                     'mode': 'FAN_AVG',
+                    'seed': 0
                 },
                 'roi': {
                     'pooling_mode': 'crop',
@@ -76,6 +77,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                  'type': 'truncated_normal_initializer',
                  'mean': 0.0,
                  'stddev': 0.01,
+                 'seed': 0
                },
                'activation_function': 'relu6',
                'l2_regularization_scale': 0.0005,
@@ -158,7 +160,9 @@ class FasterRCNNetworkTest(tf.test.TestCase):
 
         # Check that there are class probabilities and labels for each object
         self.assertEqual(
-            class_prediction['cls_prob'].shape[0],
+            class_prediction['cls_prob'][
+                class_prediction['cls_prob'].argmax(axis=1) > 0
+            ].shape[0],
             class_prediction['objects'].shape[0]
         )
 
