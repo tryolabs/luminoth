@@ -69,6 +69,22 @@ dataset:
         min_height: 400
         min_width: 400
         prob: 0.2
+    - resize:
+        min_size: 400
+        max_size: 980
+        prob: 1.
+    - distortion:
+        brightness:
+          enable: True
+          max_delta: 0.3
+        contrast:
+          enable: True
+          lower: 0.4
+          upper: 0.8
+        hue:
+          enable: True
+          max_delta: 0.2
+        prob: 1.
 
 network:
   # Total number of classes to predict
