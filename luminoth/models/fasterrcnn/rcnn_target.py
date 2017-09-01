@@ -202,6 +202,9 @@ class RCNNTarget(snt.AbstractModule):
         # Now we want to do the same for backgrounds.
         max_bg = np.ceil(self._foreground_fraction * self._minibatch_size)
 
+        # We can't use bg_condition because some of the proposals that satisfy
+        # the IoU conditions to be background may have been labeled as
+        # foreground due to them being the best proposal for a certain gt_box.
         bg_mask = tf.equal(proposals_label, 0)
         bg_inds = tf.where(
             condition=bg_mask,
