@@ -19,7 +19,6 @@ class FasterRCNN(snt.AbstractModule):
 
     It is also responsible for building the anchor reference which is used in
     graph for generating the dynamic anchors.
-
     """
 
     base_config = get_base_config(__file__)

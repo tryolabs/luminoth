@@ -3,7 +3,6 @@ import os
 import click
 import json
 import tensorflow as tf
-import time
 
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
