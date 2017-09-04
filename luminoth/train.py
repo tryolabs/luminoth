@@ -178,10 +178,6 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
             trace_level=tf.RunOptions.FULL_TRACE
         )
 
-    session_config = tf.ConfigProto()
-    session_config.gpu_options.allow_growth = True
-    session_config.log_device_placement = True
-
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
     scaffold = tf.train.Scaffold(init_op=init_op)
@@ -194,7 +190,6 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
         save_checkpoint_secs=config.train.save_checkpoint_secs,
         save_summaries_steps=config.train.save_summaries_steps,
         save_summaries_secs=config.train.save_summaries_secs,
-        config=session_config
     ) as sess:
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
