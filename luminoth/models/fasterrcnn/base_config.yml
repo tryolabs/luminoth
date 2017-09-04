@@ -65,26 +65,25 @@ dataset:
         left_right: True
         up_down: False
         prob: 0.5
-    - patch:
-        min_height: 400
-        min_width: 400
-        prob: 0.2
+    # If you resize to too small images, you may end up with zero anchors that
+    # aren't partially outside the image.
     - resize:
-        min_size: 400
-        max_size: 980
-        prob: 1.
+        min_size: 600
+        max_size: 1024
+        prob: 0.2
+    - patch:
+        min_height: 600
+        min_width: 600
+        prob: 0.4
     - distortion:
         brightness:
-          enable: True
-          max_delta: 0.3
-        contrast:
-          enable: True
-          lower: 0.4
-          upper: 0.8
-        hue:
-          enable: True
           max_delta: 0.2
-        prob: 1.
+        hue:
+          max_delta: 0.2
+        saturation:
+          lower: 0.5
+          upper: 1.5
+        prob: 0.3
 
 network:
   # Total number of classes to predict
