@@ -92,7 +92,7 @@ class ImageTest(tf.test.TestCase):
             image = tf.cast(image, tf.float32)
             if bboxes is not None:
                 bboxes = tf.cast(bboxes, tf.int32)
-            patch = random_patch(image, bboxes=bboxes, **config, seed=0)
+            patch = random_patch(image, bboxes=bboxes, seed=0, **config)
             return_dict = sess.run(patch)
             ret_bboxes = return_dict.get('bboxes')
             return return_dict['image'], ret_bboxes
@@ -100,7 +100,7 @@ class ImageTest(tf.test.TestCase):
     def _random_resize(self, image, config, bboxes=None):
         config = self._random_resize_config
         with self.test_session() as sess:
-            resize = random_resize(image, bboxes=bboxes, **config, seed=0)
+            resize = random_resize(image, bboxes=bboxes, seed=0, **config)
             return_dict = sess.run(resize)
             ret_bboxes = return_dict.get('bboxes')
             return return_dict['image'], ret_bboxes
@@ -108,7 +108,7 @@ class ImageTest(tf.test.TestCase):
     def _random_distort(self, image, config, bboxes=None):
         with self.test_session() as sess:
             distort = random_distortion(
-                image, bboxes=bboxes, **config, seed=0
+                image, bboxes=bboxes, seed=0, **config
             )
             return_dict = sess.run(distort)
             ret_bboxes = return_dict.get('bboxes')
@@ -259,8 +259,7 @@ class ImageTest(tf.test.TestCase):
             patch = patch_image(
                 image_ph, bboxes_ph,
                 offset_height=45, offset_width=45,
-                target_height=100, target_width=200,
-                seed=0
+                target_height=100, target_width=200
             )
             feed_dict = {
                 image_ph: image,

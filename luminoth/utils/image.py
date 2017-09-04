@@ -115,7 +115,7 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
 
 
 def patch_image(image, bboxes=None, offset_height=0, offset_width=0,
-                target_height=None, target_width=None, seed=None):
+                target_height=None, target_width=None):
     """Gets a patch using tf.image.crop_to_bounding_box and adjusts bboxes
 
     If patching would leave us with zero bboxes, we return the image and bboxes
@@ -412,8 +412,7 @@ def random_patch(image, bboxes=None, min_height=600, min_width=600,
     return patch_image(
         image, bboxes=bboxes,
         offset_height=offset_height, offset_width=offset_width,
-        target_height=target_height, target_width=target_width,
-        seed=seed
+        target_height=target_height, target_width=target_width
     )
 
 
