@@ -4,7 +4,8 @@ import tensorflow as tf
 from easydict import EasyDict
 
 from luminoth.utils.image import (
-    resize_image, flip_image, random_patch, random_resize, random_distortion
+    resize_image, flip_image, random_patch, random_resize, random_distortion,
+    patch_image
 )
 from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
@@ -17,24 +18,24 @@ class ImageTest(tf.test.TestCase):
         })
         self._random_distort_config = EasyDict({
             'brightness': {
-                'enable': True,
                 'max_delta': 0.3,
             },
             'contrast': {
-                'enable': True,
                 'lower': 0.4,
                 'upper': 0.8,
             },
             'hue': {
-                'enable': True,
                 'max_delta': 0.2,
+            },
+            'saturation': {
+                'lower': 0.5,
+                'upper': 1.5,
             }
         })
         self._random_patch_config = EasyDict({
-            'min_height': 400,
-            'min_width': 400,
+            'min_height': 600,
+            'min_width': 600,
         })
-        self._equality_delta = 1e-03
 
     def _gen_image(self, *shape):
         return np.random.rand(*shape)
@@ -74,17 +75,13 @@ class ImageTest(tf.test.TestCase):
         feed_dict = {
             image: image_array,
         }
-        config = EasyDict({
-            'left_right': left_right,
-            'up_down': up_down,
-        })
         if boxes_array is not None:
             boxes = tf.placeholder(bboxes_dtype, boxes_array.shape)
             feed_dict[boxes] = boxes_array
         else:
             boxes = None
         flipped = flip_image(
-            image, bboxes=boxes, **config
+            image, bboxes=boxes, left_right=left_right, up_down=up_down
         )
         with self.test_session() as sess:
             flipped_dict = sess.run(flipped, feed_dict=feed_dict)
@@ -92,7 +89,10 @@ class ImageTest(tf.test.TestCase):
 
     def _random_patch(self, image, config, bboxes=None):
         with self.test_session() as sess:
-            patch = random_patch(image, bboxes=bboxes, debug=True, **config)
+            image = tf.cast(image, tf.float32)
+            if bboxes is not None:
+                bboxes = tf.cast(bboxes, tf.int32)
+            patch = random_patch(image, bboxes=bboxes, **config, seed=0)
             return_dict = sess.run(patch)
             ret_bboxes = return_dict.get('bboxes')
             return return_dict['image'], ret_bboxes
@@ -100,7 +100,7 @@ class ImageTest(tf.test.TestCase):
     def _random_resize(self, image, config, bboxes=None):
         config = self._random_resize_config
         with self.test_session() as sess:
-            resize = random_resize(image, bboxes=bboxes, debug=True, **config)
+            resize = random_resize(image, bboxes=bboxes, **config, seed=0)
             return_dict = sess.run(resize)
             ret_bboxes = return_dict.get('bboxes')
             return return_dict['image'], ret_bboxes
@@ -108,7 +108,7 @@ class ImageTest(tf.test.TestCase):
     def _random_distort(self, image, config, bboxes=None):
         with self.test_session() as sess:
             distort = random_distortion(
-                image, bboxes=bboxes, debug=True, **config
+                image, bboxes=bboxes, **config, seed=0
             )
             return_dict = sess.run(distort)
             ret_bboxes = return_dict.get('bboxes')
@@ -242,6 +242,39 @@ class ImageTest(tf.test.TestCase):
         )
         self.assertAllEqual(resized_boxes, [[0, 0, 24, 24, -1]])
 
+    def testPatchImageUpdateCondition(self):
+        """Tests we're not patching if we would lose all gt_boxes.
+        """
+        im_shape = (600, 800, 3)
+        label = 3
+        image_ph = tf.placeholder(shape=(None, None, 3), dtype=tf.float32)
+        bboxes_ph = tf.placeholder(shape=(None, 5), dtype=tf.int32)
+
+        with self.test_session() as sess:
+            # Generate image and bboxes.
+            image = self._gen_image(*im_shape)
+            bboxes = [(0, 0, 40, 40, label), (430, 200, 480, 250, label)]
+            # Get patch_image so that the proposed patch has no gt_box center
+            # in it.
+            patch = patch_image(
+                image_ph, bboxes_ph,
+                offset_height=45, offset_width=45,
+                target_height=100, target_width=200,
+                seed=0
+            )
+            feed_dict = {
+                image_ph: image,
+                bboxes_ph: bboxes
+            }
+            # Run patch in a test session.
+            ret_dict = sess.run(patch, feed_dict)
+
+            ret_image = ret_dict['image']
+            ret_bboxes = ret_dict.get('bboxes')
+        # Assertions
+        self.assertAllClose(ret_image, image)
+        self.assertAllClose(ret_bboxes, bboxes)
+
     def testFlipOnlyImage(self):
         # No changes to image or boxes when no flip is specified.
         image = self._gen_image(100, 100, 3)
@@ -325,7 +358,7 @@ class ImageTest(tf.test.TestCase):
         When bboxes is not None.
         """
         im_shape = (800, 600, 3)
-        total_boxes = 20
+        total_boxes = 5
         # We don't care about the label
         label = 3
         # First test case, we use randomly generated image and bboxes.
@@ -344,8 +377,60 @@ class ImageTest(tf.test.TestCase):
         )
         # Assertions
         self.assertLessEqual(ret_bboxes.shape[0], total_boxes)
+        self.assertGreater(ret_bboxes.shape[0], 0)
         self.assertTrue(np.all(ret_bboxes >= 0))
-        self.assertTrue(np.all(ret_bboxes[:, :4] <= ret_image.shape[1]))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 0] <= ret_image.shape[1]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 1] <= ret_image.shape[0]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 2] <= ret_image.shape[1]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 3] <= ret_image.shape[0]
+        ))
+        self.assertTrue(np.all(ret_image.shape <= im_shape))
+
+    def testRandomPatchLargerThanImage(self):
+        """Tests random_patch normalizes the minimum sizes.
+        """
+        im_shape = (600, 800, 3)
+        total_boxes = 5
+        config = EasyDict({
+            'min_height': 900,
+            'min_width': 900
+        })
+        label = 3
+        image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
+        # Add a label to each bbox.
+        bboxes_w_label = tf.concat(
+            [
+                bboxes,
+                tf.fill((bboxes.shape[0], 1), label)
+            ],
+            axis=1
+        )
+        ret_image, ret_bboxes = self._random_patch(
+            image, config, bboxes_w_label
+        )
+        # Assertions
+        self.assertLessEqual(ret_bboxes.shape[0], total_boxes)
+        self.assertGreater(ret_bboxes.shape[0], 0)
+        self.assertTrue(np.all(ret_bboxes >= 0))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 0] <= ret_image.shape[1]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 1] <= ret_image.shape[0]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 2] <= ret_image.shape[1]
+        ))
+        self.assertTrue(np.all(
+            ret_bboxes[:, 3] <= ret_image.shape[0]
+        ))
         self.assertTrue(np.all(ret_image.shape <= im_shape))
 
     def testRandomPatchOnlyImage(self):
@@ -370,7 +455,7 @@ class ImageTest(tf.test.TestCase):
         """
         im_shape = (600, 800, 3)
         config = self._random_resize_config
-        total_boxes = 35
+        total_boxes = 5
         label = 3
 
         image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
@@ -435,9 +520,51 @@ class ImageTest(tf.test.TestCase):
         )
         # Assertions
         self.assertEqual(im_shape, ret_image.shape)
-        self.assertAllClose(
-            bboxes, ret_bboxes[:, :4], atol=self._equality_delta
+        self.assertAllEqual(
+            bboxes, ret_bboxes[:, :4]
         )
+
+    def testSmallRandomDistort(self):
+        """Tests random_distort with small-change arguments.
+
+        We pass parameters to random_distort that make it so that it should
+        change the image relatively little, and then check that in fact it
+        changed relatively little.
+        """
+        total_boxes = 3
+        im_shape = (600, 900, 3)
+        config = EasyDict({
+            'brightness': {
+                'max_delta': 0.00001,
+            },
+            'hue': {
+                'max_delta': 0.00001,
+            },
+            'saturation': {
+                'lower': 0.99999,
+                'upper': 1.00001,
+            },
+            'contrast': {
+                'lower': 0.99999,
+                'upper': 1.00001
+            }
+        })
+        label = 3
+        image, bboxes = self._get_image_with_boxes(im_shape, total_boxes)
+        # Add a label to each bbox.
+        bboxes_w_label = tf.concat(
+            [
+                bboxes,
+                tf.fill((bboxes.shape[0], 1), label)
+            ],
+            axis=1
+        )
+        ret_image, ret_bboxes = self._random_distort(
+            image, config, bboxes_w_label
+        )
+        # Assertions
+        large_number = 0.1
+        self.assertAllClose(image, ret_image, rtol=0.05, atol=large_number)
 
 
 if __name__ == '__main__':
