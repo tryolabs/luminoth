@@ -36,7 +36,8 @@ summaries = {
             'draw_rpn_bbox_pred': None,
             'draw_rpn_bbox_pred_with_target': [
                 {'worst': True}, {'worst': False}
-            ]
+            ],
+            'draw_gt_boxes': None,
         },
         'rcnn': {
             'draw_rcnn_cls_batch': None,
@@ -74,7 +75,7 @@ def add_images_to_tensoboard(pred_dict, global_step, summary_dir, with_rcnn):
         summaries['fasterrcnn']['rpn'], pred_dict, summary_writer,
         global_step
     )
-    if with_rcnn:
+    if with_rcnn and summaries['fasterrcnn'].get('rcnn'):
         add_to_summary(
             summaries['fasterrcnn']['rcnn'], pred_dict, summary_writer,
             global_step
@@ -188,6 +189,24 @@ def draw_positive_anchors(pred_dict):
 
     for gt_box in gt_boxes:
         draw.rectangle(list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
+
+    return image_pil
+
+
+def draw_gt_boxes(pred_dict):
+    """
+    Draws GT boxes.
+    """
+    gt_boxes = pred_dict['gt_boxes']
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for gt_box in gt_boxes:
+        draw.rectangle(
+            list(gt_box[:4]),
+            fill=(0, 0, 255, 60),
+            outline=(0, 0, 255, 150)
+        )
 
     return image_pil
 

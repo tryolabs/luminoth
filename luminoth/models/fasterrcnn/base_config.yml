@@ -74,7 +74,7 @@ dataset:
     - patch:
         min_height: 600
         min_width: 600
-        prob: 0.4
+        prob: 0.2
     - distortion:
         brightness:
           max_delta: 0.2
