@@ -4,6 +4,8 @@ import click
 import json
 import tensorflow as tf
 
+from tensorflow.python import debug as tf_debug
+
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
 from luminoth.utils.config import (
@@ -113,6 +115,8 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
         # TODO: Make optional for different types of models.
         load_op = model.load_pretrained_weights()
 
+        # TODO: what is this? probably broken since code changes for
+        #       distributed training
         # saver = model.get_saver()
         # if config.train.ignore_scope:
         #     partial_loader = model.get_saver(
@@ -182,24 +186,29 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
     # is not restored from checkpoint.
     scaffold = tf.train.Scaffold(init_op=init_op)
 
+    #
+    # Custom hooks for our session
+    #
+    hooks = []
+    if config.train.tf_debug:
+        debug_hook = tf_debug.LocalCLIDebugHook()
+        debug_hook.add_tensor_filter(
+            'has_inf_or_nan', tf_debug.has_inf_or_nan
+        )
+        hooks.extend([debug_hook])
+
     with tf.train.MonitoredTrainingSession(
         master=target,
         is_chief=is_chief,
         checkpoint_dir=config.train.job_dir,
         scaffold=scaffold,
+        hooks=hooks,
         save_checkpoint_secs=config.train.save_checkpoint_secs,
         save_summaries_steps=config.train.save_summaries_steps,
         save_summaries_secs=config.train.save_summaries_secs,
     ) as sess:
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-        if config.train.tf_debug:
-            from tensorflow.python import debug as tensorflow_debug
-            sess = tensorflow_debug.LocalCLIDebugWrapperSession(sess)
-            sess.add_tensor_filter(
-                'has_inf_or_nan', tensorflow_debug.has_inf_or_nan
-            )
 
         try:
             while not coord.should_stop():

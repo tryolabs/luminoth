@@ -71,7 +71,8 @@ class Pretrained(snt.AbstractModule):
             )
 
         tf.logging.debug(
-            'Loading {} variables from pretrained checkpoint {}'.format(
+            'Constructing op to load {} variables from pretrained '
+            'checkpoint {}'.format(
                 len(load_variables), checkpoint_file
             ))
 
