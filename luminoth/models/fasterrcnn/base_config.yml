@@ -3,8 +3,8 @@ train:
   debug: False
   # Training batch size for images. FasterRCNN currently only supports 1
   batch_size: 1
-  # Checkpoint file from where to load existing var values
-  checkpoint_file:
+  # Directory in which model checkpoints & summaries (for Tensorboard) will be saved
+  job_dir: null
   # Ignore scope when loading from checkpoint (useful when training RPN first
   # and then RPN + RCNN)
   ignore_scope:
@@ -46,9 +46,6 @@ train:
   momentum: 0.9
   # Number of epochs (complete dataset batches) to run
   num_epochs: 10000
-
-  # TODO: Remove this arg passed by Google Cloud ML
-  job_dir: null
 
 dataset:
   # From which directory to read the dataset
