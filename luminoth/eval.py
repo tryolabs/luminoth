@@ -9,14 +9,13 @@ from luminoth.models import get_model
 from luminoth.utils.config import (
     load_config, merge_into, parse_override
 )
-from luminoth.utils.vars import get_saver
 from luminoth.utils.bbox_overlap import bbox_overlap
 
 
 @click.command(help='Evaluate trained (or training) models')
 @click.option('model_type', '--model', required=True, default='fasterrcnn')
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
-@click.option('config_file', '--config', '-c', type=click.File('r'), help='Config to use.')  # noqa
+@click.option('config_file', '--config', '-c', help='Config to use.')  # noqa
 @click.option('--model-dir', required=True, help='Directory from where to read saved models.')  # noqa
 @click.option('--log-dir', help='Directory where to save evaluation logs.')
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
@@ -54,9 +53,10 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
 
+    # Set pretrained as not training
+    config.pretrained.trainable = False
+
     model = model_cls(config)
-    pretrained_cls = get_model(config.pretrained.net)
-    pretrained = pretrained_cls(config.pretrained)
     dataset = TFRecordDataset(config)
     train_dataset = dataset()
 
@@ -72,9 +72,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
 
     # Build the graph of the model to evaluate, retrieving required
     # intermediate tensors.
-    pretrained_dict = pretrained(train_image, is_training=False)
     prediction_dict = model(
-        train_image, pretrained_dict['net'], train_objects, is_training=False
+        train_image, train_objects
     )
 
     pred = prediction_dict['classification_prediction']
@@ -103,7 +102,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     )
 
     # Get the saver required to load model parameters.
-    saver = get_saver((model, pretrained, ))
+    saver = model.get_saver()
 
     # Aggregate the required ops to evaluate into a dict..
     ops = {
