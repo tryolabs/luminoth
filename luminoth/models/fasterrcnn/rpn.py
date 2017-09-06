@@ -173,6 +173,13 @@ class RPN(snt.AbstractModule):
         variable_summaries(
             rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
 
+        variable_summaries(self._rpn._w, 'conv/W', ['rpn'])
+        variable_summaries(self._rpn._b, 'conv/b', ['rpn'])
+        variable_summaries(self._rpn_cls._w, 'cls_conv/W', ['rpn'])
+        variable_summaries(self._rpn_cls._b, 'cls_conv/b', ['rpn'])
+        variable_summaries(self._rpn_bbox._w, 'bbox_conv/W', ['rpn'])
+        variable_summaries(self._rpn_bbox._b, 'bbox_conv/b', ['rpn'])
+
         prediction_dict['proposals'] = proposal_prediction['nms_proposals']
         prediction_dict['scores'] = proposal_prediction['nms_proposals_scores']
 
