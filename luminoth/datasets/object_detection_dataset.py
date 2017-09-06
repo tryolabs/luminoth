@@ -48,7 +48,8 @@ class ObjectDetectionDataset(snt.AbstractModule):
         self._image_min_size = config.dataset.image_preprocessing.min_size
         self._image_max_size = config.dataset.image_preprocessing.max_size
         self._random_shuffle = config.train.random_shuffle
-        self._data_augmentation = config.dataset.data_augmentation
+        # In case no keys are defined, default to empty list.
+        self._data_augmentation = config.dataset.data_augmentation or []
 
     def _build():
         pass
