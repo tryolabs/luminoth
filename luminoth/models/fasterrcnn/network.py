@@ -194,6 +194,7 @@ class FasterRCNN(snt.AbstractModule):
 
             all_losses_items = (
                 list(rpn_loss_dict.items()) + list(rcnn_loss_dict.items()))
+
             for loss_name, loss_tensor in all_losses_items:
                 tf.summary.scalar(
                     loss_name, loss_tensor,
@@ -309,8 +310,9 @@ class FasterRCNN(snt.AbstractModule):
             tf.summary.merge_all(key='rpn'),
         ]
 
-        # if training:
-        #    tf.summary.merge_all(key=self._losses_collections[0])
+        summaries.append(
+            tf.summary.merge_all(key=self._losses_collections[0])
+        )
 
         if self._with_rcnn:
             summaries.append(tf.summary.merge_all(key='rcnn'))
