@@ -277,6 +277,15 @@ def evaluate_once(config, saver, ops, checkpoint):
                     simple_value=val
                 ))
 
+            total_bboxes_per_batch = [
+                len(bboxes) for bboxes in output_per_batch['bboxes']
+            ]
+
+            summary.append(tf.Summary.Value(
+                tag='metrics/avg_bboxes',
+                simple_value=np.mean(total_bboxes_per_batch)
+            ))
+
             writer.add_summary(
                 tf.Summary(value=summary),
                 checkpoint['global_step']
