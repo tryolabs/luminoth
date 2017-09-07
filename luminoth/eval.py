@@ -118,7 +118,17 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
     last_global_step = from_global_step
     while True:
         # Get the checkpoint files to evaluate.
-        checkpoints = get_checkpoints(config, last_global_step)
+        try:
+            checkpoints = get_checkpoints(config, last_global_step)
+        except ValueError as e:
+            if not watch:
+                tf.logging.error('Missing checkpoint.')
+                raise e
+
+            tf.logging.warning(
+                'Missing checkpoint; Checking again in a minute')
+            time.sleep(60)
+            continue
 
         for checkpoint in checkpoints:
             # Always returned in order, so it's safe to assign directly.
