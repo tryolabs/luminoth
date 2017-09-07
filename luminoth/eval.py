@@ -222,14 +222,11 @@ def evaluate_once(config, saver, ops, checkpoint):
         'gt_classes': [],  # Ground-truth classes for each bounding box.
     }
 
-    # TODO: Get runname from model-dir
-    summary_dir = os.path.join(config.train.log_dir, config.train.run_name)
-
     with tf.Session() as sess:
         sess.run(ops['init_op'])
         saver.restore(sess, checkpoint['file'])
 
-        writer = tf.summary.FileWriter(summary_dir, sess.graph)
+        writer = tf.summary.FileWriter(config.train.log_dir, sess.graph)
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
