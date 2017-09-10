@@ -89,6 +89,11 @@ class RCNNTargetTest(tf.test.TestCase):
             atol=self._equality_delta
         )
 
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            self._config.minibatch_size
+        )
+
     def testEmptyCase(self):
         """Tests we're choosing the best box when none are above the
         foreground threshold.
@@ -122,6 +127,11 @@ class RCNNTargetTest(tf.test.TestCase):
         for i, label in enumerate(proposals_label):
             if i != 2:
                 self.assertLess(label, 1)
+
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            self._config.minibatch_size
+        )
 
     def testAbsolutelyEmptyCase(self):
         """Tests the code doesn't break when there's no proposals with IoU > 0.
@@ -212,6 +222,11 @@ class RCNNTargetTest(tf.test.TestCase):
         for foreground_idx in foreground_idxs:
             self.assertIn(foreground_idx, [2, 3, 4, 7])
 
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            self._config.minibatch_size
+        )
+
     def testOddMinibatchSize(self):
         """Tests we're getting the right results when there's an odd minibatch
         size.
@@ -271,6 +286,11 @@ class RCNNTargetTest(tf.test.TestCase):
             np.ceil(foreground_fraction * minibatch_size)
         )
 
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            config.minibatch_size
+        )
+
     def testBboxTargetConsistency(self):
         """Tests that bbox_targets is consistent with proposals_label.
 
@@ -282,7 +302,7 @@ class RCNNTargetTest(tf.test.TestCase):
         config = EasyDict({
             'foreground_threshold': 0.5,
             'background_threshold_high': 0.5,
-            'background_threshold_low': 0.1,
+            'background_threshold_low': 0,  # use 0 to get complete batch
             'foreground_fraction': 0.5,
             # We change the minibatch_size the catch all our foregrounds
             'minibatch_size': 8,
@@ -323,6 +343,10 @@ class RCNNTargetTest(tf.test.TestCase):
             foreground_idxs, non_empty_bbox_target_idxs
         )
         self.assertGreater(proposals_label[proposals_label >= 1].shape[0], 0)
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            config.minibatch_size
+        )
 
     def testMultipleGtBoxes(self):
         """Tests we're getting the right labels when there's several gt_boxes.
@@ -416,6 +440,42 @@ class RCNNTargetTest(tf.test.TestCase):
             # Assertion
             foreground_number = proposals_label[proposals_label > 0].shape[0]
             self.assertGreater(foreground_number, 0)
+
+    def testCorrectBatchSize(self):
+        config = EasyDict({
+            'foreground_threshold': 0.5,
+            'background_threshold_high': 0.5,
+            # Use zero to get all non matching as backgrounds.
+            'background_threshold_low': 0.0,
+            'foreground_fraction': 0.5,
+            # We change the minibatch_size the catch all our foregrounds
+            'minibatch_size': 64,
+        })
+
+        gt_boxes = tf.constant([
+            [10, 10, 20, 20, 0]
+        ], dtype=tf.float32)
+
+        proposed_boxes_backgrounds = [[1, 21, 21, 30, 30]] * 100
+        proposed_boxes_foreground = [[1, 11, 11, 19, 19]] * 100
+
+        proposed_boxes = tf.constant(
+            proposed_boxes_backgrounds + proposed_boxes_foreground,
+            dtype=tf.float32
+        )
+
+        model = RCNNTarget(self._num_classes, config)
+
+        (proposals_label, bbox_targets) = self._run_rcnn_target(
+            model,
+            gt_boxes,
+            proposed_boxes
+        )
+
+        self.assertEqual(
+            proposals_label[proposals_label >= 0].shape[0],
+            config.minibatch_size
+        )
 
 
 if __name__ == '__main__':

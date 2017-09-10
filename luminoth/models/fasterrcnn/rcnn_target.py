@@ -1,6 +1,5 @@
 import tensorflow as tf
 import sonnet as snt
-import numpy as np
 
 from luminoth.utils.bbox_transform_tf import encode
 from luminoth.utils.bbox_overlap import bbox_overlap_tf
@@ -68,7 +67,6 @@ class RCNNTarget(snt.AbstractModule):
                 other proposal we return zeros.
                 The shape of the Tensor is (num_proposals, 4).
         """
-
         # TODO: revise casts to int64 in tf.sparse_to_dense and tf.scatter_nd
         # calls.
 
@@ -98,7 +96,7 @@ class RCNNTarget(snt.AbstractModule):
         # find the gt_box with which it has the highest overlap.
         max_overlaps = tf.reduce_max(overlaps, axis=1)
 
-        iou_is_high_enough_for_bg = tf.greater(
+        iou_is_high_enough_for_bg = tf.greater_equal(
             max_overlaps, self._background_threshold_low
         )
         iou_is_not_too_high_for_bg = tf.less(
@@ -199,8 +197,16 @@ class RCNNTarget(snt.AbstractModule):
             false_fn=lambda: proposals_label
         )
 
+        total_fg_in_batch = tf.shape(
+            tf.where(
+                condition=tf.greater(proposals_label, 0)
+            )
+        )[0]
+
         # Now we want to do the same for backgrounds.
-        max_bg = np.ceil(self._foreground_fraction * self._minibatch_size)
+        # We calculate up to how many backgrounds we desire based on the
+        # final number of foregrounds and the total desired batch size.
+        max_bg = self._minibatch_size - total_fg_in_batch
 
         # We can't use bg_condition because some of the proposals that satisfy
         # the IoU conditions to be background may have been labeled as
