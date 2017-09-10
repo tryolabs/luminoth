@@ -49,6 +49,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
 
     # Build the dataset tensors, overriding the default dataset split.
     config.dataset.split = dataset_split
+    # Disable data augmentation.
+    config.dataset.data_augmentation = []
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
