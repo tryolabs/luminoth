@@ -34,6 +34,15 @@ def variable_summaries(var, name, collections):
         tf.summary.scalar('sparsity', tf.nn.zero_fraction(var), collections)
 
 
+def layer_summaries(layer, collections):
+    layer_name = layer.module_name
+    if hasattr(layer, '_w'):
+        variable_summaries(layer._w, '{}/W'.format(layer_name), collections)
+
+    if hasattr(layer, '_b'):
+        variable_summaries(layer._b, '{}/b'.format(layer_name), collections)
+
+
 def get_initializer(initializer_config):
     """Get variable initializer.
 

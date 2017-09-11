@@ -5,7 +5,9 @@ from luminoth.models.fasterrcnn.rcnn_proposal import RCNNProposal
 from luminoth.models.fasterrcnn.rcnn_target import RCNNTarget
 from luminoth.models.fasterrcnn.roi_pool import ROIPoolingLayer
 from luminoth.utils.losses import smooth_l1_loss
-from luminoth.utils.vars import variable_summaries, get_initializer
+from luminoth.utils.vars import (
+    get_initializer, layer_summaries, variable_summaries
+)
 
 
 class RCNN(snt.AbstractModule):
@@ -143,6 +145,11 @@ class RCNN(snt.AbstractModule):
 
             prediction_dict['cls_target'] = roi_proposals_target
             prediction_dict['bbox_offsets_target'] = roi_bbox_target
+            if self._debug:
+                prediction_dict['rcnn_target'] = {
+                    'proposals_target': proposals_target,
+                    'bbox_target': bbox_target,
+                }
 
         else:
             roi_proposals = proposals
@@ -208,6 +215,12 @@ class RCNN(snt.AbstractModule):
         if self._debug:
             prediction_dict['proposal_prediction'] = proposal_prediction
 
+        for i, layer in enumerate(self._layers):
+            layer_summaries(layer, ['rcnn'])
+
+        layer_summaries(self._classifier_layer, ['rcnn'])
+        layer_summaries(self._bbox_layer, ['rcnn'])
+
         return prediction_dict
 
     def loss(self, prediction_dict):
@@ -266,6 +279,11 @@ class RCNN(snt.AbstractModule):
                 #    cls_prob, not_ignored, name='cls_prob_labeled')
                 cls_target_labeled = tf.boolean_mask(
                     cls_target, not_ignored, name='cls_target_labeled')
+
+                tf.summary.scalar(
+                    'batch_size',
+                    tf.shape(cls_score_labeled)[0], ['rcnn']
+                )
 
                 # Transform to one-hot vector
                 cls_target_one_hot = tf.one_hot(

@@ -10,7 +10,9 @@ from sonnet.python.modules.conv import Conv2D
 from .rpn_target import RPNTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
-from luminoth.utils.vars import variable_summaries, get_initializer
+from luminoth.utils.vars import (
+    get_initializer, layer_summaries, variable_summaries
+)
 
 
 class RPN(snt.AbstractModule):
@@ -173,12 +175,9 @@ class RPN(snt.AbstractModule):
         variable_summaries(
             rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
 
-        variable_summaries(self._rpn._w, 'conv/W', ['rpn'])
-        variable_summaries(self._rpn._b, 'conv/b', ['rpn'])
-        variable_summaries(self._rpn_cls._w, 'cls_conv/W', ['rpn'])
-        variable_summaries(self._rpn_cls._b, 'cls_conv/b', ['rpn'])
-        variable_summaries(self._rpn_bbox._w, 'bbox_conv/W', ['rpn'])
-        variable_summaries(self._rpn_bbox._b, 'bbox_conv/b', ['rpn'])
+        layer_summaries(self._rpn, ['rpn'])
+        layer_summaries(self._rpn_cls, ['rpn'])
+        layer_summaries(self._rpn_bbox, ['rpn'])
 
         prediction_dict['proposals'] = proposal_prediction['nms_proposals']
         prediction_dict['scores'] = proposal_prediction['nms_proposals_scores']
@@ -244,6 +243,11 @@ class RPN(snt.AbstractModule):
             labels = tf.boolean_mask(rpn_cls_target, labels_not_ignored)
             # cls_prob = tf.boolean_mask(rpn_cls_prob, labels_not_ignored)
             cls_score = tf.boolean_mask(rpn_cls_score, labels_not_ignored)
+
+            tf.summary.scalar(
+                'batch_size',
+                tf.shape(labels)[0], ['rpn']
+            )
 
             # We need to transform `labels` to `cls_prob` shape.
             # convert [1, 0] to [[0, 1], [1, 0]]
