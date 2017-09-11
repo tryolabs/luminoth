@@ -87,19 +87,19 @@ Convert datasets to TensorFlow's *`.tfrecords`* for efficient processing using t
 - [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html)
 
 ```
-lumi dataset voc --data-dir ~/dataset/voc/ --output-dir ~/dataset/voc/tf/
+lumi dataset transform --type pascalvoc --data-dir ~/dataset/pascalvoc/ --output-dir ~/dataset/pascalvoc/tf/
 ```
 
 - [ImageNet](http://image-net.org/download)
 
 ```
-lumi dataset imagenet --data-dir ~/dataset/imagenet/ --output-dir ~/dataset/imagenet/tf/
+lumi dataset transform --type imagenet --data-dir ~/dataset/imagenet/ --output-dir ~/dataset/imagenet/tf/
 ```
 
 - [COCO](http://mscoco.org/dataset/#download)
 
 ```
-lumi dataset coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
+lumi dataset transform --type coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
 ```
 
 ## Training
