@@ -1,7 +1,8 @@
+import sys
 import click
 import tensorflow as tf
 
-from .dataset import RecordSaver
+from .dataset import RecordSaver, InvalidDataDirectory
 from .imagenet import ImageNet
 from .pascalvoc import PascalVOC
 
@@ -34,7 +35,12 @@ def transform(dataset_type, data_dir, output_dir, ignore_splits, only_filename,
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    ds = VALID_DATASETS[dataset_type](data_dir=data_dir)
+    try:
+        ds = VALID_DATASETS[dataset_type](data_dir=data_dir)
+    except InvalidDataDirectory as e:
+        tf.logging.error('Invalid data directory: {}'.format(e))
+        sys.exit(1)
+
     saver = RecordSaver(
         ds, output_dir,
         ignore_splits=ignore_splits,

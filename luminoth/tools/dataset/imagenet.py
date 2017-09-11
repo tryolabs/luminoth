@@ -6,7 +6,7 @@ from PIL import Image
 from luminoth.utils.dataset import (
     read_xml, read_image, to_int64, to_string, to_bytes
 )
-from .dataset import DatasetTool
+from .dataset import DatasetTool, InvalidDataDirectory
 
 
 def adjust_bbox(xmin, ymin, xmax, ymax, old_width, old_height,
@@ -26,10 +26,31 @@ class ImageNet(DatasetTool):
     def __init__(self, data_dir):
         super(ImageNet, self).__init__()
         self._data_dir = data_dir
+        self._imagesets_path = os.path.join(self._data_dir, 'ImageSets', 'DET')
+        self._images_path = os.path.join(self._data_dir, 'Data', 'DET',)
+        self._annotations_path = os.path.join(
+            self._data_dir, 'Annotations', 'DET'
+        )
+        self.is_valid()
+
+    def is_valid(self):
+        if not tf.gfile.Exists(self._data_dir):
+            raise InvalidDataDirectory(
+                '"{}" does not exist.'.format(self._data_dir)
+            )
+
+        if not tf.gfile.Exists(self._imagesets_path):
+            raise InvalidDataDirectory('ImageSets path is missing')
+
+        if not tf.gfile.Exists(self._images_path):
+            raise InvalidDataDirectory('Images path is missing')
+
+        if not tf.gfile.Exists(self._annotations_path):
+            raise InvalidDataDirectory('Annotations path is missing')
 
     def read_classes(self):
         path = os.path.join(
-            self._data_dir, 'Annotations', 'DET', 'train', 'ILSVRC2013_train'
+            self._annotations_path, 'train', 'ILSVRC2013_train'
         )
         classes = set()
         for entry in tf.gfile.ListDirectory(path):
@@ -37,13 +58,18 @@ class ImageNet(DatasetTool):
 
         return list(sorted(classes))
 
-    def load_split(self, split='train'):
+    def get_split_path(self, split):
         if split not in self.VALID_SPLITS:
             raise ValueError
+        split_path = os.path.join(self._imagesets_path, '{}.txt'.format(split))
+        return split_path
 
-        split_path = os.path.join(
-            self._data_dir, 'ImageSets', 'DET', '{}.txt'.format(split)
-        )
+    def get_image_path(self, image_id):
+        return os.path.join(self._images_path, '{}.JPEG'.format(image_id))
+
+    def load_split(self, split='train'):
+        split_path = self.get_split_path(split)
+
         with tf.gfile.GFile(split_path) as f:
             for line in f:
                 # The images in 'extra' directories don't have annotations.
@@ -53,15 +79,16 @@ class ImageNet(DatasetTool):
                 filename = os.path.join(split, filename)
                 yield filename.strip()
 
-    def get_image_path(self, image_id):
-        return os.path.join(
-            self._data_dir, 'Data', 'DET', '{}.JPEG'.format(image_id)
-        )
+    def get_split_size(self, split):
+        # TODO: More efficient way to do this.
+        total_records = 0
+        for line in self.load_split(split):
+            total_records += 1
+
+        return total_records
 
     def get_image_annotation(self, image_id):
-        return os.path.join(
-            self._data_dir, 'Annotations', 'DET', '{}.xml'.format(image_id)
-        )
+        return os.path.join(self._annotations_path, '{}.xml'.format(image_id))
 
     def image_to_example(self, classes, image_id):
         annotation_path = self.get_image_annotation(image_id)
