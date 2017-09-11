@@ -1,11 +1,10 @@
-import click
 import os
 import tensorflow as tf
 
 from luminoth.utils.dataset import (
     read_xml, read_image, to_int64, to_string, to_bytes
 )
-from .dataset import DatasetTool, RecordSaver
+from .dataset import DatasetTool
 
 
 class PascalVOC(DatasetTool):
@@ -125,37 +124,3 @@ class PascalVOC(DatasetTool):
         )
 
         return example
-
-
-@click.command()
-@click.option('--data-dir', default='datasets/voc')
-@click.option('--output-dir', default='datasets/voc/tf')
-@click.option('ignore_splits', '--ignore-split', multiple=True)
-@click.option('--only-filename', help='Create dataset with a single example.')
-@click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
-@click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')  # noqa
-@click.option('--seed', type=int, help='Seed used for picking random classes.')
-@click.option('--debug', is_flag=True, help='Set debug level logging.')
-def pascalvoc(data_dir, output_dir, ignore_splits, only_filename,
-              limit_examples, limit_classes, seed, debug):
-    """
-    Prepares VOC dataset for ingestion.
-
-    Converts the VOC dataset into three (one per split) TFRecords files.
-    """
-    if debug:
-        tf.logging.set_verbosity(tf.logging.DEBUG)
-    else:
-        tf.logging.set_verbosity(tf.logging.INFO)
-
-    voc = PascalVOC(data_dir=data_dir)
-    saver = RecordSaver(
-        voc, output_dir,
-        ignore_splits=ignore_splits,
-        only_filename=only_filename,
-        limit_examples=limit_examples,
-        limit_classes=limit_classes,
-        seed=seed
-    )
-
-    saver.save()
