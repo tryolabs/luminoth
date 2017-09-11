@@ -1,6 +1,7 @@
 import click
 import os
 import tensorflow as tf
+import time
 
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
@@ -228,8 +229,13 @@ def train(model_type, config_file, override_params, continue_training,
 
         try:
             while not coord.should_stop():
+                write_summary = (
+                    not config.train.no_log and
+                    (step + 1) % config.train.summary_every == 0
+                )
+
                 run_metadata = None
-                if (step + 1) % config.train.summary_every == 0:
+                if write_summary:
                     run_metadata = tf.RunMetadata()
 
                 run_options = None
@@ -238,32 +244,52 @@ def train(model_type, config_file, override_params, continue_training,
                         trace_level=tf.RunOptions.FULL_TRACE
                     )
 
-                (
-                    _, summary, train_loss, step, pred_dict, filename, _
-                ) = sess.run([
-                    train_op, summarizer, total_loss, global_step,
-                    prediction_dict, train_filename,
-                    metric_ops
-                ], run_metadata=run_metadata, options=run_options)
-
-                write_summary = (
-                    not config.train.no_log and
-                    step % config.train.summary_every == 0
+                display_images = (
+                    config.train.debug and
+                    (step + 1) % config.train.display_every == 0
                 )
+
+                fetches = {
+                    'train': train_op,
+                    'train_loss': total_loss,
+                    'step': global_step,
+                    'filename': train_filename,
+                }
+
+                if display_images:
+                    fetches['prediction_dict'] = prediction_dict
+
                 if write_summary:
+                    fetches['summary'] = summarizer
+                    fetches['metrics'] = metric_ops
+
+                before = time.time()
+                fetched = sess.run(
+                    fetches, run_metadata=run_metadata, options=run_options
+                )
+
+                train_loss = fetched['train_loss']
+                step = fetched['step']
+                filename = fetched['filename']
+
+                tf.logging.info(
+                    'step: {}, file: {}, train_loss: {} (in {:.2f}s)'.format(
+                        step, filename, train_loss, time.time() - before
+                    )
+                )
+
+                if write_summary:
+                    summary = fetched['summary']
                     writer.add_summary(summary, step)
                     writer.add_run_metadata(
                         run_metadata, str(step)
                     )
 
-                display_images = (
-                    config.train.debug and
-                    step % config.train.display_every == 0
-                )
                 if display_images:
                     from luminoth.utils.image_vis import (
                         add_images_to_tensoboard
                     )
+                    pred_dict = fetched['prediction_dict']
                     add_images_to_tensoboard(
                         pred_dict, step, summary_dir, config.network.with_rcnn
                     )
@@ -276,10 +302,6 @@ def train(model_type, config_file, override_params, continue_training,
                         timeline_filename = 'timeline_{}.json'.format(step)
                         with tf.gfile.GFile(timeline_filename, 'w') as f:
                             f.write(chrome_trace)
-
-                tf.logging.info('step: {}, file: {}, train_loss: {}'.format(
-                    step, filename, train_loss
-                ))
 
                 if not config.train.no_log:
                     if step % config.train.save_every == 0:
