@@ -4,7 +4,7 @@ import tensorflow as tf
 from luminoth.utils.dataset import (
     read_xml, read_image, to_int64, to_string, to_bytes
 )
-from .dataset import DatasetTool
+from .dataset import DatasetTool, InvalidDataDirectory
 
 
 class PascalVOC(DatasetTool):
@@ -12,12 +12,29 @@ class PascalVOC(DatasetTool):
     def __init__(self, data_dir):
         super(PascalVOC, self).__init__()
         self._data_dir = data_dir
+        self._labels_path = os.path.join(self._data_dir, 'ImageSets', 'Main')
+        self._images_path = os.path.join(self._data_dir, 'JPEGImages')
+        self._annots_path = os.path.join(self._data_dir, 'Annotations')
+        self.is_valid()
+
+    def is_valid(self):
+        if not tf.gfile.Exists(self._data_dir):
+            raise InvalidDataDirectory(
+                '"{}" does not exist.'.format(self._data_dir)
+            )
+
+        if not tf.gfile.Exists(self._labels_path):
+            raise InvalidDataDirectory('Labels path is missing')
+
+        if not tf.gfile.Exists(self._images_path):
+            raise InvalidDataDirectory('Images path is missing')
+
+        if not tf.gfile.Exists(self._annots_path):
+            raise InvalidDataDirectory('Annotations path is missing')
 
     def read_classes(self):
-        path = os.path.join(self._data_dir, 'ImageSets', 'Main')
-
         classes = set()
-        for entry in tf.gfile.ListDirectory(path):
+        for entry in tf.gfile.ListDirectory(self._labels_path):
             if "_" not in entry:
                 continue
             class_name, _ = entry.split('_')
@@ -25,25 +42,32 @@ class PascalVOC(DatasetTool):
 
         return list(sorted(classes))
 
-    def load_split(self, split='train'):
+    def get_split_path(self, split):
         if split not in self.VALID_SPLITS:
             raise ValueError
 
-        split_path = os.path.join(
-            self._data_dir, 'ImageSets', 'Main', '{}.txt'.format(split))
+        split_path = os.path.join(self._labels_path, '{}.txt'.format(split))
+
+        return split_path
+
+    def get_image_path(self, image_id):
+        return os.path.join(self._images_path, '{}.jpg'.format(image_id))
+
+    def load_split(self, split='train'):
+        split_path = self.get_split_path(split)
         with tf.gfile.GFile(split_path) as f:
             for line in f:
                 yield line.strip()
 
-    def get_image_path(self, image_id):
-        return os.path.join(
-            self._data_dir, 'JPEGImages', '{}.jpg'.format(image_id)
-        )
+    def get_split_size(self, split):
+        total_records = 0
+        for line in self.load_split(split):
+            total_records += 1
+
+        return total_records
 
     def get_image_annotation(self, image_id):
-        return os.path.join(
-            self._data_dir, 'Annotations', '{}.xml'.format(image_id)
-        )
+        return os.path.join(self._annots_path, '{}.xml'.format(image_id))
 
     def image_to_example(self, classes, image_id):
         annotation_path = self.get_image_annotation(image_id)

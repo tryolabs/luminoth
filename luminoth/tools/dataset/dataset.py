@@ -1,8 +1,15 @@
 import abc
+import click
 import json
 import os
 import random
 import tensorflow as tf
+
+
+class InvalidDataDirectory(Exception):
+    """
+    Error raised when the chosen intput directory for the dataset is not valid.
+    """
 
 
 class DatasetTool(object):
@@ -11,6 +18,15 @@ class DatasetTool(object):
 
     def __init__(self):
         super(DatasetTool, self).__init__()
+
+    @abc.abstractmethod
+    def is_valid(self):
+        """
+        Check that the dataset is valid.
+
+        Raises:
+            InvalidDataDirectory: When the instance directory is not valid.
+        """
 
     @abc.abstractmethod
     def read_classes(self):
@@ -39,6 +55,18 @@ class DatasetTool(object):
 
         Returns:
             filenames (generator):
+        """
+
+    @abc.abstractmethod
+    def get_split_size(self, split):
+        """
+        Returns the total number of samples found in the split `split`.
+
+        Args:
+            split: Data split.
+
+        Returns:
+            total_samples: Total number of samples in split `split` in dataset.
         """
 
     @abc.abstractmethod
@@ -158,29 +186,36 @@ class RecordSaver():
             'Generating outputs for splits = {}'.format(", ".join(splits)))
 
         for split in splits:
-            tf.logging.debug('Converting split = {}'.format(split))
+            split_size = self.dataset.get_split_size(split)
+            if self.limit_examples:
+                split_size = min(self.limit_examples, split_size)
+
+            tf.logging.info('Converting split = {}'.format(split))
             record_file = self.get_record_file(split)
             writer = tf.python_io.TFRecordWriter(record_file)
 
             total_examples = 0
-            for num, image_id in enumerate(self.dataset.load_split(split)):
-                if not self.only_filename or self.only_filename == image_id:
-                    # Using limit on classes it's possible for an
-                    # image_to_example to return None (because no classes
-                    # match).
-                    example = self.dataset.image_to_example(
-                        self.classes, image_id
-                    )
-                    if example:
-                        total_examples += 1
-                        writer.write(example.SerializeToString())
+            with click.progressbar(self.dataset.load_split(split),
+                                   length=split_size) as split_lines:
+                for image_id in split_lines:
+                    if (not self.only_filename or
+                       self.only_filename == image_id):
+                        # Using limit on classes it's possible for an
+                        # image_to_example to return None (because no classes
+                        # match).
+                        example = self.dataset.image_to_example(
+                            self.classes, image_id
+                        )
+                        if example:
+                            total_examples += 1
+                            writer.write(example.SerializeToString())
 
-                stop_saving = (
-                    self.limit_examples and
-                    total_examples == self.limit_examples
-                )
-                if stop_saving:
-                    break
+                    stop_saving = (
+                        self.limit_examples and
+                        total_examples == self.limit_examples
+                    )
+                    if stop_saving:
+                        break
 
             tf.logging.info(
                 'Saved split {} to "{}"'.format(split, record_file)
