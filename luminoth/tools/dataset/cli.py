@@ -1,6 +1,6 @@
 import click
 
-from .voc import voc
+from .pascalvoc import pascalvoc
 from .imagenet import imagenet
 
 
@@ -9,5 +9,5 @@ def dataset():
     pass
 
 
-dataset.add_command(voc)
+dataset.add_command(pascalvoc)
 dataset.add_command(imagenet)
