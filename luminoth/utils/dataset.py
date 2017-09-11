@@ -37,21 +37,21 @@ def read_image(path):
     return image
 
 
-def _int64(value):
+def to_int64(value):
     value = [int(value)] if not isinstance(value, list) else value
     return tf.train.Feature(
         int64_list=tf.train.Int64List(value=value)
     )
 
 
-def _bytes(value):
+def to_bytes(value):
     value = [value] if not isinstance(value, list) else value
     return tf.train.Feature(
         bytes_list=tf.train.BytesList(value=value)
     )
 
 
-def _string(value):
+def to_string(value):
     value = [value] if not isinstance(value, list) else value
     value = [v.encode('utf-8') for v in value]
     return tf.train.Feature(

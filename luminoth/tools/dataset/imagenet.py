@@ -1,17 +1,13 @@
 import click
-import json
 import os
-import random
 import tensorflow as tf
 
 from PIL import Image
 
 from luminoth.utils.dataset import (
-    read_xml, read_image, _int64, _string, _bytes
+    read_xml, read_image, to_int64, to_string, to_bytes
 )
-
-
-DEFAULT_TOTAL_CLASSES = 20
+from .dataset import DatasetTool, RecordSaver
 
 
 def adjust_bbox(xmin, ymin, xmax, ymax, old_width, old_height,
@@ -27,202 +23,152 @@ def adjust_bbox(xmin, ymin, xmax, ymax, old_width, old_height,
     return xmin, ymin, xmax, ymax
 
 
-def read_classes(root):
-    # TODO: find a more robust way without doing something as wasteful as
-    # parsing all xml annotations to get the objects mentioned.
-    # ILSVRC2014 added no new catgories, so this works.
-    path = os.path.join(
-        root, 'Annotations', 'DET', 'train', 'ILSVRC2013_train'
-    )
-    classes = set()
-    for entry in tf.gfile.ListDirectory(path):
-        classes.add(entry)
+class ImageNet(DatasetTool):
+    def __init__(self, data_dir):
+        super(ImageNet, self).__init__()
+        self._data_dir = data_dir
 
-    return list(sorted(classes))
-
-
-def load_split(root, split='train'):
-    if split not in ['train', 'val', 'test']:
-        raise ValueError
-
-    split_path = os.path.join(
-        root, 'ImageSets', 'DET', '{}.txt'.format(split)
-    )
-    with tf.gfile.GFile(split_path) as f:
-        for line in f:
-            # The images in 'extra' directories don't have annotations.
-            if 'extra' in line:
-                continue
-            filename = line.split()[0]
-            filename = os.path.join(split, filename)
-            yield filename.strip()
-
-
-def get_image_path(data_dir, image_id):
-    return os.path.join(data_dir, 'Data', 'DET', '{}.JPEG'.format(image_id))
-
-
-def get_image_annotation(data_dir, image_id):
-    return os.path.join(
-        data_dir, 'Annotations', 'DET', '{}.xml'.format(image_id)
-    )
-
-
-def image_to_example(data_dir, classes, image_id):
-    annotation_path = get_image_annotation(data_dir, image_id)
-    image_path = get_image_path(data_dir, image_id)
-
-    # Read both the image and the annotation into memory.
-    annotation = read_xml(annotation_path)
-    image = read_image(image_path)
-
-    # TODO: consider alternatives to using Pillow here.
-    image_pil = Image.open(image_path)
-    width = image_pil.width
-    height = image_pil.height
-    image_pil.close()
-
-    object_features_values = {
-        'label': [],
-        'xmin': [],
-        'ymin': [],
-        'xmax': [],
-        'ymax': [],
-    }
-
-    objects = annotation.get('object')
-    if objects is None:
-        # If there's no bounding boxes, we don't want it
-        return
-    for b in annotation['object']:
-        try:
-            label_id = classes.index(b['name'])
-        except ValueError:
-            continue
-
-        (xmin, ymin, xmax, ymax) = adjust_bbox(
-            xmin=int(b['bndbox']['xmin']), ymin=int(b['bndbox']['ymin']),
-            xmax=int(b['bndbox']['xmax']), ymax=int(b['bndbox']['ymax']),
-            old_width=int(annotation['size']['width']),
-            old_height=int(annotation['size']['height']),
-            new_width=width, new_height=height
+    def read_classes(self):
+        path = os.path.join(
+            self._data_dir, 'Annotations', 'DET', 'train', 'ILSVRC2013_train'
         )
-        object_features_values['label'].append(_int64(label_id))
-        object_features_values['xmin'].append(_int64(xmin))
-        object_features_values['ymin'].append(_int64(ymin))
-        object_features_values['xmax'].append(_int64(xmax))
-        object_features_values['ymax'].append(_int64(ymax))
+        classes = set()
+        for entry in tf.gfile.ListDirectory(path):
+            classes.add(entry)
 
-    if len(object_features_values['label']) == 0:
-        # No bounding box matches the available classes.
-        return
+        return list(sorted(classes))
 
-    object_feature_lists = {
-        'label': tf.train.FeatureList(feature=object_features_values['label']),
-        'xmin': tf.train.FeatureList(feature=object_features_values['xmin']),
-        'ymin': tf.train.FeatureList(feature=object_features_values['ymin']),
-        'xmax': tf.train.FeatureList(feature=object_features_values['xmax']),
-        'ymax': tf.train.FeatureList(feature=object_features_values['ymax']),
-    }
+    def load_split(self, split='train'):
+        if split not in self.VALID_SPLITS:
+            raise ValueError
 
-    object_features = tf.train.FeatureLists(feature_list=object_feature_lists)
+        split_path = os.path.join(
+            self._data_dir, 'ImageSets', 'DET', '{}.txt'.format(split)
+        )
+        with tf.gfile.GFile(split_path) as f:
+            for line in f:
+                # The images in 'extra' directories don't have annotations.
+                if 'extra' in line:
+                    continue
+                filename = line.split()[0]
+                filename = os.path.join(split, filename)
+                yield filename.strip()
 
-    sample = {
-        'width': _int64(width),
-        'height': _int64(height),
-        'depth': _int64(3),
-        'filename': _string(annotation['filename']),
-        'image_raw': _bytes(image),
-    }
+    def get_image_path(self, image_id):
+        return os.path.join(
+            self._data_dir, 'Data', 'DET', '{}.JPEG'.format(image_id)
+        )
 
-    # Now build an `Example` protobuf object and save with the writer.
-    context = tf.train.Features(feature=sample)
-    example = tf.train.SequenceExample(
-        feature_lists=object_features, context=context
-    )
+    def get_image_annotation(self, image_id):
+        return os.path.join(
+            self._data_dir, 'Annotations', 'DET', '{}.xml'.format(image_id)
+        )
 
-    return example
+    def image_to_example(self, classes, image_id):
+        annotation_path = self.get_image_annotation(image_id)
+        image_path = self.get_image_path(image_id)
+
+        # Read both the image and the annotation into memory.
+        annotation = read_xml(annotation_path)
+        image = read_image(image_path)
+
+        # TODO: consider alternatives to using Pillow here.
+        image_pil = Image.open(image_path)
+        width = image_pil.width
+        height = image_pil.height
+        image_pil.close()
+
+        obj_vals = {
+            'label': [],
+            'xmin': [],
+            'ymin': [],
+            'xmax': [],
+            'ymax': [],
+        }
+
+        objects = annotation.get('object')
+        if objects is None:
+            # If there's no bounding boxes, we don't want it
+            return
+        for b in annotation['object']:
+            try:
+                label_id = classes.index(b['name'])
+            except ValueError:
+                continue
+
+            (xmin, ymin, xmax, ymax) = adjust_bbox(
+                xmin=int(b['bndbox']['xmin']), ymin=int(b['bndbox']['ymin']),
+                xmax=int(b['bndbox']['xmax']), ymax=int(b['bndbox']['ymax']),
+                old_width=int(annotation['size']['width']),
+                old_height=int(annotation['size']['height']),
+                new_width=width, new_height=height
+            )
+            obj_vals['label'].append(to_int64(label_id))
+            obj_vals['xmin'].append(to_int64(xmin))
+            obj_vals['ymin'].append(to_int64(ymin))
+            obj_vals['xmax'].append(to_int64(xmax))
+            obj_vals['ymax'].append(to_int64(ymax))
+
+        if len(obj_vals['label']) == 0:
+            # No bounding box matches the available classes.
+            return
+
+        object_feature_lists = {
+            'label': tf.train.FeatureList(feature=obj_vals['label']),
+            'xmin': tf.train.FeatureList(feature=obj_vals['xmin']),
+            'ymin': tf.train.FeatureList(feature=obj_vals['ymin']),
+            'xmax': tf.train.FeatureList(feature=obj_vals['xmax']),
+            'ymax': tf.train.FeatureList(feature=obj_vals['ymax']),
+        }
+
+        object_features = tf.train.FeatureLists(
+            feature_list=object_feature_lists
+        )
+
+        sample = {
+            'width': to_int64(width),
+            'height': to_int64(height),
+            'depth': to_int64(3),
+            'filename': to_string(annotation['filename']),
+            'image_raw': to_bytes(image),
+        }
+
+        # Now build an `Example` protobuf object and save with the writer.
+        context = tf.train.Features(feature=sample)
+        example = tf.train.SequenceExample(
+            feature_lists=object_features, context=context
+        )
+
+        return example
 
 
 @click.command()
-@click.option('--data-dir', default='datasets/voc')
-@click.option('--output-dir', default='datasets/voc/tf')
-@click.option('splits', '--split', multiple=True, default=['train', 'val', 'test'])  # noqa
+@click.option('--data-dir', default='datasets/imagenet')
+@click.option('--output-dir', default='datasets/imagenet/tf')
 @click.option('ignore_splits', '--ignore-split', multiple=True)
 @click.option('--only-filename', help='Create dataset with a single example.')
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
-@click.option('--limit-classes', type=int, default=DEFAULT_TOTAL_CLASSES, help='Limit dataset with `N` random classes.')  # noqa
-@click.option('--seed', type=int, default=0, help='Seed used for picking random classes.')  # noqa
+@click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')  # noqa
+@click.option('--seed', type=int, help='Seed used for picking random classes.')
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def imagenet(data_dir, output_dir, splits, ignore_splits, only_filename,
+def imagenet(data_dir, output_dir, ignore_splits, only_filename,
              limit_examples, limit_classes, seed, debug):
     """
     Prepares ImageNet dataset for ingestion.
     """
-    # TODO: this is a copy-paste from voc.py
-    # It is pretty close to working as it is, but consider rewriting this or
-    # reusing (without copy-pasting) the voc code.
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    tf.logging.info('Saving output_dir = {}'.format(output_dir))
-    if not tf.gfile.Exists(output_dir):
-        tf.gfile.MakeDirs(output_dir)
+    imagenet = ImageNet(data_dir=data_dir)
+    saver = RecordSaver(
+        imagenet, output_dir,
+        ignore_splits=ignore_splits,
+        only_filename=only_filename,
+        limit_examples=limit_examples,
+        limit_classes=limit_classes,
+        seed=seed
+    )
 
-    classes = read_classes(data_dir)
-
-    if limit_classes < DEFAULT_TOTAL_CLASSES:
-        random.seed(seed)
-        classes = random.sample(classes, limit_classes)
-        tf.logging.info('Limiting to {} classes: {}'.format(
-            limit_classes, classes
-        ))
-
-    if only_filename:
-        classes_filename = 'classes-{}.json'.format(only_filename)
-    elif limit_examples:
-        classes_filename = 'classes-top{}-{}classes.json'.format(
-            limit_examples, limit_classes
-        )
-    else:
-        classes_filename = 'classes.json'
-
-    classes_file = os.path.join(output_dir, classes_filename)
-
-    json.dump(classes, tf.gfile.GFile(classes_file, 'w'))
-
-    splits = [s for s in splits if s not in set(ignore_splits)]
-    tf.logging.debug(
-        'Generating outputs for splits = {}'.format(", ".join(splits)))
-
-    for split in splits:
-        tf.logging.debug('Converting split = {}'.format(split))
-        if only_filename:
-            record_filename = '{}-{}.tfrecords'.format(split, only_filename)
-        elif limit_examples:
-            record_filename = '{}-top{}-{}classes.tfrecords'.format(
-                split, limit_examples, limit_classes
-            )
-        else:
-            record_filename = '{}.tfrecords'.format(split)
-
-        record_file = os.path.join(output_dir, record_filename)
-        writer = tf.python_io.TFRecordWriter(record_file)
-
-        total_examples = 0
-        for num, image_id in enumerate(load_split(data_dir, split)):
-            if not only_filename or only_filename == image_id:
-                # Using limit on classes it's possible for an image_to_example
-                # to return None (because no classes match).
-                example = image_to_example(data_dir, classes, image_id)
-                if example:
-                    total_examples += 1
-                    writer.write(example.SerializeToString())
-
-            if limit_examples and total_examples == limit_examples:
-                break
-
-        writer.close()
-        tf.logging.info('Saved split {} to "{}"'.format(split, record_file))
+    saver.save()
