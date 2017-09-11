@@ -16,7 +16,10 @@ from luminoth.train import train
 from luminoth.eval import evaluate
 
 
-@click.group()
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
 def cli():
     pass
 
