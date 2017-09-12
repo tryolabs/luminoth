@@ -158,41 +158,21 @@ class FasterRCNNetworkTest(tf.test.TestCase):
             class_prediction['objects']
         )
 
-        # Check that there are class probabilities and labels for each object
         self.assertEqual(
-            class_prediction['cls_prob'][
-                class_prediction['cls_prob'].argmax(axis=1) > 0
-            ].shape[0],
-            class_prediction['objects'].shape[0]
-        )
-
-        self.assertEqual(
-            class_prediction['objects_labels'].shape[0],
+            class_prediction['labels'].shape[0],
             class_prediction['objects'].shape[0]
         )
 
         # Check that every object label is less or equal than 'num_classes'
         self.assertTrue(
-            np.less_equal(class_prediction['objects_labels'],
+            np.less_equal(class_prediction['labels'],
                           self.config.network.num_classes).all()
-        )
-
-        # Check that every roi_proposal has 4 coordinates + 1 batch index
-        self.assertEqual(
-            class_prediction['roi_proposals'].shape[1],
-            5
-        )
-
-        # Check we get roi_proposals clipped to the image.
-        self.assertAllEqual(
-            clip_boxes(class_prediction['roi_proposals'], self.image_size),
-            class_prediction['roi_proposals']
         )
 
         # Check that the sum of class probabilities is 1
         self.assertAllClose(
-            np.sum(class_prediction['cls_prob'], axis=1),
-            np.ones((class_prediction['cls_prob'].shape[0]))
+            np.sum(class_prediction['rcnn']['cls_prob'], axis=1),
+            np.ones((class_prediction['rcnn']['cls_prob'].shape[0]))
         )
 
         # Check that the sum of rpn class probabilities is 1

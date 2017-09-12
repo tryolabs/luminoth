@@ -80,8 +80,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
 
     pred = prediction_dict['classification_prediction']
     pred_objects = pred['objects']
-    pred_objects_classes = pred['objects_labels']
-    pred_objects_scores = pred['objects_labels_prob']
+    pred_objects_classes = pred['labels']
+    pred_objects_scores = pred['probs']
 
     # Retrieve *all* the losses from the model and calculate their streaming
     # means, so we get the loss over the whole dataset.

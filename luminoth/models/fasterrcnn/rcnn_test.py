@@ -102,14 +102,14 @@ class RCNNTest(tf.test.TestCase):
         """
 
         objects_shape = prediction_dict['objects'].shape
-        objects_labels_shape = prediction_dict['objects_labels'].shape
-        objects_labels_prob_shape = prediction_dict['objects_labels_prob'] \
+        objects_labels_shape = prediction_dict['labels'].shape
+        objects_labels_prob_shape = prediction_dict['probs'] \
             .shape
 
-        cls_score_shape = prediction_dict['cls_score'].shape
-        cls_prob_shape = prediction_dict['cls_prob'].shape
+        cls_score_shape = prediction_dict['rcnn']['cls_score'].shape
+        cls_prob_shape = prediction_dict['rcnn']['cls_prob'].shape
 
-        bbox_offsets_shape = prediction_dict['bbox_offsets'].shape
+        bbox_offsets_shape = prediction_dict['rcnn']['bbox_offsets'].shape
 
         # We choose cls_score as the 'standard' num_proposals which we will
         # compare to the other shapes that should include num_proposals. We
@@ -135,11 +135,12 @@ class RCNNTest(tf.test.TestCase):
         )
 
         if training:
-            cls_target_shape = prediction_dict['cls_target'].shape
+            cls_target_shape = prediction_dict['target']['cls'].shape
             self.assertEqual(cls_target_shape, (num_proposals,))
 
-            bbox_offsets_trgt_shape = prediction_dict['bbox_offsets_target'] \
-                .shape
+            bbox_offsets_trgt_shape = (
+                prediction_dict['target']['bbox_offsets'].shape
+            )
             self.assertEqual(
                 bbox_offsets_trgt_shape,
                 (num_proposals, 4)
@@ -234,7 +235,9 @@ class RCNNTest(tf.test.TestCase):
         )
         # Assertions
         self.assertLessEqual(
-            prediction_dict['objects'].shape[0],
+            prediction_dict['target']['cls'][
+                prediction_dict['target']['cls'] >= 0
+            ].shape[0],
             self._config.target.minibatch_size,
         )
 
@@ -306,11 +309,15 @@ class RCNNTest(tf.test.TestCase):
         )
 
         loss_graph = self._shared_model.loss({
-            'cls_score': cls_score_ph,
-            'cls_prob': cls_prob_ph,
-            'cls_target': cls_target_ph,
-            'bbox_offsets': bbox_offsets_ph,
-            'bbox_offsets_target': bbox_offsets_target_ph,
+            'rcnn': {
+                'cls_score': cls_score_ph,
+                'cls_prob': cls_prob_ph,
+                'bbox_offsets': bbox_offsets_ph,
+            },
+            'target': {
+                'cls': cls_target_ph,
+                'bbox_offsets': bbox_offsets_target_ph,
+            }
         })
 
         # Generate values that ensure a perfect score

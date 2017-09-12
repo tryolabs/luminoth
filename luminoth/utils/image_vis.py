@@ -563,8 +563,8 @@ def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
     tf.logging.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
-    cls_targets = pred_dict['classification_prediction']['cls_target']
-    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+    cls_targets = pred_dict['classification_prediction']['target']['cls']
+    bbox_offsets_targets = pred_dict['classification_prediction']['target']['bbox_offsets']
 
     batch_idx = np.where(cls_targets != -1)[0]
 
@@ -601,8 +601,8 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
     tf.logging.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
-    cls_targets = pred_dict['classification_prediction']['cls_target']
-    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+    cls_targets = pred_dict['classification_prediction']['target']['cls']
+    bbox_offsets_targets = pred_dict['classification_prediction']['target']['bbox_offsets']
 
     batch_idx = np.where(cls_targets != -1)[0]
 
@@ -611,7 +611,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
     bbox_offsets_targets = bbox_offsets_targets[batch_idx]
 
     # Cross entropy per proposal already has >= 0 target batches (not ignored proposals)
-    cross_entropy_per_proposal = pred_dict['classification_prediction']['cross_entropy_per_proposal']
+    cross_entropy_per_proposal = pred_dict['classification_prediction']['_debug']['losses']['cross_entropy_per_proposal']
 
     if worst:
         selected_idx = cross_entropy_per_proposal.argsort()[::-1][:n]
@@ -652,8 +652,8 @@ def draw_rcnn_reg_batch_errors(pred_dict):
     tf.logging.debug('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
-    cls_targets = pred_dict['classification_prediction']['cls_target']
-    bbox_offsets_targets = pred_dict['classification_prediction']['bbox_offsets_target']
+    cls_targets = pred_dict['classification_prediction']['target']['cls']
+    bbox_offsets_targets = pred_dict['classification_prediction']['target']['bbox_offsets']
     bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
 
     batch_idx = np.where(cls_targets >= 0)[0]
@@ -662,7 +662,7 @@ def draw_rcnn_reg_batch_errors(pred_dict):
     cls_targets = cls_targets[batch_idx]
     bbox_offsets_targets = bbox_offsets_targets[batch_idx]
     bbox_offsets = bbox_offsets[batch_idx]
-    cross_entropy_per_proposal = pred_dict['classification_prediction']['cross_entropy_per_proposal']
+    cross_entropy_per_proposal = pred_dict['classification_prediction']['_debug']['losses']['cross_entropy_per_proposal']
 
     foreground_batch_idx = np.where(cls_targets > 0)[0]
 
@@ -671,7 +671,7 @@ def draw_rcnn_reg_batch_errors(pred_dict):
     bbox_offsets_targets = bbox_offsets_targets[foreground_batch_idx]
     bbox_offsets = bbox_offsets[foreground_batch_idx]
     cross_entropy_per_proposal = cross_entropy_per_proposal[foreground_batch_idx]
-    reg_loss_per_proposal = pred_dict['classification_prediction']['reg_loss_per_proposal']
+    reg_loss_per_proposal = pred_dict['classification_prediction']['_debug']['losses']['reg_loss_per_proposal']
 
     cls_targets = cls_targets - 1
 
@@ -715,9 +715,9 @@ def draw_rcnn_reg_batch_errors(pred_dict):
 
 def recalculate_objects(pred_dict):
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
-    proposals_prob = pred_dict['classification_prediction']['cls_prob']
+    proposals_prob = pred_dict['classification_prediction']['rcnn']['cls_prob']
     proposals_target = proposals_prob.argmax(axis=1) - 1
-    bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
+    bbox_offsets = pred_dict['classification_prediction']['rcnn']['bbox_offsets']
     objects = pred_dict['classification_prediction']['objects']
 
     bbox_offsets = bbox_offsets[proposals_target >= 0]
@@ -735,8 +735,8 @@ def recalculate_objects(pred_dict):
 def draw_object_prediction(pred_dict, topn=50):
     tf.logging.debug('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
-    objects_labels = pred_dict['classification_prediction']['objects_labels']
-    objects_labels_prob = pred_dict['classification_prediction']['objects_labels_prob']
+    objects_labels = pred_dict['classification_prediction']['labels']
+    objects_labels_prob = pred_dict['classification_prediction']['probs']
 
     if len(objects_labels) == 0:
         tf.logging.warning('No objects detected. Probably all classified as background.')

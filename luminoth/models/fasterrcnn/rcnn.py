@@ -108,60 +108,42 @@ class RCNN(snt.AbstractModule):
                 (x1, y1, x2, y2).
             im_shape: A Tensor with the shape of the image in the form of
                 (image_height, image_width)
-            inference: Whether the module is created for training or not,
-                which in turn defines if targets are calculated.
             gt_boxes (optional): A Tensor with the ground truth boxes of the
                 image. Its shape is (total_num_gt, 5), using the encoding
                 (x1, y1, x2, y2, label).
 
         Returns:
             prediction_dict a dict with the object predictions.
+                It should have the keys:
+                objects:
+                labels:
+                probs:
 
-        TODO: Not training behaviour, we have to extract all ROI and classify
-        them?
+                rcnn:
+                target:
+
         """
         self._instantiate_layers()
 
-        prediction_dict = {}
+        prediction_dict = {'_debug': {}}
 
         if gt_boxes is not None:
-            # TODO: If not training, we should not depend on proposals_target
-            # to use region of interest pooling, we would just need to use all
-            # available proposals.
-            proposals_target, bbox_target = self._rcnn_target(
+            proposals_target, bbox_offsets_target = self._rcnn_target(
                 proposals, gt_boxes)
 
-            with tf.name_scope('prepare_batch'):
-                # We flatten to set shape, but it is already a flat Tensor.
-                in_batch_proposals = tf.reshape(
-                    tf.greater_equal(proposals_target, 0), [-1]
-                )
-                roi_proposals = tf.boolean_mask(
-                    proposals, in_batch_proposals)
-                roi_bbox_target = tf.boolean_mask(
-                    bbox_target, in_batch_proposals)
-                roi_proposals_target = tf.boolean_mask(
-                    proposals_target, in_batch_proposals)
-
-            prediction_dict['cls_target'] = roi_proposals_target
-            prediction_dict['bbox_offsets_target'] = roi_bbox_target
-            if self._debug:
-                prediction_dict['rcnn_target'] = {
-                    'proposals_target': proposals_target,
-                    'bbox_target': bbox_target,
-                }
-
-        else:
-            roi_proposals = proposals
+            prediction_dict['target'] = {
+                'cls': proposals_target,
+                'bbox_offsets': bbox_offsets_target,
+            }
 
         roi_prediction = self._roi_pool(
-            roi_proposals, pretrained_feature_map,
+            proposals, pretrained_feature_map,
             im_shape
         )
 
         if self._debug:
             # Save raw roi prediction in debug mode.
-            prediction_dict['roi_prediction'] = roi_prediction
+            prediction_dict['_debug']['roi'] = roi_prediction
 
         pooled_layer = roi_prediction['roi_pool']
 
@@ -171,8 +153,7 @@ class RCNN(snt.AbstractModule):
         net = tf.identity(flatten_net)
 
         if self._debug:
-            prediction_dict['flatten_net'] = net
-            variable_summaries(pooled_layer, 'pooled_layer', ['rcnn'])
+            prediction_dict['_debug']['flatten_net'] = net
 
         # After flattening we are lef with a
         # (num_proposals, pool_height * pool_width * 512) Tensor.
@@ -181,42 +162,40 @@ class RCNN(snt.AbstractModule):
             # Through FC layer.
             net = layer(net)
             if self._debug:
-                prediction_dict['layer_{}_out'.format(i)] = net
+                prediction_dict['_debug']['layer_{}_out'.format(i)] = net
 
             # Apply activation and dropout.
             net = self._activation(net)
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
         cls_score = self._classifier_layer(net)
-        prob = tf.nn.softmax(cls_score, dim=1)
+        cls_prob = tf.nn.softmax(cls_score, dim=1)
         bbox_offsets = self._bbox_layer(net)
+
+        prediction_dict['rcnn'] = {
+            'cls_score': cls_score,
+            'cls_prob': cls_prob,
+            'bbox_offsets': bbox_offsets,
+        }
 
         # Get final objects proposals based on the probabilty, the offsets and
         # the original proposals.
-        proposal_prediction = self._rcnn_proposal(
-            roi_proposals, bbox_offsets, prob, im_shape)
-
-        variable_summaries(prob, 'prob', ['rcnn'])
-        variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
-
-        prediction_dict['cls_score'] = cls_score
-        prediction_dict['cls_prob'] = prob
-        prediction_dict['bbox_offsets'] = bbox_offsets
-        prediction_dict['roi_proposals'] = roi_proposals
+        proposals_pred = self._rcnn_proposal(
+            proposals, bbox_offsets, cls_prob, im_shape)
 
         # objects, objects_labels, and objects_labels_prob are the only keys
         # that matter for drawing objects.
-        prediction_dict['objects'] = proposal_prediction['objects']
-        prediction_dict['objects_labels'] = (
-            proposal_prediction['proposal_label'])
-        prediction_dict['objects_labels_prob'] = (
-            proposal_prediction['proposal_label_prob'])
+        prediction_dict['objects'] = proposals_pred['objects']
+        prediction_dict['labels'] = proposals_pred['proposal_label']
+        prediction_dict['probs'] = proposals_pred['proposal_label_prob']
 
         if self._debug:
-            prediction_dict['proposal_prediction'] = proposal_prediction
+            prediction_dict['_debug']['proposal'] = proposals_pred
 
-        for i, layer in enumerate(self._layers):
-            layer_summaries(layer, ['rcnn'])
+        # Calculate summaries for results
+        variable_summaries(cls_prob, 'cls_prob', ['rcnn'])
+        variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
+        variable_summaries(pooled_layer, 'pooled_layer', ['rcnn'])
 
         layer_summaries(self._classifier_layer, ['rcnn'])
         layer_summaries(self._bbox_layer, ['rcnn'])
@@ -229,27 +208,29 @@ class RCNN(snt.AbstractModule):
 
         Args:
             prediction_dict with keys:
-                cls_score: shape (num_proposals, num_classes + 1)
-                    Has the class scoring for each the proposals. Classes are
-                    1-indexed with 0 being the background.
+                rcnn:
+                    cls_score: shape (num_proposals, num_classes + 1)
+                        Has the class scoring for each the proposals. Classes
+                        are 1-indexed with 0 being the background.
 
-                cls_prob: shape (num_proposals, num_classes + 1)
-                    Application of softmax on cls_score.
+                    cls_prob: shape (num_proposals, num_classes + 1)
+                        Application of softmax on cls_score.
 
-                cls_target: shape (num_proposals,)
-                    Has the correct label for each of the proposals.
-                    0 => background
-                    1..n => 1-indexed classes
+                    cls_target: shape (num_proposals,)
+                        Has the correct label for each of the proposals.
+                        0 => background
+                        1..n => 1-indexed classes
+                target:
+                    bbox_offsets: shape (num_proposals, num_classes * 4)
+                        Has the offset for each proposal for each class.
+                        We have to compare only the proposals labeled with the
+                        offsets for that label.
 
-                bbox_offsets: shape (num_proposals, num_classes * 4)
-                    Has the offset for each proposal for each class.
-                    We have to compare only the proposals labeled with the
-                    offsets for that label.
-
-                bbox_offsets_target: shape (num_proposals, 4)
-                    Has the true offset of each proposal for the true label.
-                    In case of not having a true label (non-background) then
-                    it's just zeroes.
+                    bbox_offsets_target: shape (num_proposals, 4)
+                        Has the true offset of each proposal for the true
+                        label.
+                        In case of not having a true label (non-background)
+                        then it's just zeroes.
 
         Returns:
             loss_dict with keys:
@@ -261,10 +242,12 @@ class RCNN(snt.AbstractModule):
         """
         with self._enter_variable_scope():
             with tf.name_scope('RCNNLoss'):
-                cls_score = prediction_dict['cls_score']
-                # cls_prob = prediction_dict['cls_prob']
+                cls_score = prediction_dict['rcnn']['cls_score']
+                # cls_prob = prediction_dict['rcnn']['cls_prob']
                 # Cast target explicitly as int32.
-                cls_target = tf.cast(prediction_dict['cls_target'], tf.int32)
+                cls_target = tf.cast(
+                    prediction_dict['target']['cls'], tf.int32
+                )
 
                 # First we need to calculate the log loss betweetn cls_prob and
                 # cls_target
@@ -299,16 +282,21 @@ class RCNN(snt.AbstractModule):
                 )
 
                 if self._debug:
+                    prediction_dict['_debug']['losses'] = {}
                     # Save the cross entropy per proposal to be able to
                     # visualize proposals with high and low error.
-                    prediction_dict['cross_entropy_per_proposal'] = (
+                    prediction_dict['_debug']['losses'][
+                        'cross_entropy_per_proposal'
+                    ] = (
                         cross_entropy_per_proposal
                     )
 
                 # Second we need to calculate the smooth l1 loss between
                 # `bbox_offsets` and `bbox_offsets_target`.
-                bbox_offsets = prediction_dict['bbox_offsets']
-                bbox_offsets_target = prediction_dict['bbox_offsets_target']
+                bbox_offsets = prediction_dict['rcnn']['bbox_offsets']
+                bbox_offsets_target = (
+                    prediction_dict['target']['bbox_offsets']
+                )
 
                 # We only want the non-background labels bounding boxes.
                 not_ignored = tf.reshape(tf.greater(cls_target, 0), [-1])
@@ -358,7 +346,9 @@ class RCNN(snt.AbstractModule):
                 if self._debug:
                     # Also save reg loss per proposals to be able to visualize
                     # good and bad proposals in debug mode.
-                    prediction_dict['reg_loss_per_proposal'] = (
+                    prediction_dict['_debug']['losses'][
+                        'reg_loss_per_proposal'
+                    ] = (
                         reg_loss_per_proposal
                     )
 
