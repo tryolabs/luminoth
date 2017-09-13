@@ -93,7 +93,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
             metrics_collections='metrics',
             updates_collections='metric_ops',
         )
-        full_loss_name = 'val_losses/{}'.format(loss_name)
+        full_loss_name = '{}_losses/{}'.format(dataset_split, loss_name)
         losses[full_loss_name] = loss_mean
 
     metric_ops = tf.get_collection('metric_ops')
@@ -117,6 +117,8 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         'losses': losses,
     }
 
+    metrics_scope = '{}_metrics'.format(dataset_split)
+
     last_global_step = from_global_step
     while True:
         # Get the checkpoint files to evaluate.
@@ -139,7 +141,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
                 checkpoint['global_step'], checkpoint['file']
             )
             last_global_step = checkpoint['global_step']
-            evaluate_once(config, saver, ops, checkpoint)
+            evaluate_once(config, saver, ops, checkpoint, metrics_scope)
 
         # If no watching was requested, finish the execution.
         if not watch:
@@ -208,7 +210,7 @@ def get_checkpoints(config, from_global_step=None):
     return checkpoints
 
 
-def evaluate_once(config, saver, ops, checkpoint):
+def evaluate_once(config, saver, ops, checkpoint, metrics_scope='metrics'):
     """Run the evaluation once.
 
     Create a new session with the previously-built graph, run it through the
@@ -274,7 +276,10 @@ def evaluate_once(config, saver, ops, checkpoint):
             # TODO: Find a way to generate these summaries automatically, or
             # less manually.
             summary = [
-                tf.Summary.Value(tag='metrics/mAP@0.5', simple_value=map_0_5),
+                tf.Summary.Value(
+                    tag='{}/mAP@0.5'.format(metrics_scope),
+                    simple_value=map_0_5
+                ),
             ]
 
             for loss_name, loss_value in val_losses.items():
@@ -285,7 +290,7 @@ def evaluate_once(config, saver, ops, checkpoint):
 
             for idx, val in enumerate(per_class_0_5):
                 summary.append(tf.Summary.Value(
-                    tag='metrics/AP@0.5/{}'.format(idx),
+                    tag='{}/AP@0.5/{}'.format(metrics_scope, idx),
                     simple_value=val
                 ))
 
@@ -294,7 +299,7 @@ def evaluate_once(config, saver, ops, checkpoint):
             ]
 
             summary.append(tf.Summary.Value(
-                tag='metrics/avg_bboxes',
+                tag='{}/avg_bboxes'.format(metrics_scope),
                 simple_value=np.mean(total_bboxes_per_batch)
             ))
 
