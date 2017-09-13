@@ -281,9 +281,11 @@ def train(model_type, config_file, override_params, continue_training,
                 if write_summary:
                     summary = fetched['summary']
                     writer.add_summary(summary, step)
-                    writer.add_run_metadata(
-                        run_metadata, str(step)
-                    )
+                    if step == 1:
+                        # only add the run_metadata for first step.
+                        writer.add_run_metadata(
+                            run_metadata, str(step)
+                        )
 
                 if display_images:
                     from luminoth.utils.image_vis import (
