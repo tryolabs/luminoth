@@ -279,6 +279,7 @@ def train(model_type, config_file, override_params, continue_training,
                 )
 
                 if write_summary:
+                    before = time.time()
                     summary = fetched['summary']
                     writer.add_summary(summary, step)
                     if step == 1:
@@ -286,14 +287,23 @@ def train(model_type, config_file, override_params, continue_training,
                         writer.add_run_metadata(
                             run_metadata, str(step)
                         )
+                    tf.logging.info('wrote summary in {:.2f}s'.format(
+                        time.time() - before
+                    ))
 
                 if display_images:
+                    before = time.time()
                     from luminoth.utils.image_vis import (
                         add_images_to_tensoboard
                     )
                     pred_dict = fetched['prediction_dict']
                     add_images_to_tensoboard(
                         pred_dict, step, summary_dir, config.network.with_rcnn
+                    )
+                    tf.logging.info(
+                        'saved images in summary in {:.2f}s'.format(
+                            time.time() - before
+                        )
                     )
 
                     if config.train.save_timeline:
@@ -308,7 +318,11 @@ def train(model_type, config_file, override_params, continue_training,
                 if not config.train.no_log:
                     if step % config.train.save_every == 0:
                         # We don't support partial saver.
+                        before = time.time()
                         saver.save(sess, checkpoint_path, global_step=step)
+                        tf.logging.info('saving checkpoint in {:.2f}s'.format(
+                            time.time() - before
+                        ))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info('step = {}, train_loss = {:.2f}'.format(
