@@ -74,7 +74,7 @@ class FasterRCNN(snt.AbstractModule):
             config.pretrained, parent_name=self.module_name
         )
 
-    def _build(self, image, gt_boxes=None):
+    def _build(self, image, gt_boxes=None, training=False):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -85,6 +85,7 @@ class FasterRCNN(snt.AbstractModule):
                 Its shape should be `(num_gt_boxes, 5)`
                 Where for each gt box we have (x1, y1, x2, y2, label),
                 in that order.
+            training: A boolean to whether or not it is used for training.
 
         Returns:
             classification_prob: A tensor with the softmax probability for
@@ -135,7 +136,7 @@ class FasterRCNN(snt.AbstractModule):
         if self._with_rcnn:
             classification_pred = self._rcnn(
                 pretrained_feature_map, rpn_prediction['proposals'],
-                image_shape, gt_boxes=gt_boxes
+                image_shape, gt_boxes=gt_boxes, training=training
             )
 
             prediction_dict['classification_prediction'] = classification_pred

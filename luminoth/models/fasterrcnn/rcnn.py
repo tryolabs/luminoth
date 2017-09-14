@@ -95,7 +95,7 @@ class RCNN(snt.AbstractModule):
         )
 
     def _build(self, pretrained_feature_map, proposals, im_shape,
-               gt_boxes=None):
+               gt_boxes=None, training=False):
         """
         Classifies proposals based on the pooled feature map.
 
@@ -111,6 +111,8 @@ class RCNN(snt.AbstractModule):
             gt_boxes (optional): A Tensor with the ground truth boxes of the
                 image. Its shape is (total_num_gt, 5), using the encoding
                 (x1, y1, x2, y2, label).
+            training (optional): A boolean to determine if we are just using
+                the module for training or for complete object inference.
 
         Returns:
             prediction_dict a dict with the object predictions.
@@ -130,6 +132,19 @@ class RCNN(snt.AbstractModule):
         if gt_boxes is not None:
             proposals_target, bbox_offsets_target = self._rcnn_target(
                 proposals, gt_boxes)
+
+            if training:
+                with tf.name_scope('prepare_batch'):
+                    # We flatten to set shape, but it is already a flat Tensor.
+                    in_batch_proposals = tf.reshape(
+                        tf.greater_equal(proposals_target, 0), [-1]
+                    )
+                    proposals = tf.boolean_mask(
+                        proposals, in_batch_proposals)
+                    bbox_offsets_target = tf.boolean_mask(
+                        bbox_offsets_target, in_batch_proposals)
+                    proposals_target = tf.boolean_mask(
+                        proposals_target, in_batch_proposals)
 
             prediction_dict['target'] = {
                 'cls': proposals_target,

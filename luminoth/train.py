@@ -84,7 +84,7 @@ def train(model_type, config_file, override_params, continue_training,
     # PLACE
     train_image = tf.expand_dims(train_image, 0)
 
-    prediction_dict = model(train_image, train_bboxes)
+    prediction_dict = model(train_image, train_bboxes, training=True)
 
     total_loss = model.loss(prediction_dict)
 
