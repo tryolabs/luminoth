@@ -132,6 +132,7 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['image_shape'] = image_shape
             prediction_dict['all_anchors'] = all_anchors
             prediction_dict['gt_boxes'] = gt_boxes
+            prediction_dict['pretrained_feature_map'] = pretrained_feature_map
 
         if self._with_rcnn:
             classification_pred = self._rcnn(

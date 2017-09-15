@@ -12,7 +12,7 @@ VALID_INITIALIZERS = {
 }
 
 
-def variable_summaries(var, name, collections):
+def variable_summaries(var, name, collections=None):
     """Attach a lot of summaries to a Tensor (for TensorBoard visualization).
 
     Args:

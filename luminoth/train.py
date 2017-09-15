@@ -8,6 +8,8 @@ from luminoth.models import get_model
 from luminoth.utils.config import (
     load_config, merge_into, kwargs_to_config, parse_override
 )
+from luminoth.utils.vars import variable_summaries
+
 
 OPTIMIZERS = {
     'adam': tf.train.AdamOptimizer,
@@ -163,6 +165,10 @@ def train(model_type, config_file, override_params, continue_training,
     trainable_vars = model.get_trainable_vars()
     grads_and_vars = optimizer.compute_gradients(total_loss, trainable_vars)
 
+    for grad, var in grads_and_vars:
+        if grad is not None:
+            variable_summaries(grad, 'grad/{}'.format(var.name[:-2]))
+
     # Clip by norm. Grad can be null when not training some modules.
     with tf.name_scope('clip_gradients_by_norm'):
         grads_and_vars = [
@@ -175,6 +181,10 @@ def train(model_type, config_file, override_params, continue_training,
             if gv[0] is not None else gv
             for gv in grads_and_vars
         ]
+
+    for grad, var in grads_and_vars:
+        if grad is not None:
+            variable_summaries(grad, 'clipped_grad/{}'.format(var.name[:-2]))
 
     train_op = optimizer.apply_gradients(
         grads_and_vars, global_step=global_step
