@@ -33,7 +33,7 @@ class ObjectDetectionDataset(snt.AbstractModule):
         random_shuffle (bool): To consume the dataset using random shuffle or
             to just use a regular FIFO queue.
     """
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, seed=None, **kwargs):
         """
         Save general purpose attributes for Dataset module.
 
@@ -50,6 +50,7 @@ class ObjectDetectionDataset(snt.AbstractModule):
         self._random_shuffle = config.train.random_shuffle
         # In case no keys are defined, default to empty list.
         self._data_augmentation = config.dataset.data_augmentation or []
+        self._seed = seed
 
     def _build():
         pass
@@ -92,7 +93,7 @@ class ObjectDetectionDataset(snt.AbstractModule):
             aug_config = aug_config[aug_type]
             aug_fn = DATA_AUGMENTATION_STRATEGIES[aug_type]
 
-            random_number = tf.random_uniform([])
+            random_number = tf.random_uniform([], seed=self._seed)
             prob = tf.to_float(aug_config.pop('prob', default_prob))
             apply_aug_strategy = tf.less(random_number, prob)
 

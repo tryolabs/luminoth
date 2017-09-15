@@ -58,7 +58,7 @@ class TFRecordDataset(ObjectDetectionDataset):
         # String input producer allows for a variable number of files to read
         # from. We just know we have a single file.
         filename_queue = tf.train.string_input_producer(
-            [split_path], num_epochs=self._num_epochs
+            [split_path], num_epochs=self._num_epochs, seed=self._seed
         )
 
         # Define reader to parse records.
@@ -113,7 +113,8 @@ class TFRecordDataset(ObjectDetectionDataset):
                 min_after_dequeue=0,
                 dtypes=queue_dtypes,
                 names=queue_names,
-                name='tfrecord_random_queue'
+                name='tfrecord_random_queue',
+                seed=self._seed
             )
         else:
             queue = tf.FIFOQueue(

@@ -31,7 +31,8 @@ class RCNN(snt.AbstractModule):
         probability assigned to it.
     """
 
-    def __init__(self, num_classes, config, debug=False, name='rcnn'):
+    def __init__(self, num_classes, config, debug=False, seed=None,
+                 name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
         # List of the fully connected layer sized used before classifying and
@@ -40,7 +41,7 @@ class RCNN(snt.AbstractModule):
         self._activation = tf.nn.relu6
         self._dropout_keep_prob = config.dropout_keep_prop
 
-        self.initializer = get_initializer(config.initializer)
+        self.initializer = get_initializer(config.initializer, seed=seed)
         self.regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale)
 
@@ -48,6 +49,7 @@ class RCNN(snt.AbstractModule):
         # useful for debugging.
         self._debug = debug
         self._config = config
+        self._seed = seed
 
     def _instantiate_layers(self):
         # We define layers as an array since they are simple fully conected
@@ -86,7 +88,7 @@ class RCNN(snt.AbstractModule):
         # RCNNTarget is used to define a minibatch and the correct values for
         # each of the proposals.
         self._rcnn_target = RCNNTarget(
-            self._num_classes, self._config.target, debug=self._debug
+            self._num_classes, self._config.target, seed=self._seed
         )
         # RCNNProposal generates the final bounding boxes and tries to remove
         # duplicates.

@@ -24,7 +24,7 @@ class RCNNTarget(snt.AbstractModule):
     which proposals and corresponding targets are included in the minibatch and
     which ones are completly ignored.
     """
-    def __init__(self, num_classes, config, debug=False, name='rcnn_proposal'):
+    def __init__(self, num_classes, config, seed=None, name='rcnn_proposal'):
         """
         Args:
             num_classes: Number of possible classes.
@@ -41,12 +41,7 @@ class RCNNTarget(snt.AbstractModule):
         # High and low treshold to be considered background.
         self._background_threshold_high = config.background_threshold_high
         self._background_threshold_low = config.background_threshold_low
-        self._debug = debug
-
-        if self._debug:
-            tf.logging.warning(
-                'Using RCNN Target in debug mode makes random seed '
-                'to be fixed at 0.')
+        self._seed = seed
 
     def _build(self, proposals, gt_boxes):
         """
@@ -164,10 +159,7 @@ class RCNNTarget(snt.AbstractModule):
             # size `fg_inds.shape[0] - max_fg`.
             # We shuffle along the dimension 0 and then we get the first
             # num_fg_inds - max_fg indices and we disable them.
-            if self._debug:
-                shuffled_inds = tf.random_shuffle(fg_inds, seed=0)
-            else:
-                shuffled_inds = tf.random_shuffle(fg_inds)
+            shuffled_inds = tf.random_shuffle(fg_inds, seed=self._seed)
             disable_place = (tf.shape(fg_inds)[0] - max_fg)
             # This function should never run if num_fg_inds <= max_fg, so we
             # add an assertion to catch the wrong behaviour if it happens.
@@ -218,10 +210,7 @@ class RCNNTarget(snt.AbstractModule):
 
         def disable_some_bgs():
             # Mutatis mutandis, all comments from disable_some_fgs apply.
-            if self._debug:
-                shuffled_inds = tf.random_shuffle(bg_inds, seed=0)
-            else:
-                shuffled_inds = tf.random_shuffle(bg_inds)
+            shuffled_inds = tf.random_shuffle(bg_inds, seed=self._seed)
             disable_place = (tf.shape(bg_inds)[0] - max_bg)
             integrity_assertion = tf.assert_non_negative(
                 disable_place,

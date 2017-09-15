@@ -26,7 +26,7 @@ class RPNTargetTest(tf.test.TestCase):
         im_size = tf.placeholder(tf.float32, shape=(2,))
         all_anchors = tf.placeholder(tf.float32, shape=anchors.shape)
 
-        model = RPNTarget(anchors.shape[0], config, debug=True)
+        model = RPNTarget(anchors.shape[0], config, seed=0)
         labels, bbox_targets, max_overlaps = model(
             all_anchors, gt_boxes_tf, im_size)
 

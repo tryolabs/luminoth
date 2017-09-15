@@ -17,7 +17,8 @@ from luminoth.utils.vars import (
 
 class RPN(snt.AbstractModule):
 
-    def __init__(self, num_anchors, config, debug=False, name='rpn'):
+    def __init__(self, num_anchors, config, debug=False, seed=None,
+                 name='rpn'):
         """RPN - Region Proposal Network
 
         This module works almost independently from the Faster RCNN module.
@@ -31,10 +32,11 @@ class RPN(snt.AbstractModule):
         self._kernel_shape = config.kernel_shape
 
         self._debug = debug
+        self._seed = seed
 
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.0
-        self._initializer = get_initializer(config.initializer)
+        self._initializer = get_initializer(config.initializer, seed=seed)
         self._regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale
         )
@@ -116,7 +118,7 @@ class RPN(snt.AbstractModule):
         self._instantiate_layers()
         self._proposal = RPNProposal(self._num_anchors, self._config.proposals)
         self._anchor_target = RPNTarget(
-            self._num_anchors, self._config.target, debug=self._debug
+            self._num_anchors, self._config.target, seed=self._seed
         )
 
         prediction_dict = {}

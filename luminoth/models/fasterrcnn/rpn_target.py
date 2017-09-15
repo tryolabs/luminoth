@@ -47,7 +47,7 @@ class RPNTarget(snt.AbstractModule):
         labels: label for each anchor
         bbox_targets: bbox regresion values for each anchor
     """
-    def __init__(self, num_anchors, config, debug=False, name='anchor_target'):
+    def __init__(self, num_anchors, config, seed=None, name='anchor_target'):
         super(RPNTarget, self).__init__(name=name)
         self._num_anchors = num_anchors
 
@@ -65,12 +65,8 @@ class RPNTarget(snt.AbstractModule):
         self._foreground_fraction = config.foreground_fraction
         self._minibatch_size = config.minibatch_size
 
-        self._debug = debug
-        if self._debug:
-            tf.logging.warning(
-                'Using RPN Anchor Target in debug mode makes random seed '
-                'to be fixed at 0.'
-            )
+        # When choosing random targets use `seed` to replicate behaviour.
+        self._seed = seed
 
     def _build(self, all_anchors, gt_boxes, im_size):
         """
@@ -204,10 +200,7 @@ class RPNTarget(snt.AbstractModule):
         # Subsample positive labels if we have too many
         def subsample_positive():
             # Shuffle the foreground indices
-            if self._debug:
-                disable_fg_inds = tf.random_shuffle(fg_inds, seed=0)
-            else:
-                disable_fg_inds = tf.random_shuffle(fg_inds)
+            disable_fg_inds = tf.random_shuffle(fg_inds, seed=self._seed)
             # Select the indices that we have to ignore, this is
             # `tf.shape(fg_inds)[0] - num_fg` because we want to get only
             # `num_fg` foreground labels.
@@ -244,10 +237,8 @@ class RPNTarget(snt.AbstractModule):
         # Subsample negative labels if we have too many
         def subsample_negative():
             # Shuffle the background indices
-            if self._debug:
-                disable_bg_inds = tf.random_shuffle(bg_inds, seed=0)
-            else:
-                disable_bg_inds = tf.random_shuffle(bg_inds)
+            disable_bg_inds = tf.random_shuffle(bg_inds, seed=self._seed)
+
             # Select the indices that we have to ignore, this is
             # `tf.shape(bg_inds)[0] - num_bg` because we want to get only
             # `num_bg` background labels.

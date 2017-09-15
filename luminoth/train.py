@@ -26,6 +26,7 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')  # noqa
+@click.option('--seed', type=float, help='Global seed value for random operations.')  # noqa
 @click.option('--model-dir', default='models/', help='Directory to save the partial trained models.')  # noqa
 @click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')  # noqa
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')  # noqa
@@ -46,8 +47,11 @@ LEARNING_RATE_DECAY_METHODS = set([
 @click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')  # noqa
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')  # noqa
 @click.option('--job-dir')  # TODO: Ignore this arg passed by Google Cloud ML.
-def train(model_type, config_file, override_params, continue_training,
+def train(model_type, config_file, override_params, continue_training, seed,
           **kwargs):
+
+    if seed:
+        tf.set_random_seed(seed)
 
     model_class = get_model(model_type)
     config = model_class.base_config
@@ -70,8 +74,8 @@ def train(model_type, config_file, override_params, continue_training,
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    model = model_class(config)
-    dataset = TFRecordDataset(config)
+    model = model_class(config, seed=seed)
+    dataset = TFRecordDataset(config, seed=seed)
     train_dataset = dataset()
 
     train_image = train_dataset['image']

@@ -29,7 +29,7 @@ class RCNNTargetTest(tf.test.TestCase):
         self._equality_delta = 1e-03
 
         self._shared_model = RCNNTarget(
-            self._num_classes, self._config, debug=True
+            self._num_classes, self._config, seed=0
         )
 
     def _run_rcnn_target(self, model, gt_boxes, proposed_boxes):
@@ -240,7 +240,7 @@ class RCNNTargetTest(tf.test.TestCase):
             'minibatch_size': 5,
         })
 
-        model = RCNNTarget(self._num_classes, config)
+        model = RCNNTarget(self._num_classes, config, seed=0)
 
         gt_boxes = tf.constant(
             [(200, 300, 250, 390, self._placeholder_label)],
@@ -308,7 +308,7 @@ class RCNNTargetTest(tf.test.TestCase):
             'minibatch_size': 8,
         })
 
-        model = RCNNTarget(self._num_classes, config)
+        model = RCNNTarget(self._num_classes, config, seed=0)
 
         gt_boxes = tf.constant(
             [(200, 300, 250, 390, self._placeholder_label)],
@@ -361,7 +361,7 @@ class RCNNTargetTest(tf.test.TestCase):
             # We change the minibatch_size the catch all our foregrounds
             'minibatch_size': 18,
         })
-        model = RCNNTarget(num_classes, config)
+        model = RCNNTarget(num_classes, config, seed=0)
 
         gt_boxes = tf.constant(
             [
@@ -464,7 +464,7 @@ class RCNNTargetTest(tf.test.TestCase):
             dtype=tf.float32
         )
 
-        model = RCNNTarget(self._num_classes, config)
+        model = RCNNTarget(self._num_classes, config, seed=0)
 
         (proposals_label, bbox_targets) = self._run_rcnn_target(
             model,

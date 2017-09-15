@@ -24,8 +24,8 @@ class FasterRCNN(snt.AbstractModule):
 
     base_config = get_base_config(__file__)
 
-    def __init__(self, config, debug=False, with_rcnn=True, num_classes=None,
-                 name='fasterrcnn'):
+    def __init__(self, config, with_rcnn=True, num_classes=None, debug=False,
+                 seed=None, name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
         # Main configuration object, it holds not only the necessary
@@ -44,6 +44,7 @@ class FasterRCNN(snt.AbstractModule):
         # Turn on debug mode with returns more Tensors which can be used for
         # better visualization and (of course) debugging.
         self._debug = config.train.debug
+        self._seed = seed
 
         # Anchor config, check out the docs of base_config.yml for a better
         # understanding of how anchors work.
@@ -104,12 +105,16 @@ class FasterRCNN(snt.AbstractModule):
         pretrained_feature_map = pretrained_prediction['net']
 
         # The RPN submodule which generates proposals of objects.
-        self._rpn = RPN(self._num_anchors, self._config.rpn, debug=self._debug)
+        self._rpn = RPN(
+            self._num_anchors, self._config.rpn,
+            debug=self._debug, seed=self._seed
+        )
         if self._with_rcnn:
             # The RCNN submodule which classifies RPN's proposals and
             # classifies them as background or a specific class.
             self._rcnn = RCNN(
-                self._num_classes, self._config.rcnn, debug=self._debug
+                self._num_classes, self._config.rcnn,
+                debug=self._debug, seed=self._seed
             )
 
         image_shape = tf.shape(image)[1:3]
@@ -120,7 +125,8 @@ class FasterRCNN(snt.AbstractModule):
         # Generate anchors for the image based on the anchor reference.
         all_anchors = self._generate_anchors(pretrained_feature_map)
         rpn_prediction = self._rpn(
-            pretrained_feature_map, image_shape, all_anchors, gt_boxes=gt_boxes
+            pretrained_feature_map, image_shape, all_anchors,
+            gt_boxes=gt_boxes
         )
 
         prediction_dict = {

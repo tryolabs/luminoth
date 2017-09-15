@@ -43,7 +43,7 @@ def layer_summaries(layer, collections):
         variable_summaries(layer._b, '{}/b'.format(layer_name), collections)
 
 
-def get_initializer(initializer_config):
+def get_initializer(initializer_config, seed=None):
     """Get variable initializer.
 
     Args:
@@ -62,6 +62,7 @@ def get_initializer(initializer_config):
 
     config = initializer_config.copy()
     initializer = VALID_INITIALIZERS[config.pop('type')]
+    config['seed'] = seed
 
     return initializer(**config)
 
