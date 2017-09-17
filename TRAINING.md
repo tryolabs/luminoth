@@ -33,13 +33,13 @@ You can choose how many workers you want, which [scale tiers](https://cloud.goog
 2. Install [Google Cloud SDK](https://cloud.google.com/sdk/) on your machine.
 3. Manual login:
 ```
-$ gscloud auth login
+$ gcloud auth login
 ```
 4. Your dataset needs to be available for Google Cloud ML resources. To upload it run:
 ```
 $ gsutil -o GSUtil:parallel_composite_upload_threshold=150M cp -r /path/to/dataset/tfrecords gs://your_bucket/path
 ```
-5. Create Google Create a Service Account Key (JSON format) and download it to your directory of choice.
+5. Create a [Service Account Key](https://console.cloud.google.com/iam-admin/serviceaccounts/project) (JSON format) and download it to your directory of choice.
 
 ### Train
 

@@ -1,13 +1,15 @@
 import click
-import os.path
+import os
+import tempfile
 import time
 import tensorflow as tf
 import googleapiclient.discovery as discovery
+import subprocess
 
 from datetime import datetime
 
 from google.cloud import storage
-from google.oauth2 import service_account
+from oauth2client import service_account
 
 
 SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
@@ -28,6 +30,45 @@ def gc():
     pass
 
 
+def build_package(bucket):
+    package_path = os.path.abspath(
+        os.path.join(os.path.realpath(__file__), '..', '..', '..', '..')
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = os.path.join(temp_dir, 'output')
+
+        devnull = open(os.devnull, 'w')
+        subprocess.call(
+            [
+                'python', 'setup.py', 'egg_info', '--egg-base', temp_dir,
+                'build', '--build-base', temp_dir, '--build-temp', temp_dir,
+                'sdist', '--dist-dir', output_dir
+            ],
+            cwd=package_path, stdout=devnull, stderr=devnull
+        )
+        subprocess.call(
+            [
+                'python', 'setup.py', 'build', '--build-base', temp_dir,
+                '--build-temp', temp_dir, 'sdist', '--dist-dir', output_dir
+            ],
+            cwd=package_path, stdout=devnull, stderr=devnull
+        )
+        subprocess.call(
+            ['python', 'setup.py', 'sdist', '--dist-dir', output_dir],
+            cwd=package_path, stdout=devnull, stderr=devnull
+        )
+
+        tarball_filename = os.listdir(output_dir)[0]
+        tarball_path = os.path.join(
+            output_dir, tarball_filename
+        )
+
+        path = upload_file(bucket, 'packages', tarball_path)
+
+        return path
+
+
 def get_bucket(service_account_json, bucket_name):
     storage_client = storage.Client.from_service_account_json(
         service_account_json)
@@ -46,7 +87,9 @@ def upload_file(bucket, base_path, filename):
 
 
 def get_credentials(file):
-    return service_account.Credentials.from_service_account_file(file)
+    return service_account.ServiceAccountCredentials.from_json_keyfile_name(
+        file
+    )
 
 
 def cloud_service(credentials, service, version='v1'):
@@ -68,6 +111,11 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
           dataset, scale_tier, master_type, worker_type, worker_count):
     args = []
 
+    # Creates bucket for logs and models if it doesn't exist
+    bucket = get_bucket(service_account_json, bucket_name)
+
+    package_path = build_package(bucket)
+
     if not job_id:
         job_id = 'train_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
 
@@ -79,13 +127,11 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
         dataset = 'gs://{}'.format(dataset)
 
     args.extend([
-        '--log-dir', 'gs://{}/{}/logs'.format(bucket_name, base_path),
-        '--model-dir', 'gs://{}/{}/model'.format(bucket_name, base_path),
-        '--override', 'dataset.dir={}'.format(dataset)
+        '--job-dir', 'gs://{}/{}'.format(bucket_name, base_path),
+        '--override', 'dataset.dir={}'.format(dataset),
+        # Turning off data_augmentation because of TF 1.2 limitations
+        '--override', 'dataset.data_augmentation=false'
     ])
-
-    # Creates bucket for logs and models if it doesn't exist
-    bucket = get_bucket(service_account_json, bucket_name)
 
     if config:
         # Upload config file to be used by the training job.
@@ -98,7 +144,7 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
     training_inputs = {
         'scaleTier': scale_tier,
         'packageUris': [
-            'gs://luminoth-config/luminoth-0.0.1-py2-none-any.whl'
+            'gs://{}/{}'.format(bucket_name, package_path)
         ],
         'pythonModule': 'luminoth.train',
         'args': args,
