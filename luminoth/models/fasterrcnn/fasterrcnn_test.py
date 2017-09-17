@@ -46,6 +46,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 'dropout_keep_prop': 1.0,
                 'activation_function': 'relu6',
                 'l2_regularization_scale': 0.0005,
+                'use_mean': False,
                 'initializer': {
                     'type': 'variance_scaling_initializer',
                     'factor': 1.0,

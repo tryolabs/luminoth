@@ -38,8 +38,9 @@ class RCNN(snt.AbstractModule):
         # List of the fully connected layer sized used before classifying and
         # adjusting the bounding box.
         self._layer_sizes = config.layer_sizes
-        self._activation = tf.nn.relu6
+        self._activation = tf.nn.relu
         self._dropout_keep_prob = config.dropout_keep_prop
+        self._use_mean = config.use_mean
 
         self.initializer = get_initializer(config.initializer, seed=seed)
         self.regularizer = tf.contrib.layers.l2_regularizer(
@@ -63,7 +64,6 @@ class RCNN(snt.AbstractModule):
             )
             for i, layer_size in enumerate(self._layer_sizes)
         ]
-
         # We define the classifier layer having a num_classes + 1 background
         # since we want to be able to predict if the proposal is background as
         # well.
@@ -162,12 +162,19 @@ class RCNN(snt.AbstractModule):
             # Save raw roi prediction in debug mode.
             prediction_dict['_debug']['roi'] = roi_prediction
 
-        pooled_layer = roi_prediction['roi_pool']
+        pooled_features = roi_prediction['roi_pool']
+
+        if self._use_mean:
+            # We avg our height and width dimensions for a more
+            # "memory-friendly" Tensor.
+            pooled_features = tf.reduce_mean(
+                pooled_features, [1, 2], keep_dims=True
+            )
 
         # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
-        flatten_net = tf.contrib.layers.flatten(pooled_layer)
-        net = tf.identity(flatten_net)
+        flatten_features = tf.contrib.layers.flatten(pooled_features)
+        net = tf.identity(flatten_features)
 
         if self._debug:
             prediction_dict['_debug']['flatten_net'] = net
@@ -212,7 +219,7 @@ class RCNN(snt.AbstractModule):
         # Calculate summaries for results
         variable_summaries(cls_prob, 'cls_prob', ['rcnn'])
         variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
-        variable_summaries(pooled_layer, 'pooled_layer', ['rcnn'])
+        variable_summaries(pooled_features, 'pooled_features', ['rcnn'])
 
         layer_summaries(self._classifier_layer, ['rcnn'])
         layer_summaries(self._bbox_layer, ['rcnn'])

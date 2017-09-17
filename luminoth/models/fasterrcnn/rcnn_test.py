@@ -24,6 +24,7 @@ class RCNNTest(tf.test.TestCase):
             'layer_sizes': [4096, 4096],
             'dropout_keep_prop': 1.0,
             'activation_function': 'relu6',
+            'use_mean': False,
             'initializer': {
                 'type': 'variance_scaling_initializer',
                 'factor': 1.0,
