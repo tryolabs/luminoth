@@ -3,86 +3,35 @@ import os
 import click
 import json
 import tensorflow as tf
+import time
 
 from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
-from luminoth.utils.config import (
-    load_config, merge_into, kwargs_to_config, parse_override
+from luminoth.utils.config import get_model_config
+from luminoth.utils.training import (
+    get_optimizer, clip_gradients_by_norm
 )
-from luminoth.utils.vars import variable_summaries
 
 
-OPTIMIZERS = {
-    'adam': tf.train.AdamOptimizer,
-    'momentum': tf.train.MomentumOptimizer,
-}
+def run(target, cluster_spec, is_chief, model_type, config_file,
+        override_params, continue_training, seed, **kwargs):
 
-LEARNING_RATE_DECAY_METHODS = set([
-    'piecewise_constant', 'exponential_decay', 'none'
-])
+    if seed:
+        tf.set_random_seed(seed)
 
+    model_class = get_model(model_type)
 
-def get_model_config(model_class, config_file, override_params, **kwargs):
-    config = model_class.base_config
-
-    # Load train extra options
-    config.train = merge_into(kwargs_to_config(kwargs), config.train)
-
-    if config_file:
-        # If we have a custom config file overwriting default settings
-        # then we merge those values to the base_config.
-        custom_config = load_config(config_file)
-        config = merge_into(custom_config, config)
-
-    if override_params:
-        override_config = parse_override(override_params)
-        config = merge_into(override_config, config)
+    config = get_model_config(
+        model_class.base_config, config_file, override_params, **kwargs
+    )
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    return config
-
-
-def get_learning_rate(config, global_step=None):
-    method = config.train.learning_rate_decay_method
-    if not method or method == 'none':
-        return config.train.initial_learning_rate
-
-    if method == 'piecewise_constant':
-        return tf.train.piecewise_constant(
-            global_step, boundaries=[
-                tf.cast(config.train.learning_rate_decay, tf.int64), ],
-            values=[
-                config.train.initial_learning_rate,
-                config.train.initial_learning_rate * 0.1
-            ], name='learning_rate_piecewise_constant'
-        )
-
-    if method == 'exponential_decay':
-        return tf.train.exponential_decay(
-            learning_rate=config.initial_learning_rate,
-            global_step=global_step,
-            decay_steps=config.train.learning_rate_decay, decay_rate=0.96,
-            staircase=True, name='learning_rate_with_decay'
-        )
-
-    raise ValueError('Invalid learning_rate method "{}"'.format(method))
-
-
-def run(target, cluster_spec, is_chief, model_type, config_file,
-        override_params, continue_training, seed=0, **kwargs):
-
-    if seed:
-        tf.set_random_seed(seed)
-
-    model_class = get_model(model_type)
-    config = get_model_config(
-        model_class, config_file, override_params, **kwargs)
     model = model_class(config, seed=seed)
 
     # Placement of ops on devices using replica device setter
@@ -114,23 +63,9 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
         # load_weights returns no_op when empty checkpoint_file.
         # TODO: Make optional for different types of models.
         load_op = model.load_pretrained_weights()
+        # TODO: Partial loader
 
-        # TODO: what is this? probably broken since code changes for
-        #       distributed training
-        # saver = model.get_saver()
-        # if config.train.ignore_scope:
-        #     partial_loader = model.get_saver(
-        #         ignore_scope=config.train.ignore_scope
-        #     )
-
-        learning_rate = get_learning_rate(config, global_step)
-        tf.summary.scalar('losses/learning_rate', learning_rate)
-
-        optimizer_cls = OPTIMIZERS[config.train.optimizer_type]
-        if config.train.optimizer_type == 'momentum':
-            optimizer = optimizer_cls(learning_rate, config.train.momentum)
-        else:
-            optimizer = optimizer_cls(learning_rate)
+        optimizer = get_optimizer(config.train, global_step)
 
         trainable_vars = model.get_trainable_vars()
 
@@ -139,27 +74,8 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
             total_loss, trainable_vars
         )
 
-        for grad, var in grads_and_vars:
-            if grad is not None:
-                variable_summaries(grad, 'grad/{}'.format(var.name[:-2]))
-
-        # Clip by norm. Grad can be null when not training some modules.
-        with tf.name_scope('clip_gradients_by_norm'):
-            grads_and_vars = [
-                (
-                    tf.check_numerics(
-                        tf.clip_by_norm(gv[0], 10.),
-                        'Invalid gradient'
-                    ), gv[1]
-                )
-                if gv[0] is not None else gv
-                for gv in grads_and_vars
-            ]
-
-        for grad, var in grads_and_vars:
-            if grad is not None:
-                variable_summaries(
-                    grad, 'clipped_grad/{}'.format(var.name[:-2]))
+        # Clip by norm. TODO: Configurable
+        grads_and_vars = clip_gradients_by_norm(grads_and_vars)
 
         train_op = optimizer.apply_gradients(
             grads_and_vars, global_step=global_step
@@ -184,11 +100,9 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
 
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
-    scaffold = tf.train.Scaffold(init_op=init_op)
+    scaffold = tf.train.Scaffold(init_op=init_op, saver=model.get_saver())
 
-    #
     # Custom hooks for our session
-    #
     hooks = []
     if config.train.tf_debug:
         debug_hook = tf_debug.LocalCLIDebugHook()
@@ -197,10 +111,22 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
         )
         hooks.extend([debug_hook])
 
+    if not config.train.job_dir:
+        tf.logging.warning(
+            '`job_dir` is not defined. Checkpoints and logs will not be saved.'
+        )
+    elif config.train.run_name:
+        # Use run_name when available
+        checkpoint_dir = os.path.join(
+            config.train.job_dir, config.train.run_name
+        )
+    else:
+        checkpoint_dir = config.train.job_dir
+
     with tf.train.MonitoredTrainingSession(
         master=target,
         is_chief=is_chief,
-        checkpoint_dir=config.train.job_dir,
+        checkpoint_dir=checkpoint_dir,
         scaffold=scaffold,
         hooks=hooks,
         save_checkpoint_secs=config.train.save_checkpoint_secs,
@@ -212,15 +138,17 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
 
         try:
             while not coord.should_stop():
+                before = time.time()
                 _, train_loss, step, filename = sess.run([
                     train_op, total_loss, global_step, train_filename
                 ], options=run_options)
 
-                # TODO: Add image summary when master.
+                # TODO: Add image summary every once in a while.
 
-                tf.logging.info('step: {}, file: {}, train_loss: {}'.format(
-                    step, filename, train_loss
-                ))
+                tf.logging.info(
+                    'step: {}, file: {}, train_loss: {}, in {:.2f}s'.format(
+                        step, filename, train_loss, time.time() - before
+                    ))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info(
@@ -245,39 +173,35 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
 @click.option('--seed', type=float, help='Global seed value for random operations.')  # noqa
 @click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')  # noqa
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')  # noqa
-@click.option('--log-dir', default='/tmp/luminoth/', help='Directory for Tensorboard logs.')  # noqa
 @click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')  # noqa
 @click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')  # noqa
+@click.option('--run-name', type=str, help='Run name used to log in Tensorboard and isolate checkpoints.')  # noqa
 @click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')  # noqa
 @click.option('--display-every', default=500, type=int, help='Show image debug information every N batches (debug mode must be activated)')  # noqa
 @click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')  # noqa
 @click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')  # noqa
 @click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')  # noqa
-@click.option('--initial-learning-rate', default=0.0001, type=float, help='Initial learning rate.')  # noqa
-@click.option('--learning-rate-decay', default=10000, type=int, help='Decay learning rate after N batches.')  # noqa
-@click.option('--learning-rate-decay-method', default='piecewise_constant', type=click.Choice(LEARNING_RATE_DECAY_METHODS), help='Tipo of learning rate decay to use.')  # noqa
-@click.option('optimizer_type', '--optimizer', default='momentum', type=click.Choice(OPTIMIZERS.keys()), help='Optimizer to use.')  # noqa
 @click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')  # noqa
-@click.option('--job-dir')
+@click.option('--job-dir', type=str, help='Directory where to save logs and checkpoints from training.')  # noqa
 def train(*args, **kwargs):
     """
-    Parse TF_CONFIG to cluster_spec and call run_train() method.
-
-    TF_CONFIG environment variable is available when running using
-    gcloud either locally or on cloud. It has all the information required
-    to create a ClusterSpec which is important for running distributed code.
+    Parse TF_CONFIG to cluster_spec and call run() function
     """
-    tf_config = os.environ.get('TF_CONFIG')
+
+    # TF_CONFIG environment variable is available when running using
+    # gcloud either locally or on cloud. It has all the information required
+    # to create a ClusterSpec which is important for running distributed code.
+    tf_config_val = os.environ.get('TF_CONFIG')
 
     # If TF_CONFIG is not available, run local
-    if not tf_config:
+    if not tf_config_val:
         return run('', None, True, *args, **kwargs)
 
-    tf_config_json = json.loads(tf_config)
+    tf_config = json.loads(tf_config_val)
 
-    cluster = tf_config_json.get('cluster')
-    job_name = tf_config_json.get('task', {}).get('type')
-    task_index = tf_config_json.get('task', {}).get('index')
+    cluster = tf_config.get('cluster')
+    job_name = tf_config.get('task', {}).get('type')
+    task_index = tf_config.get('task', {}).get('index')
 
     # If cluster information is empty run local
     if job_name is None or task_index is None:

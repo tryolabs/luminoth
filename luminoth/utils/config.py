@@ -95,3 +95,22 @@ def parse_config_value(value):
         pass
 
     return value
+
+
+def get_model_config(base_config, config_file, override_params, **kwargs):
+    config = easydict.EasyDict(base_config.copy())
+
+    # Load train extra options
+    config.train = merge_into(kwargs_to_config(kwargs), config.train)
+
+    if config_file:
+        # If we have a custom config file overwriting default settings
+        # then we merge those values to the base_config.
+        custom_config = load_config(config_file)
+        config = merge_into(custom_config, config)
+
+    if override_params:
+        override_config = parse_override(override_params)
+        config = merge_into(override_config, config)
+
+    return config

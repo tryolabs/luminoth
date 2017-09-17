@@ -16,13 +16,12 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 @click.option('model_type', '--model', required=True, default='fasterrcnn')
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('config_file', '--config', '-c', help='Config to use.')  # noqa
-@click.option('--model-dir', required=True, help='Directory from where to read saved models.')  # noqa
-@click.option('--log-dir', help='Directory where to save evaluation logs.')
+@click.option('--job-dir', required=True, help='Directory from where to read saved models and write evaluation logs.')  # noqa
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
-             watch, from_global_step, override_params):
+def evaluate(model_type, dataset_split, config_file, job_dir, watch,
+             from_global_step, override_params):
     """
     Evaluate models using dataset.
     """
@@ -35,8 +34,7 @@ def evaluate(model_type, dataset_split, config_file, model_dir, log_dir,
         custom_config = load_config(config_file)
         config = merge_into(custom_config, config)
 
-    config.train.model_dir = model_dir or config.train.model_dir
-    config.train.log_dir = log_dir or config.train.log_dir
+    config.train.job_dir = job_dir or config.train.job_dir
 
     if override_params:
         override_config = parse_override(override_params)
@@ -166,16 +164,16 @@ def get_checkpoints(config, from_global_step=None):
         checkpoints found.
 
     Raises:
-        ValueError: If there are no checkpoints on the ``train.model_dir`` key
+        ValueError: If there are no checkpoints on the ``train.job_dir`` key
             of `config`.
     """
     # The latest checkpoint file should be the last item of
     # `all_model_checkpoint_paths`, according to the CheckpointState protobuf
     # definition.
-    ckpt = tf.train.get_checkpoint_state(config.train.model_dir)
+    ckpt = tf.train.get_checkpoint_state(config.train.job_dir)
     if not ckpt or not ckpt.all_model_checkpoint_paths:
         raise ValueError('Could not find checkpoint in {}.'.format(
-            config.train.model_dir
+            config.train.job_dir
         ))
 
     # TODO: Any other way to get the global_step?
@@ -198,13 +196,13 @@ def get_checkpoints(config, from_global_step=None):
         ]
 
         tf.logging.info(
-            'Found %s checkpoints in model_dir with global_step > %s',
+            'Found %s checkpoints in job_dir with global_step > %s',
             len(checkpoints), from_global_step,
         )
 
     else:
         tf.logging.info(
-            'Found {} checkpoints in model_dir'.format(len(checkpoints))
+            'Found {} checkpoints in job_dir'.format(len(checkpoints))
         )
 
     return checkpoints
@@ -240,7 +238,7 @@ def evaluate_once(config, saver, ops, checkpoint, metrics_scope='metrics'):
         sess.run(ops['init_op'])
         saver.restore(sess, checkpoint['file'])
 
-        writer = tf.summary.FileWriter(config.train.log_dir, sess.graph)
+        writer = tf.summary.FileWriter(config.train.job_dir, sess.graph)
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
