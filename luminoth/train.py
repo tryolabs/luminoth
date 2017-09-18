@@ -104,7 +104,14 @@ def run(model_type, config_file, override_params, continue_training, seed,
 
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
-    scaffold = tf.train.Scaffold(init_op=init_op, saver=model.get_saver())
+    scaffold = tf.train.Scaffold(
+        init_op=init_op,
+        saver=model.get_saver(),
+        summary_op=tf.summary.merge([
+            tf.summary.merge_all(),
+            model.summary,
+        ])
+    )
 
     # Custom hooks for our session
     hooks = []
