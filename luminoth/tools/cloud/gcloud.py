@@ -1,10 +1,11 @@
 import click
-import os
-import tempfile
-import time
-import tensorflow as tf
 import googleapiclient.discovery as discovery
+import json
+import os
 import subprocess
+import tempfile
+import tensorflow as tf
+import time
 
 from datetime import datetime
 
@@ -30,10 +31,14 @@ def gc():
     pass
 
 
-def build_package(bucket):
+def build_package(bucket, base_path):
     package_path = os.path.abspath(
         os.path.join(os.path.realpath(__file__), '..', '..', '..', '..')
     )
+
+    click.echo('Building custom Luminoth package from "{}".'.format(
+        package_path
+    ))
 
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = os.path.join(temp_dir, 'output')
@@ -64,9 +69,25 @@ def build_package(bucket):
             output_dir, tarball_filename
         )
 
-        path = upload_file(bucket, 'packages', tarball_path)
+        path = upload_file(
+            bucket, '{}/packages'.format(base_path), tarball_path
+        )
 
         return path
+
+
+def get_account_attribute(service_account_json, attr):
+    return json.load(
+        tf.gfile.GFile(service_account_json, 'r')
+    ).get(attr)
+
+
+def get_project_id(service_account_json):
+    return get_account_attribute(service_account_json, 'project_id')
+
+
+def get_client_id(service_account_json):
+    return get_account_attribute(service_account_json, 'client_id')
 
 
 def get_bucket(service_account_json, bucket_name):
@@ -78,11 +99,13 @@ def get_bucket(service_account_json, bucket_name):
     return bucket
 
 
-def upload_file(bucket, base_path, filename):
-    click.echo('Uploading config file: {}'.format(filename))
-    path = '{}/{}'.format(base_path, os.path.basename(filename))
+def upload_file(bucket, base_path, file_path):
+    filename = os.path.basename(file_path)
+    path = '{}/{}'.format(base_path, filename)
+    click.echo('Uploading file: "{}"\n          -> to "gs://{}/{}"'.format(
+        filename, bucket.name, path))
     blob = bucket.blob(path)
-    blob.upload_from_file(tf.gfile.GFile(filename, 'rb'))
+    blob.upload_from_file(tf.gfile.GFile(file_path, 'rb'))
     return path
 
 
@@ -98,29 +121,40 @@ def cloud_service(credentials, service, version='v1'):
 
 @gc.command(help='Start a training job')
 @click.option('--job-id', help='JobId for saving models and logs.')
-@click.option('--project-id', required=True)
 @click.option('--service-account-json', required=True)
-@click.option('--bucket', 'bucket_name', required=True, help='Where to save models and logs.')  # noqa
+@click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
 @click.option('--dataset', required=True, help='Bucket where the dataset is located.')  # noqa
 @click.option('--config', help='Path to config to use in training.')
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
-def train(job_id, project_id, service_account_json, bucket_name, config,
-          dataset, scale_tier, master_type, worker_type, worker_count):
+def train(job_id, service_account_json, bucket_name, config, dataset,
+          scale_tier, master_type, worker_type, worker_count):
     args = []
+
+    project_id = get_project_id(service_account_json)
+    if project_id is None:
+        raise ValueError(
+            'Missing "project_id" in service_account_json "{}"'.format(
+                service_account_json))
+
+    if bucket_name is None:
+        client_id = get_client_id(service_account_json)
+        bucket_name = 'luminoth-{}'.format(client_id)
+        click.echo(
+            'Bucket name not specified. Using "{}".'.format(bucket_name))
 
     # Creates bucket for logs and models if it doesn't exist
     bucket = get_bucket(service_account_json, bucket_name)
-
-    package_path = build_package(bucket)
 
     if not job_id:
         job_id = 'train_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
 
     # Define path in bucket to store job's config, logs, etc.
     base_path = 'lumi_{}'.format(job_id)
+
+    package_path = build_package(bucket, base_path)
 
     # Check if absolute or relative dataset path
     if not dataset.startswith('gs://'):
@@ -129,7 +163,7 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
     args.extend([
         '--job-dir', 'gs://{}/{}'.format(bucket_name, base_path),
         '--override', 'dataset.dir={}'.format(dataset),
-        # Turning off data_augmentation because of TF 1.2 limitations
+        # TODO: Turning off data_augmentation because of TF 1.2 limitations
         '--override', 'dataset.data_augmentation=false'
     ])
 
@@ -168,8 +202,10 @@ def train(job_id, project_id, service_account_json, bucket_name, config,
 
     try:
         click.echo('Submitting training job.')
-        request.execute()
+        res = request.execute()
         click.echo('Job {} submitted successfully.'.format(job_id))
+        click.echo('state = {}, createTime = {}'.format(
+            res.get('state'), res.get('createTime')))
     except Exception as err:
         click.echo(
             'There was an error creating the training job. '

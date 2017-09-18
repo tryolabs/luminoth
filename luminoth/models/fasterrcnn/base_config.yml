@@ -37,7 +37,7 @@ train:
   # Initial learning rate, independent of the optimizer being used
   initial_learning_rate: 0.0001
   # When using learning rate decay, use this to decay after that many batches
-  learning_rate_decay: 400000
+  learning_rate_decay: 50000
   # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay)
   learning_rate_decay_method: piecewise_constant
   # Type of optimizer to use (momentum, adam)
