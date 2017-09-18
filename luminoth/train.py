@@ -15,8 +15,9 @@ from luminoth.utils.training import (
 )
 
 
-def run(target, cluster_spec, is_chief, model_type, config_file,
-        override_params, continue_training, seed, **kwargs):
+def run(model_type, config_file, override_params, continue_training, seed,
+        target='', cluster_spec=None, is_chief=True, job_name=None,
+        task_index=None, **kwargs):
 
     if seed:
         tf.set_random_seed(seed)
@@ -26,6 +27,9 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
     config = get_model_config(
         model_class.base_config, config_file, override_params, **kwargs
     )
+
+    log_prefix = '[{}-{}] - '.format(job_name, task_index) \
+        if job_name is not None and task_index is not None else ''
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -90,7 +94,7 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
             load_op
         )
 
-    tf.logging.info('Starting training for {}'.format(model))
+    tf.logging.info('{}Starting training for {}'.format(log_prefix, model))
 
     run_options = None
     if config.train.full_trace:
@@ -146,14 +150,15 @@ def run(target, cluster_spec, is_chief, model_type, config_file,
                 # TODO: Add image summary every once in a while.
 
                 tf.logging.info(
-                    'step: {}, file: {}, train_loss: {}, in {:.2f}s'.format(
-                        step, filename, train_loss, time.time() - before
+                    '{}step: {}, file: {}, train_loss: {}, in {:.2f}s'.format(
+                        log_prefix, step, filename, train_loss,
+                        time.time() - before
                     ))
 
         except tf.errors.OutOfRangeError:
             tf.logging.info(
-                'finished training after {} epoch limit'.format(
-                    config.train.num_epochs
+                '{}finished training after {} epoch limit'.format(
+                    log_prefix, config.train.num_epochs
                 )
             )
 
@@ -193,19 +198,18 @@ def train(*args, **kwargs):
     # to create a ClusterSpec which is important for running distributed code.
     tf_config_val = os.environ.get('TF_CONFIG')
 
-    # If TF_CONFIG is not available, run local
-    if not tf_config_val:
-        return run('', None, True, *args, **kwargs)
-
-    tf_config = json.loads(tf_config_val)
+    if tf_config_val:
+        tf_config = json.loads(tf_config_val)
+    else:
+        tf_config = {}
 
     cluster = tf_config.get('cluster')
     job_name = tf_config.get('task', {}).get('type')
     task_index = tf_config.get('task', {}).get('index')
 
-    # If cluster information is empty run local
+    # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
-        return run('', None, True, *args, **kwargs)
+        return run(*args, **kwargs)
 
     cluster_spec = tf.train.ClusterSpec(cluster)
     server = tf.train.Server(
@@ -218,8 +222,13 @@ def train(*args, **kwargs):
         server.join()
         return
     elif job_name in ['master', 'worker']:
-        is_master = job_name == 'master'
-        return run(server.target, cluster_spec, is_master, *args, **kwargs)
+        is_chief = job_name == 'master'
+        return run(
+            *args,
+            target=server.target, cluster_spec=cluster_spec,
+            is_chief=is_chief, job_name=job_name, task_index=task_index,
+            **kwargs
+        )
 
 
 if __name__ == '__main__':
