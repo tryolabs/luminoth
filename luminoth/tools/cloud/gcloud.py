@@ -25,6 +25,8 @@ DEFAULT_MASTER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_COUNT = 2
 
+VGG_WEIGHTS = 'gs://luminoth-pretrained/vgg_16.ckpt'
+
 
 @click.group(help='Train models in Google Cloud ML')
 def gc():
@@ -163,6 +165,7 @@ def train(job_id, service_account_json, bucket_name, config, dataset,
     args.extend([
         '--job-dir', 'gs://{}/{}'.format(bucket_name, base_path),
         '--override', 'dataset.dir={}'.format(dataset),
+        '--override', 'pretrained.weights={}'.format(VGG_WEIGHTS),
         # TODO: Turning off data_augmentation because of TF 1.2 limitations
         '--override', 'dataset.data_augmentation=false'
     ])

@@ -62,12 +62,11 @@ def run(model_type, config_file, override_params, continue_training, seed,
         prediction_dict = model(train_image, train_bboxes, training=True)
         total_loss = model.loss(prediction_dict)
 
-        global_step = tf.contrib.framework.get_or_create_global_step()
+        # Load pretrained weights needs to be called before defining the train
+        # op. After it, variables for the optimizer are created.
+        load_pretrained_op = model.load_pretrained_weights()
 
-        # load_weights returns no_op when empty checkpoint_file.
-        # TODO: Make optional for different types of models.
-        load_op = model.load_pretrained_weights()
-        # TODO: Partial loader
+        global_step = tf.contrib.framework.get_or_create_global_step()
 
         optimizer = get_optimizer(config.train, global_step)
 
@@ -85,13 +84,10 @@ def run(model_type, config_file, override_params, continue_training, seed,
             grads_and_vars, global_step=global_step
         )
 
-        # Create initializer for variables.
         init_op = tf.group(
             tf.global_variables_initializer(),
-            # Queue-related variables need a special initializer
-            tf.local_variables_initializer(),
-            # Load pre-trained weights of part of the network only
-            load_op
+            # Queue-related variables need a special initializer.
+            tf.local_variables_initializer()
         )
 
     tf.logging.info('{}Starting training for {}'.format(log_prefix, model))
@@ -105,7 +101,10 @@ def run(model_type, config_file, override_params, continue_training, seed,
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
     scaffold = tf.train.Scaffold(
+        # Initialize local and global variables.
         init_op=init_op,
+        # Load pretrained weights after init_op.
+        local_init_op=load_pretrained_op,
         saver=model.get_saver(),
         summary_op=tf.summary.merge([
             tf.summary.merge_all(),
