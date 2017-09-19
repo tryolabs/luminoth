@@ -117,6 +117,10 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
 
     metrics_scope = '{}_metrics'.format(dataset_split)
 
+    # Use global writer for all checkpoints. We don't want to write different
+    # files for each checkpoint.
+    writer = tf.summary.FileWriter(config.train.job_dir)
+
     last_global_step = from_global_step
     while True:
         # Get the checkpoint files to evaluate.
@@ -139,7 +143,10 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
                 checkpoint['global_step'], checkpoint['file']
             )
             last_global_step = checkpoint['global_step']
-            evaluate_once(config, saver, ops, checkpoint, metrics_scope)
+            evaluate_once(
+                writer, saver, ops, config.network.num_classes, checkpoint,
+                metrics_scope=metrics_scope
+            )
 
         # If no watching was requested, finish the execution.
         if not watch:
@@ -208,7 +215,8 @@ def get_checkpoints(config, from_global_step=None):
     return checkpoints
 
 
-def evaluate_once(config, saver, ops, checkpoint, metrics_scope='metrics'):
+def evaluate_once(writer, saver, ops, num_classes, checkpoint,
+                  metrics_scope='metrics'):
     """Run the evaluation once.
 
     Create a new session with the previously-built graph, run it through the
@@ -238,8 +246,6 @@ def evaluate_once(config, saver, ops, checkpoint, metrics_scope='metrics'):
         sess.run(ops['init_op'])
         saver.restore(sess, checkpoint['file'])
 
-        writer = tf.summary.FileWriter(config.train.job_dir, sess.graph)
-
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -268,7 +274,7 @@ def evaluate_once(config, saver, ops, checkpoint, metrics_scope='metrics'):
             # Save final evaluation stats into summary under the checkpoint's
             # global step.
             map_0_5, per_class_0_5 = calculate_map(
-                output_per_batch, config.network.num_classes, 0.5
+                output_per_batch, num_classes, 0.5
             )
 
             # TODO: Find a way to generate these summaries automatically, or
