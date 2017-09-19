@@ -26,16 +26,19 @@ def merge_into(new_config, base_config):
         return
 
     for key, value in new_config.items():
+        if value is None:
+            continue
+
         # All keys in new_config must be overwriting values in base_config
         if key not in base_config:
             raise KeyError('Key "{}" is not a valid config key.'.format(key))
 
         # Since we already have the values of base_config we check against them
-        # if (base_config[key] is not None and
-        #    type(base_config[key]) is not type(value)):
-        #     raise ValueError(
-        #         'Incorrect type "{}" for key "{}". Must be "{}"'.format(
-        #             type(value), key, type(base_config[key])))
+        if (base_config[key] is not None and
+           type(base_config[key]) is not type(value)):
+            raise ValueError(
+                'Incorrect type "{}" for key "{}". Must be "{}"'.format(
+                    type(value), key, type(base_config[key])))
 
         # Recursively merge dicts
         if type(value) is easydict.EasyDict:
