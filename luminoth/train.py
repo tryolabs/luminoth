@@ -192,7 +192,6 @@ def run(model_type, config_file, override_params, continue_training, seed,
 @click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')  # noqa
 @click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')  # noqa
 @click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')  # noqa
-@click.option('--momentum', default=0.9, type=float, help='Momentum to use when using the MomentumOptimizer.')  # noqa
 @click.option('--job-dir', type=str, help='Directory where to save logs and checkpoints from training.')  # noqa
 def train(*args, **kwargs):
     """

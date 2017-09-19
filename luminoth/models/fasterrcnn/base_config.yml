@@ -34,16 +34,20 @@ train:
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
-  # Initial learning rate, independent of the optimizer being used
-  initial_learning_rate: 0.0001
-  # When using learning rate decay, use this to decay after that many batches
-  learning_rate_decay: 50000
-  # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay)
-  learning_rate_decay_method: piecewise_constant
-  # Type of optimizer to use (momentum, adam)
-  optimizer_type: momentum
-  # When using momentum optimizer which value to use for momentum
-  momentum: 0.9
+  # Learning rate config.
+  learning_rate:
+    # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
+    decay_method: piecewise_constant
+    boundaries: [50000, 100000, 150000]
+    values: [0.001, 0.0005, 0.0003, 0.0001]
+
+  # Optimizer config
+  optimizer:
+    # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
+    type: adam
+    # any options are passed directly to the optimizer as kwarg.
+    # momentum: 0.9
+
   # Number of epochs (complete dataset batches) to run
   num_epochs: 1000
 

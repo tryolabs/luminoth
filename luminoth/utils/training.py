@@ -6,11 +6,15 @@ from luminoth.utils.vars import variable_summaries
 OPTIMIZERS = {
     'adam': tf.train.AdamOptimizer,
     'momentum': tf.train.MomentumOptimizer,
+    'gradient_descent': tf.train.GradientDescentOptimizer,
+    'rmsprop': tf.train.RMSPropOptimizer,
 }
 
-LEARNING_RATE_DECAY_METHODS = set([
-    'piecewise_constant', 'exponential_decay', 'none'
-])
+LEARNING_RATE_DECAY_METHODS = {
+    'polynomial_decay': tf.train.polynomial_decay,
+    'piecewise_constant': tf.train.piecewise_constant,
+    'exponential_decay': tf.train.exponential_decay,
+}
 
 
 def get_learning_rate(train_config, global_step=None):
@@ -25,31 +29,50 @@ def get_learning_rate(train_config, global_step=None):
     Raises:
         ValueError: When the method used is not available.
     """
-    method = train_config.learning_rate_decay_method
+    lr_config = train_config.learning_rate.copy()
+    decay_method = lr_config.pop('decay_method', None)
 
-    if not method or method == 'none':
-        return train_config.initial_learning_rate
+    if not decay_method or decay_method == 'none':
+        return lr_config.get('value') or lr_config.get('learning_rate')
 
-    if method not in LEARNING_RATE_DECAY_METHODS:
-        raise ValueError('Invalid learning_rate method "{}"'.format(method))
+    if decay_method not in LEARNING_RATE_DECAY_METHODS:
+        raise ValueError('Invalid learning_rate method "{}"'.format(
+            decay_method
+        ))
 
-    if method == 'piecewise_constant':
-        learning_rate = tf.train.piecewise_constant(
-            global_step, boundaries=[
-                tf.cast(train_config.learning_rate_decay, tf.int64), ],
-            values=[
-                train_config.initial_learning_rate,
-                train_config.initial_learning_rate * 0.1
-            ], name='learning_rate_piecewise_constant'
-        )
+    if decay_method == 'piecewise_constant':
+        lr_config['x'] = global_step
+    else:
+        lr_config['global_step'] = global_step
 
-    elif method == 'exponential_decay':
-        learning_rate = tf.train.exponential_decay(
-            learning_rate=train_config.initial_learning_rate,
-            global_step=global_step,
-            decay_steps=train_config.learning_rate_decay, decay_rate=0.96,
-            staircase=True, name='learning_rate_with_decay'
-        )
+    # boundaries, when used, must be the same type as global_step (int64).
+    if 'boundaries' in lr_config:
+        lr_config['boundaries'] = [
+            tf.cast(b, tf.int64) for b in lr_config['boundaries']
+        ]
+
+    decay_function = LEARNING_RATE_DECAY_METHODS[decay_method]
+    learning_rate = decay_function(
+        **lr_config
+    )
+
+    # if decay_method == 'piecewise_constant':
+    #     learning_rate = tf.train.piecewise_constant(
+    #         global_step, boundaries=[
+    #             tf.cast(train_config.learning_rate_decay, tf.int64), ],
+    #         values=[
+    #             train_config.initial_learning_rate,
+    #             train_config.initial_learning_rate * 0.1
+    #         ], name='learning_rate_piecewise_constant'
+    #     )
+
+    # elif decay_method == 'exponential_decay':
+    #     learning_rate = tf.train.exponential_decay(
+    #         learning_rate=train_config.initial_learning_rate,
+    #         global_step=global_step,
+    #         decay_steps=train_config.learning_rate_decay, decay_rate=0.96,
+    #         staircase=True, name='learning_rate_with_decay'
+    #     )
 
     tf.summary.scalar('losses/learning_rate', learning_rate)
 
@@ -65,18 +88,15 @@ def get_optimizer(train_config, global_step=None):
             valid.
     """
     learning_rate = get_learning_rate(train_config, global_step)
-    if train_config.optimizer_type not in OPTIMIZERS:
+    optimizer_config = train_config.optimizer.copy()
+    optimizer_type = optimizer_config.pop('type')
+    if optimizer_type not in OPTIMIZERS:
         raise ValueError(
-            'Invalid optimizer type "{}"'.format(train_config.optimizer_type)
+            'Invalid optimizer type "{}"'.format(optimizer_type)
         )
 
-    optimizer_cls = OPTIMIZERS[train_config.optimizer_type]
-    if train_config.optimizer_type == 'momentum':
-        optimizer = optimizer_cls(learning_rate, train_config.momentum)
-    else:
-        optimizer = optimizer_cls(learning_rate)
-
-    return optimizer
+    optimizer_cls = OPTIMIZERS[optimizer_type]
+    return optimizer_cls(learning_rate, **optimizer_config)
 
 
 def clip_gradients_by_norm(grads_and_vars, add_to_summary=True):
