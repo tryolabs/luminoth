@@ -101,8 +101,8 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
         tf.local_variables_initializer()
     )
 
-    # Get the saver required to load model parameters.
-    saver = model.get_saver()
+    # Using a global saver instead of the one for the model.
+    saver = tf.train.Saver(sharded=True, allow_empty=True)
 
     # Aggregate the required ops to evaluate into a dict..
     ops = {

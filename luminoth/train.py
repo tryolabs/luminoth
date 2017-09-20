@@ -15,9 +15,9 @@ from luminoth.utils.training import (
 )
 
 
-def run(model_type, config_file, override_params, continue_training, seed,
-        target='', cluster_spec=None, is_chief=True, job_name=None,
-        task_index=None, **kwargs):
+def run(model_type, config_file, override_params, seed, target='',
+        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
+        **kwargs):
 
     if seed:
         tf.set_random_seed(seed)
@@ -62,10 +62,6 @@ def run(model_type, config_file, override_params, continue_training, seed,
         prediction_dict = model(train_image, train_bboxes, training=True)
         total_loss = model.loss(prediction_dict)
 
-        # Load pretrained weights needs to be called before defining the train
-        # op. After it, variables for the optimizer are created.
-        load_pretrained_op = model.load_pretrained_weights()
-
         global_step = tf.contrib.framework.get_or_create_global_step()
 
         optimizer = get_optimizer(config.train, global_step)
@@ -84,12 +80,6 @@ def run(model_type, config_file, override_params, continue_training, seed,
             grads_and_vars, global_step=global_step
         )
 
-        init_op = tf.group(
-            tf.global_variables_initializer(),
-            # Queue-related variables need a special initializer.
-            tf.local_variables_initializer()
-        )
-
     tf.logging.info('{}Starting training for {}'.format(log_prefix, model))
 
     run_options = None
@@ -98,14 +88,19 @@ def run(model_type, config_file, override_params, continue_training, seed,
             trace_level=tf.RunOptions.FULL_TRACE
         )
 
+    # Load pretrained weights needs to be called before defining the train
+    # op. After it, variables for the optimizer are created.
+    with tf.control_dependencies([tf.global_variables_initializer()]):
+        with tf.control_dependencies([model.load_pretrained_weights()]):
+            init_op = tf.no_op(name='global_init_load_pretrained')
+
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
     scaffold = tf.train.Scaffold(
         # Initialize local and global variables.
         init_op=init_op,
-        # Load pretrained weights after init_op.
-        local_init_op=load_pretrained_op,
-        saver=model.get_saver(),
+        # Queue-related variables need a special initializer.
+        local_init_op=tf.local_variables_initializer(),
         summary_op=tf.summary.merge([
             tf.summary.merge_all(),
             model.summary,
@@ -180,7 +175,6 @@ def run(model_type, config_file, override_params, continue_training, seed,
 @click.option('model_type', '--model', required=True, default='fasterrcnn')  # noqa
 @click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('--continue-training', is_flag=True, help='Continue training using model dir and run name.')  # noqa
 @click.option('--seed', type=float, help='Global seed value for random operations.')  # noqa
 @click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')  # noqa
 @click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')  # noqa

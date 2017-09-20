@@ -54,7 +54,7 @@ class Pretrained(snt.AbstractModule):
             return tf.no_op(name='not_loading_pretrained')
 
         module_variables = snt.get_variables_in_module(
-            self, tf.GraphKeys.GLOBAL_VARIABLES
+            self, tf.GraphKeys.MODEL_VARIABLES
         )
         assert len(module_variables) > 0
 
