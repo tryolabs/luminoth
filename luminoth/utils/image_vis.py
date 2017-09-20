@@ -16,7 +16,7 @@ from sys import stdout
 font = ImageFont.load_default()
 
 
-summaries = {
+summaries_fn = {
     'fasterrcnn': {
         'rpn': {
             'draw_anchors': None,
@@ -49,8 +49,9 @@ summaries = {
 }
 
 
-def add_to_summary(summaries, pred_dict, summary_writer, global_step):
-    for fn_name, arguments in summaries.items():
+def get_image_summaries(summaries_fn, pred_dict):
+    summaries = []
+    for fn_name, arguments in summaries_fn.items():
         if not arguments:
             arguments = [{}]
 
@@ -63,28 +64,27 @@ def add_to_summary(summaries, pred_dict, summary_writer, global_step):
                     '{}={}'.format(k, v) for k, v in argument.items()
                 ))
 
-            summary = add_image_to_summary(
+            summary = image_to_summary(
                 globals()[fn_name](pred_dict, **argument), tag)
-            summary_writer.add_summary(summary, global_step)
+            summaries.append(summary)
+    return summaries
 
 
-def add_images_to_tensoboard(pred_dict, global_step, summary_dir, with_rcnn):
-    summary_writer = tf.summary.FileWriter(summary_dir)
+def image_vis_summaries(pred_dict, with_rcnn=True):
 
-    add_to_summary(
-        summaries['fasterrcnn']['rpn'], pred_dict, summary_writer,
-        global_step
+    summaries = []
+    summaries.extend(
+        get_image_summaries(summaries_fn['fasterrcnn']['rpn'], pred_dict)
     )
-    if with_rcnn and summaries['fasterrcnn'].get('rcnn'):
-        add_to_summary(
-            summaries['fasterrcnn']['rcnn'], pred_dict, summary_writer,
-            global_step
+    if with_rcnn and summaries_fn['fasterrcnn'].get('rcnn'):
+        summaries.extend(
+            get_image_summaries(summaries_fn['fasterrcnn']['rcnn'], pred_dict)
         )
 
-    summary_writer.close()
+    return summaries
 
 
-def add_image_to_summary(image_pil, tag):
+def image_to_summary(image_pil, tag):
     summary = tf.Summary(value=[
         tf.Summary.Value(tag=tag, image=tf.Summary.Image(
             encoded_image_string=imagepil_to_str(image_pil)))

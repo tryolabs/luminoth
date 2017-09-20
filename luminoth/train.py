@@ -10,6 +10,7 @@ from tensorflow.python import debug as tf_debug
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
 from luminoth.utils.config import get_model_config
+from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import (
     get_optimizer, clip_gradients_by_norm
 )
@@ -108,6 +109,8 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
 
     # Custom hooks for our session
     hooks = []
+    chief_only_hooks = []
+
     if config.train.tf_debug:
         debug_hook = tf_debug.LocalCLIDebugHook()
         debug_hook.add_tensor_filter(
@@ -127,12 +130,26 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
     else:
         checkpoint_dir = config.train.job_dir
 
+    if config.train.display_every_steps or config.train.display_every_secs:
+        if not config.train.debug:
+            tf.logging.warning('ImageVisHook will not run without debug mode.')
+        else:
+            # ImageVis only runs on the chief.
+            chief_only_hooks.append(
+                ImageVisHook(
+                    prediction_dict, output_dir=checkpoint_dir,
+                    every_n_steps=config.train.display_every_steps,
+                    every_n_secs=config.train.display_every_secs
+                )
+            )
+
     with tf.train.MonitoredTrainingSession(
         master=target,
         is_chief=is_chief,
         checkpoint_dir=checkpoint_dir,
         scaffold=scaffold,
         hooks=hooks,
+        chief_only_hooks=chief_only_hooks,
         save_checkpoint_secs=config.train.save_checkpoint_secs,
         save_summaries_steps=config.train.save_summaries_steps,
         save_summaries_secs=config.train.save_summaries_secs,
@@ -181,7 +198,6 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
 @click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')  # noqa
 @click.option('--run-name', type=str, help='Run name used to log in Tensorboard and isolate checkpoints.')  # noqa
 @click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')  # noqa
-@click.option('--display-every', default=500, type=int, help='Show image debug information every N batches (debug mode must be activated)')  # noqa
 @click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')  # noqa
 @click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')  # noqa
 @click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')  # noqa

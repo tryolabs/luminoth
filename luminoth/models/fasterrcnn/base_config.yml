@@ -17,9 +17,11 @@ train:
   run_name:
   # Disables logging and saving checkpoints
   no_log: False
-  # Displays debugging images with results every N batches. Debug mode must be
+  # Displays debugging images with results every N steps. Debug mode must be
   # enabled
-  display_every: 1
+  display_every_steps:
+  # Display debugging images every N seconds.
+  display_every_secs: 300
   # Shuffle the dataset. It should only be disabled when trying to reproduce
   # some problem on some sample
   random_shuffle: True
