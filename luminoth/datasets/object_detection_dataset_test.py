@@ -22,6 +22,7 @@ class ObjectDetectionDatasetTest(tf.test.TestCase):
                 'num_epochs': 1,
                 'batch_size': 1,
                 'random_shuffle': False,
+                'seed': None,
             }
         })
 

@@ -15,18 +15,17 @@ from luminoth.utils.training import (
 )
 
 
-def run(model_type, config_file, override_params, seed, target='',
-        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        **kwargs):
-
-    if seed:
-        tf.set_random_seed(seed)
+def run(model_type, config_file, override_params, target='', cluster_spec=None,
+        is_chief=True, job_name=None, task_index=None, **kwargs):
 
     model_class = get_model(model_type)
 
     config = get_model_config(
         model_class.base_config, config_file, override_params, **kwargs
     )
+
+    if config.train.seed is not None:
+        tf.set_random_seed(config.train.seed)
 
     log_prefix = '[{}-{}] - '.format(job_name, task_index) \
         if job_name is not None and task_index is not None else ''
@@ -36,7 +35,7 @@ def run(model_type, config_file, override_params, seed, target='',
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    model = model_class(config, seed=seed)
+    model = model_class(config)
 
     # Placement of ops on devices using replica device setter
     # which automatically places the parameters on the `ps` server
@@ -45,7 +44,7 @@ def run(model_type, config_file, override_params, seed, target='',
     # See:
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
-        dataset = TFRecordDataset(config, seed=seed)
+        dataset = TFRecordDataset(config)
         train_dataset = dataset()
 
         train_image = train_dataset['image']

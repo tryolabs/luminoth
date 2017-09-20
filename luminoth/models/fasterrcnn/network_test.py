@@ -17,7 +17,8 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                 'with_rcnn': True
             },
             'train': {
-                'debug': True
+                'debug': True,
+                'seed': None,
             },
             'anchors': {
                 'base_size': 256,
@@ -48,8 +49,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                     'type': 'variance_scaling_initializer',
                     'factor': 1.0,
                     'uniform': 'True',
-                    'mode': 'FAN_AVG',
-                    'seed': 0
+                    'mode': 'FAN_AVG'
                 },
                 'roi': {
                     'pooling_mode': 'crop',
@@ -76,8 +76,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
                'initializer': {
                  'type': 'truncated_normal_initializer',
                  'mean': 0.0,
-                 'stddev': 0.01,
-                 'seed': 0
+                 'stddev': 0.01
                },
                'activation_function': 'relu6',
                'l2_regularization_scale': 0.0005,
@@ -112,7 +111,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
             tf.float32, shape=self.image.shape)
         gt_boxes = tf.placeholder(
             tf.float32, shape=self.gt_boxes.shape)
-        model = FasterRCNN(self.config, debug=True)
+        model = FasterRCNN(self.config)
 
         results = model(image, gt_boxes)
 
@@ -127,7 +126,7 @@ class FasterRCNNetworkTest(tf.test.TestCase):
     def _gen_anchors(self, config, feature_map):
         feature_map_tf = tf.placeholder(
             tf.float32, shape=feature_map.shape)
-        model = FasterRCNN(config, debug=True)
+        model = FasterRCNN(config)
 
         results = model._generate_anchors(feature_map)
 

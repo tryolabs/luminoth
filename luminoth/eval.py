@@ -7,7 +7,7 @@ import time
 from luminoth.datasets import TFRecordDataset
 from luminoth.models import get_model
 from luminoth.utils.config import (
-    load_config, merge_into, parse_override
+    get_model_config
 )
 from luminoth.utils.bbox_overlap import bbox_overlap
 
@@ -28,17 +28,11 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
     model_cls = get_model(model_type)
     config = model_cls.base_config
 
-    if config_file:
-        # If we have a custom config file overwritting default settings
-        # then we merge those values to the base_config.
-        custom_config = load_config(config_file)
-        config = merge_into(custom_config, config)
+    config = get_model_config(
+        model_cls.base_config, config_file, override_params
+    )
 
     config.train.job_dir = job_dir or config.train.job_dir
-
-    if override_params:
-        override_config = parse_override(override_params)
-        config = merge_into(override_config, config)
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -52,6 +46,10 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
+
+    # Seed setup
+    if config.train.seed:
+        tf.set_random_seed(config.train.seed)
 
     # Set pretrained as not training
     config.pretrained.trainable = False

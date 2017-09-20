@@ -23,8 +23,7 @@ class FasterRCNN(snt.AbstractModule):
 
     base_config = get_base_config(__file__)
 
-    def __init__(self, config, with_rcnn=True, num_classes=None, debug=False,
-                 seed=None, name='fasterrcnn'):
+    def __init__(self, config, name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
         # Main configuration object, it holds not only the necessary
@@ -43,7 +42,7 @@ class FasterRCNN(snt.AbstractModule):
         # Turn on debug mode with returns more Tensors which can be used for
         # better visualization and (of course) debugging.
         self._debug = config.train.debug
-        self._seed = seed
+        self._seed = config.train.seed
 
         # Anchor config, check out the docs of base_config.yml for a better
         # understanding of how anchors work.

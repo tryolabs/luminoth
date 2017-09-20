@@ -1,6 +1,8 @@
 train:
   # Run on debug mode (which enables more logging)
   debug: False
+  # Seed for random operations
+  seed:
   # Training batch size for images. FasterRCNN currently only supports 1
   batch_size: 1
   # Directory in which model checkpoints & summaries (for Tensorboard) will be saved
