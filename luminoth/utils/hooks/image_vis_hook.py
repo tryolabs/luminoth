@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from tensorflow.python.training.summary_io import SummaryWriterCache
 from luminoth.utils.image_vis import image_vis_summaries
 
 
@@ -24,7 +25,7 @@ class ImageVisHook(tf.train.SessionRunHook):
 
     def begin(self):
         if self._summary_writer is None and self._output_dir:
-            self._summary_writer = tf.summary.FileWriter(self._output_dir)
+            self._summary_writer = SummaryWriterCache.get(self._output_dir)
         self._next_step = None
         self._global_step = tf.train.get_global_step()
         if self._global_step is None:
