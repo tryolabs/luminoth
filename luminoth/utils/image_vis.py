@@ -55,7 +55,7 @@ summaries_fn = {
 }
 
 
-def get_image_summaries(summaries_fn, pred_dict):
+def get_image_summaries(summaries_fn, pred_dict, extra_tag=None):
     summaries = []
     for fn_name, arguments in summaries_fn.items():
         if not arguments:
@@ -70,21 +70,29 @@ def get_image_summaries(summaries_fn, pred_dict):
                     '{}={}'.format(k, v) for k, v in argument.items()
                 ))
 
+            if extra_tag:
+                tag = '{}/{}'.format(tag, extra_tag)
+
             summary = image_to_summary(
                 globals()[fn_name](pred_dict, **argument), tag)
             summaries.append(summary)
     return summaries
 
 
-def image_vis_summaries(pred_dict, with_rcnn=True):
+def image_vis_summaries(pred_dict, with_rcnn=True, extra_tag=None):
 
     summaries = []
     summaries.extend(
-        get_image_summaries(summaries_fn['fasterrcnn']['rpn'], pred_dict)
+        get_image_summaries(
+            summaries_fn['fasterrcnn']['rpn'], pred_dict, extra_tag=extra_tag
+        )
     )
     if with_rcnn and summaries_fn['fasterrcnn'].get('rcnn'):
         summaries.extend(
-            get_image_summaries(summaries_fn['fasterrcnn']['rcnn'], pred_dict)
+            get_image_summaries(
+                summaries_fn['fasterrcnn']['rcnn'], pred_dict,
+                extra_tag=extra_tag
+            )
         )
 
     return summaries

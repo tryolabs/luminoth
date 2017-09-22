@@ -10,6 +10,7 @@ from luminoth.utils.config import (
     get_model_config
 )
 from luminoth.utils.bbox_overlap import bbox_overlap
+from luminoth.utils.image_vis import image_vis_summaries
 
 
 @click.command(help='Evaluate trained (or training) models')
@@ -20,8 +21,10 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
+@click.option('--image-vis', is_flag=True, default=False, help='Display images in TensorBoard.')  # noqa
+@click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 def evaluate(model_type, dataset_split, config_file, job_dir, watch,
-             from_global_step, override_params):
+             from_global_step, override_params, image_vis, files_per_class):
     """
     Evaluate models using dataset.
     """
@@ -33,6 +36,8 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
     )
 
     config.train.job_dir = job_dir or config.train.job_dir
+    # Only activate debug for image visualizations.
+    config.train.debug = image_vis
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -60,6 +65,7 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
 
     train_image = train_dataset['image']
     train_objects = train_dataset['bboxes']
+    train_filename = train_dataset['filename']
 
     # TODO: This is not the best place to configure rank? Why is rank not
     # transmitted through the queue
@@ -111,6 +117,8 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
         'pred_objects_scores': pred_objects_scores,
         'train_objects': train_objects,
         'losses': losses,
+        'prediction_dict': prediction_dict,
+        'filename': train_filename
     }
 
     metrics_scope = '{}_metrics'.format(dataset_split)
@@ -118,6 +126,8 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
     # Use global writer for all checkpoints. We don't want to write different
     # files for each checkpoint.
     writer = tf.summary.FileWriter(config.train.job_dir)
+
+    files_to_visualize = {}
 
     last_global_step = from_global_step
     while True:
@@ -145,7 +155,9 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
                 start = time.time()
                 evaluate_once(
                     writer, saver, ops, config.network.num_classes, checkpoint,
-                    metrics_scope=metrics_scope
+                    metrics_scope=metrics_scope, image_vis=image_vis,
+                    files_per_class=files_per_class,
+                    files_to_visualize=files_to_visualize
                 )
                 last_global_step = checkpoint['global_step']
                 tf.logging.info('Evaluated in {:.2f}s'.format(
@@ -231,7 +243,8 @@ def get_checkpoints(config, from_global_step=None):
 
 
 def evaluate_once(writer, saver, ops, num_classes, checkpoint,
-                  metrics_scope='metrics'):
+                  metrics_scope='metrics', image_vis=False,
+                  files_per_class=None, files_to_visualize=None):
     """Run the evaluation once.
 
     Create a new session with the previously-built graph, run it through the
@@ -266,23 +279,56 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
 
         try:
             while not coord.should_stop():
-                (
-                    _, batch_bboxes, batch_classes, batch_scores,
-                    batch_gt_objects,
-                ) = sess.run([
-                    ops['metric_ops'], ops['pred_objects'],
-                    ops['pred_objects_classes'], ops['pred_objects_scores'],
-                    ops['train_objects'],
-                ])
+                fetches = {
+                    'metric_ops': ops['metric_ops'],
+                    'bboxes': ops['pred_objects'],
+                    'classes': ops['pred_objects_classes'],
+                    'scores': ops['pred_objects_scores'],
+                    'gt_bboxes': ops['train_objects'],
+                }
+                if image_vis:
+                    fetches['prediction_dict'] = ops['prediction_dict']
+                    fetches['filename'] = ops['filename']
 
-                output_per_batch['bboxes'].append(batch_bboxes)
-                output_per_batch['classes'].append(batch_classes)
-                output_per_batch['scores'].append(batch_scores)
+                batch_fetched = sess.run(fetches)
 
+                output_per_batch['bboxes'].append(batch_fetched.get('bboxes'))
+                output_per_batch['classes'].append(batch_fetched['classes'])
+                output_per_batch['scores'].append(batch_fetched['scores'])
+
+                batch_gt_objects = batch_fetched['gt_bboxes']
                 output_per_batch['gt_bboxes'].append(batch_gt_objects[:, :4])
-                output_per_batch['gt_classes'].append(batch_gt_objects[:, 4])
+                batch_gt_classes = batch_gt_objects[:, 4]
+                output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = sess.run(ops['losses'])
+
+                if fetches:
+                    filename = batch_fetched['filename'][:-4].decode('utf-8')
+                    visualize_file = False
+                    for gt_class in batch_gt_classes:
+                        cls_files = files_to_visualize.get(
+                            gt_class, set()
+                        )
+                        if len(cls_files) < files_per_class:
+                            files_to_visualize.setdefault(
+                                gt_class, set()
+                            ).add(filename)
+                            visualize_file = True
+                            break
+                        elif filename in cls_files:
+                            visualize_file = True
+                            break
+
+                    if visualize_file:
+                        image_summaries = image_vis_summaries(
+                            batch_fetched['prediction_dict'],
+                            extra_tag=filename
+                        )
+                        for image_summary in image_summaries:
+                            writer.add_summary(
+                                image_summary, checkpoint['global_step']
+                            )
 
         except tf.errors.OutOfRangeError:
 
@@ -323,8 +369,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
             ))
 
             writer.add_summary(
-                tf.Summary(value=summary),
-                checkpoint['global_step']
+                tf.Summary(value=summary), checkpoint['global_step']
             )
 
         finally:
