@@ -137,14 +137,31 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
         for checkpoint in checkpoints:
             # Always returned in order, so it's safe to assign directly.
             tf.logging.info(
-                'Evaluating global_step %s using checkpoint \'%s\'',
-                checkpoint['global_step'], checkpoint['file']
+                'Evaluating global_step {} using checkpoint \'{}\''.format(
+                    checkpoint['global_step'], checkpoint['file']
+                )
             )
-            last_global_step = checkpoint['global_step']
-            evaluate_once(
-                writer, saver, ops, config.network.num_classes, checkpoint,
-                metrics_scope=metrics_scope
-            )
+            try:
+                start = time.time()
+                evaluate_once(
+                    writer, saver, ops, config.network.num_classes, checkpoint,
+                    metrics_scope=metrics_scope
+                )
+                last_global_step = checkpoint['global_step']
+                tf.logging.info('Evaluated in {:.2f}s'.format(
+                    time.time() - start
+                ))
+            except tf.errors.NotFoundError:
+                # The checkpoint is not ready yet. It was written in the
+                # checkpoints file, but it still hasn't been completely saved.
+                tf.logging.info(
+                    'Checkpoint {} is not ready yet. '
+                    'Checking again in a minute.'.format(
+                        checkpoint['file']
+                    )
+                )
+                time.sleep(60)
+                continue
 
         # If no watching was requested, finish the execution.
         if not watch:
