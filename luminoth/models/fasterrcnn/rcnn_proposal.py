@@ -120,14 +120,28 @@ class RCNNProposal(snt.AbstractModule):
                 bbox_pred_flatten, label_one_hot_flatten)
 
         # Using the bbox_pred and the proposals we generate the objects.
-        objects_unfiltered = decode(proposals, bbox_pred)
+        raw_objects = decode(proposals, bbox_pred)
         # Clip boxes to image.
-        objects_unfiltered = clip_boxes(objects_unfiltered, im_shape)
+        clipped_objects = clip_boxes(raw_objects, im_shape)
+
+        # Filter objects that have an non-valid area.
+        (x_min, y_min, x_max, y_max) = tf.unstack(clipped_objects, axis=1)
+        object_filter = tf.greater_equal(
+            tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
+            0.0
+        )
+
+        objects = tf.boolean_mask(
+            clipped_objects, object_filter)
+        proposal_label = tf.boolean_mask(
+            proposal_label, object_filter)
+        proposal_label_prob = tf.boolean_mask(
+            proposal_label_prob, object_filter)
 
         # We have to use the TensorFlow's bounding box convention to use the
         # included function for NMS.
         # After gathering results we should normalize it back.
-        objects_tf = change_order(objects_unfiltered)
+        objects_tf = change_order(objects)
 
         selected_boxes = []
         selected_probs = []
@@ -179,7 +193,7 @@ class RCNNProposal(snt.AbstractModule):
         top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
 
         return {
-            'objects_unfiltered': objects_unfiltered,
+            'raw_objects': raw_objects,
             'objects': top_k_objects,
             'proposal_label': top_k_proposal_label,
             'proposal_label_prob': top_k_proposal_label_prob,
