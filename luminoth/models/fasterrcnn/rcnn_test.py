@@ -42,6 +42,7 @@ class RCNNTest(tf.test.TestCase):
                 'class_max_detections': 100,
                 'class_nms_threshold': 0.6,
                 'total_max_detections': 300,
+                'min_prob_threshold': 0.0,
             },
             'target': {
                 'foreground_fraction': 0.25,

@@ -193,6 +193,8 @@ rcnn:
     class_nms_threshold: 0.6
     # Maximum total detections for an image (sorted by score)
     total_max_detections: 300
+    # Minimum prob to be used as proposed object
+    min_prob_threshold: 0.5
 
   target:
     # Ratio between foreground and background samples in minibatch

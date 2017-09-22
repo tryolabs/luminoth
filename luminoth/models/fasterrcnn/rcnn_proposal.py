@@ -38,6 +38,8 @@ class RCNNProposal(snt.AbstractModule):
         self._class_nms_threshold = config.class_nms_threshold
         # Maximum number of detections to return.
         self._total_max_detections = config.total_max_detections
+        # Threshold probability
+        self._min_prob_threshold = config.min_prob_threshold or 0.0
 
     def _build(self, proposals, bbox_pred, cls_prob, im_shape):
         """
@@ -75,7 +77,14 @@ class RCNNProposal(snt.AbstractModule):
         proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
 
         # We are going to use only the non-background proposals.
-        proposal_filter = tf.greater_equal(proposal_label, 0)
+        non_background_filter = tf.greater_equal(proposal_label, 0)
+        # Filter proposals with less than threshold probability.
+        min_prob_filter = tf.greater_equal(
+            proposal_label_prob, self._min_prob_threshold
+        )
+        proposal_filter = tf.logical_and(
+            non_background_filter, min_prob_filter
+        )
 
         equal_shapes = tf.assert_equal(
             tf.shape(proposals)[0], tf.shape(bbox_pred)[0]
