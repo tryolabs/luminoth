@@ -86,6 +86,8 @@ class RCNNProposal(snt.AbstractModule):
             non_background_filter, min_prob_filter
         )
 
+        total_proposals = tf.shape(proposals)[0]
+
         equal_shapes = tf.assert_equal(
             tf.shape(proposals)[0], tf.shape(bbox_pred)[0]
         )
@@ -99,6 +101,14 @@ class RCNNProposal(snt.AbstractModule):
                 proposal_label_prob, proposal_filter)
             bbox_pred = tf.boolean_mask(
                 bbox_pred, proposal_filter)
+
+        filtered_proposals = tf.shape(proposals)[0]
+
+        tf.summary.scalar(
+            'background_or_low_prob_proposals',
+            total_proposals - filtered_proposals,
+            ['rcnn']
+        )
 
         # Create one hot with labels for using it to filter bbox_predictions.
         label_one_hot = tf.one_hot(proposal_label, depth=self._num_classes)
@@ -131,12 +141,26 @@ class RCNNProposal(snt.AbstractModule):
             0.0
         )
 
+        total_raw_objects = tf.shape(raw_objects)[0]
         objects = tf.boolean_mask(
             clipped_objects, object_filter)
         proposal_label = tf.boolean_mask(
             proposal_label, object_filter)
         proposal_label_prob = tf.boolean_mask(
             proposal_label_prob, object_filter)
+
+        total_objects = tf.shape(objects)[0]
+
+        tf.summary.scalar(
+            'invalid_proposals',
+            total_objects - total_raw_objects, ['rcnn']
+        )
+
+        tf.summary.scalar(
+            'valid_proposals_ratio',
+            tf.cast(total_proposals, tf.float32) /
+            tf.cast(total_objects, tf.float32), ['rcnn']
+        )
 
         # We have to use the TensorFlow's bounding box convention to use the
         # included function for NMS.

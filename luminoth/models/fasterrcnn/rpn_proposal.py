@@ -108,10 +108,22 @@ class RPNProposal(snt.AbstractModule):
         proposal_filter = tf.reshape(proposal_filter, [-1])
 
         # Filter proposals and scores.
+        total_proposals = tf.shape(scores)[0]
         scores = tf.boolean_mask(
             scores, proposal_filter, name='filter_invalid_scores')
         proposals = tf.boolean_mask(
             proposals, proposal_filter, name='filter_invalid_proposals')
+        filtered_proposals = tf.shape(scores)[0]
+
+        tf.summary.scalar(
+            'valid_proposals_ratio',
+            (
+                tf.cast(filtered_proposals, tf.float32) /
+                tf.cast(total_proposals, tf.float32)
+            ), ['rpn'])
+
+        tf.summary.scalar(
+            'invalid_proposals', total_proposals - filtered_proposals, ['rpn'])
 
         # Get top `pre_nms_top_n` indices by sorting the proposals by score.
         k = tf.minimum(self._pre_nms_top_n, tf.shape(scores)[0])
