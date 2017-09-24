@@ -1,31 +1,22 @@
-import tensorflow as tf
+import easydict
 import numpy as np
+import tensorflow as tf
 
-from easydict import EasyDict
-from luminoth.models.pretrained.pretrained import (
-    Pretrained, _R_MEAN, _G_MEAN, _B_MEAN
+from luminoth.models.base.base_network import (
+    BaseNetwork, _R_MEAN, _G_MEAN, _B_MEAN, VALID_ARCHITECTURES
 )
-from luminoth.models.pretrained.vgg import VGG
 
 
-class PretrainedTest(tf.test.TestCase):
-    def testAbstractModule(self):
-        """
-        Cannot create instance of Pretrained itself.
-        """
-        with self.assertRaises(TypeError):
-            Pretrained()
+class BaseNetworkTest(tf.test.TestCase):
+    def setUp(self):
+        self.config = easydict.EasyDict({
+            'architecture': 'vgg_16',
+        })
 
     def testSubstractChannels(self):
-        m = VGG(EasyDict({
-            'trainable': False,
-            'finetune_num_layers': 0,
-            'weight_decay': 0,
-            'endpoint': None,
-        }))
+        m = BaseNetwork(self.config)
         inputs = tf.placeholder(tf.float32, [1, 2, 2, 3])
         substracted_inputs = m._substract_channels(inputs)
-        inputs
         # white image
         r = 255. - _R_MEAN
         g = 255. - _G_MEAN
@@ -41,6 +32,14 @@ class PretrainedTest(tf.test.TestCase):
                 # numpy broadcast multiplication
                 np.ones([1, 2, 2, 3]) * [r, g, b]
             )
+
+    def testAllArchitectures(self):
+        for architecture in VALID_ARCHITECTURES:
+            self.config.architecture = architecture
+            m = BaseNetwork(self.config)
+            inputs = tf.placeholder(tf.float32, [1, None, None, 3])
+            # Should not fail.
+            m(inputs)
 
 
 if __name__ == '__main__':

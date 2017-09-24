@@ -1,13 +1,9 @@
 from luminoth.models.fasterrcnn import FasterRCNN
-from luminoth.models.pretrained import VGG, ResNetV2
 
 
+# TODO: More models :)
 MODELS = {
     'fasterrcnn': FasterRCNN,
-    'vgg': VGG,
-    'vgg_16': VGG,
-    'resnet': ResNetV2,
-    'resnetv2': ResNetV2,
 }
 
 

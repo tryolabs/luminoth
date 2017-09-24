@@ -96,15 +96,17 @@ network:
   # Use RCNN or just RPN
   with_rcnn: True
 
-pretrained:
+base_network:
   # Which type of pretrained network to use
-  net: vgg_16
+  architecture: vgg_16
   # Should we train the pretrained network
   trainable: True
   # From which file to load the weights
   weights:
+  # Should we download weights if not available
+  download: True
   # Which endpoint layer to use as feature map for network
-  endpoint: vgg_16/conv5/conv5_1
+  endpoint: conv5/conv5_1
   # Is trainable, how many layers from the endpoint are we training
   finetune_num_layers: 3
   # Regularization

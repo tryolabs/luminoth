@@ -96,13 +96,13 @@ class RCNN(snt.AbstractModule):
             self._num_classes, self._config.proposals
         )
 
-    def _build(self, pretrained_feature_map, proposals, im_shape,
-               gt_boxes=None, training=False):
+    def _build(self, conv_feature_map, proposals, im_shape,
+               gt_boxes=None, is_training=False):
         """
         Classifies proposals based on the pooled feature map.
 
         Args:
-            pretrained_feature_map: The feature map of the image extracted
+            conv_feature_map: The feature map of the image extracted
                 using the pretrained network.
                 Shape (num_proposals, pool_height, pool_width, 512).
             proposals: A Tensor with the bounding boxes proposed by de RPN. Its
@@ -113,7 +113,7 @@ class RCNN(snt.AbstractModule):
             gt_boxes (optional): A Tensor with the ground truth boxes of the
                 image. Its shape is (total_num_gt, 5), using the encoding
                 (x1, y1, x2, y2, label).
-            training (optional): A boolean to determine if we are just using
+            is_training (optional): A boolean to determine if we are just using
                 the module for training or for complete object inference.
 
         Returns:
@@ -135,7 +135,7 @@ class RCNN(snt.AbstractModule):
             proposals_target, bbox_offsets_target = self._rcnn_target(
                 proposals, gt_boxes)
 
-            if training:
+            if is_training:
                 with tf.name_scope('prepare_batch'):
                     # We flatten to set shape, but it is already a flat Tensor.
                     in_batch_proposals = tf.reshape(
@@ -154,7 +154,7 @@ class RCNN(snt.AbstractModule):
             }
 
         roi_prediction = self._roi_pool(
-            proposals, pretrained_feature_map,
+            proposals, conv_feature_map,
             im_shape
         )
 
