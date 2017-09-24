@@ -32,10 +32,11 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 'rcnn_cls_loss_weight': 1.0,
                 'rcnn_reg_loss_weights': 2.0,
             },
-            'pretrained': {
-                'net': 'vgg_16',
+            'base_network': {
+                'architecture': 'vgg_16',
                 'trainable': True,
-                'endpoint': 'vgg_16/conv5/conv5_1',
+                'endpoint': 'conv5/conv5_1',
+                'download': False,
                 'finetune_num_layers': 3,
                 'weight_decay': 0.0005,
             },
@@ -123,10 +124,9 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             })
             return results
 
-    def _gen_anchors(self, config, feature_map):
+    def _gen_anchors(self, config, feature_map_shape):
         model = FasterRCNN(config)
-
-        results = model._generate_anchors(tf.constant(feature_map))
+        results = model._generate_anchors(feature_map_shape)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -207,7 +207,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         config.anchors.ratios = [0.5, 1, 2]
         config.anchors.stride = 1  # image is 32 x 32
 
-        anchors = self._gen_anchors(config, feature_map)
+        anchors = self._gen_anchors(config, feature_map.shape)
 
         # Check the amount of anchors generated is correct:
         # 9216 = 32^2 * config.anchor.scales * config.anchor.ratios = 1024 * 9

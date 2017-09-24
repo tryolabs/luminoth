@@ -71,12 +71,12 @@ class RPN(snt.AbstractModule):
             padding='VALID', name='bbox_conv'
         )
 
-    def _build(self, pretrained_feature_map, image_shape, all_anchors,
+    def _build(self, conv_feature_map, image_shape, all_anchors,
                gt_boxes=None):
         """Builds the RPN model subgraph.
 
         Args:
-            pretrained_feature_map: A Tensor with the output of some pretrained
+            conv_feature_map: A Tensor with the output of some pretrained
                 network. Its dimensions should be
                 `[feature_map_height, feature_map_width, depth]` where depth is
                 512 for the default layer in VGG and 1024 for the default layer
@@ -123,7 +123,7 @@ class RPN(snt.AbstractModule):
 
         prediction_dict = {}
 
-        rpn_feature = self._rpn_activation(self._rpn(pretrained_feature_map))
+        rpn_feature = self._rpn_activation(self._rpn(conv_feature_map))
 
         # Then we apply separate conv layers for classification and regression.
         rpn_cls_score_original = self._rpn_cls(rpn_feature)

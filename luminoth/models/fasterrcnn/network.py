@@ -1,10 +1,10 @@
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import luminoth.models  # TODO: Cyclic import
 
 from luminoth.models.fasterrcnn.rcnn import RCNN
 from luminoth.models.fasterrcnn.rpn import RPN
+from luminoth.models.base import TruncatedBaseNetwork
 from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.config import get_base_config
 from luminoth.utils.vars import variable_summaries, get_saver
@@ -69,11 +69,11 @@ class FasterRCNN(snt.AbstractModule):
         self._losses_collections = ['fastercnn_losses']
 
         # We want the pretrained model to be outside the FasterRCNN name scope.
-        self.pretrained = luminoth.models.get_model(config.pretrained.net)(
-            config.pretrained, parent_name=self.module_name
+        self.base_network = TruncatedBaseNetwork(
+            config.base_network, parent_name=self.module_name
         )
 
-    def _build(self, image, gt_boxes=None, training=False):
+    def _build(self, image, gt_boxes=None, is_training=True):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -84,7 +84,7 @@ class FasterRCNN(snt.AbstractModule):
                 Its shape should be `(num_gt_boxes, 5)`
                 Where for each gt box we have (x1, y1, x2, y2, label),
                 in that order.
-            training: A boolean to whether or not it is used for training.
+            is_training: A boolean to whether or not it is used for training.
 
         Returns:
             classification_prob: A tensor with the softmax probability for
@@ -99,8 +99,7 @@ class FasterRCNN(snt.AbstractModule):
         # A Tensor with the feature map for the image,
         # its shape should be `(feature_height, feature_width, 512)`.
         # The shape depends of the pretrained network in use.
-        pretrained_prediction = self.pretrained(image)
-        pretrained_feature_map = pretrained_prediction['net']
+        conv_feature_map = self.base_network(image, is_training=is_training)
 
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(
@@ -118,12 +117,12 @@ class FasterRCNN(snt.AbstractModule):
         image_shape = tf.shape(image)[1:3]
 
         variable_summaries(
-            pretrained_feature_map, 'pretrained_feature_map', ['rpn'])
+            conv_feature_map, 'conv_feature_map', ['rpn'])
 
         # Generate anchors for the image based on the anchor reference.
-        all_anchors = self._generate_anchors(pretrained_feature_map)
+        all_anchors = self._generate_anchors(tf.shape(conv_feature_map))
         rpn_prediction = self._rpn(
-            pretrained_feature_map, image_shape, all_anchors,
+            conv_feature_map, image_shape, all_anchors,
             gt_boxes=gt_boxes
         )
 
@@ -139,12 +138,12 @@ class FasterRCNN(snt.AbstractModule):
                 self._anchor_reference
             )
             prediction_dict['gt_boxes'] = gt_boxes
-            prediction_dict['pretrained_feature_map'] = pretrained_feature_map
+            prediction_dict['conv_feature_map'] = conv_feature_map
 
         if self._with_rcnn:
             classification_pred = self._rcnn(
-                pretrained_feature_map, rpn_prediction['proposals'],
-                image_shape, gt_boxes=gt_boxes, training=training
+                conv_feature_map, rpn_prediction['proposals'],
+                image_shape, gt_boxes=gt_boxes, is_training=is_training
             )
 
             prediction_dict['classification_prediction'] = classification_pred
@@ -254,7 +253,7 @@ class FasterRCNN(snt.AbstractModule):
             # - regularization loss
             return total_loss
 
-    def _generate_anchors(self, feature_map):
+    def _generate_anchors(self, feature_map_shape):
         """Generate anchor for an image.
 
         Using the feature map, the output of the pretrained network for an
@@ -265,9 +264,8 @@ class FasterRCNN(snt.AbstractModule):
         that are uniformly generated throught the image.
 
         Args:
-            feature_map: A Tensor of shape
-                `(1, feature_height, feature_width, 512)` using the VGG as
-                pretrained.
+            feature_map_shape: Shape of the convolutional feature map used as
+                input for the RPN. Should be (batch, height, width, depth).
 
         Returns:
             all_anchors: A flattened Tensor with all the anchors of shape
@@ -275,9 +273,8 @@ class FasterRCNN(snt.AbstractModule):
                 using the (x1, y1, x2, y2) convention.
         """
         with tf.variable_scope('generate_anchors'):
-            feature_map_shape = tf.shape(feature_map)[1:3]
-            grid_width = feature_map_shape[1]
-            grid_height = feature_map_shape[0]
+            grid_width = feature_map_shape[2]  # width
+            grid_height = feature_map_shape[1]  # height
             shift_x = tf.range(grid_width) * self._anchor_stride
             shift_y = tf.range(grid_height) * self._anchor_stride
             shift_x, shift_y = tf.meshgrid(shift_x, shift_y)
@@ -328,8 +325,8 @@ class FasterRCNN(snt.AbstractModule):
         """Get trainable vars included in the module.
         """
         trainable_vars = snt.get_variables_in_module(self)
-        if self._config.pretrained.trainable:
-            pretrained_trainable_vars = self.pretrained.get_trainable_vars()
+        if self._config.base_network.trainable:
+            pretrained_trainable_vars = self.base_network.get_trainable_vars()
             tf.logging.info('Training {} vars from pretrained module.'.format(
                 len(pretrained_trainable_vars)))
             trainable_vars += pretrained_trainable_vars
@@ -341,11 +338,9 @@ class FasterRCNN(snt.AbstractModule):
     def get_saver(self, ignore_scope=None):
         """Get an instance of tf.train.Saver for all modules and submodules.
         """
-        return get_saver((self, self.pretrained), ignore_scope=ignore_scope)
+        return get_saver((self, self.base_network), ignore_scope=ignore_scope)
 
     def load_pretrained_weights(self):
         """Get operation to load pretrained weights from file.
         """
-        return self.pretrained.load_weights(
-            checkpoint_file=self._config.pretrained.weights
-        )
+        return self.base_network.load_weights()

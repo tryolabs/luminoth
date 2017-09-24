@@ -88,11 +88,14 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
             trace_level=tf.RunOptions.FULL_TRACE
         )
 
-    # Load pretrained weights needs to be called before defining the train
-    # op. After it, variables for the optimizer are created.
-    with tf.control_dependencies([tf.global_variables_initializer()]):
-        with tf.control_dependencies([model.load_pretrained_weights()]):
-            init_op = tf.no_op(name='global_init_load_pretrained')
+    if is_chief:
+        # Load pretrained weights needs to be called before defining the train
+        # op. After it, variables for the optimizer are created.
+        with tf.control_dependencies([tf.global_variables_initializer()]):
+            with tf.control_dependencies([model.load_pretrained_weights()]):
+                init_op = tf.no_op(name='global_init_load_pretrained')
+    else:
+        init_op = tf.no_op()
 
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.

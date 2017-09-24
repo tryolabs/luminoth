@@ -68,7 +68,7 @@ class ROIPoolingLayer(snt.AbstractModule):
 
             return bboxes
 
-    def _roi_crop(self, roi_proposals, pretrained, im_shape):
+    def _roi_crop(self, roi_proposals, conv_feature_map, im_shape):
         # Get normalized bounding boxes.
         bboxes = self._get_bboxes(roi_proposals, im_shape)
         # Generate fake batch ids
@@ -76,7 +76,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         batch_ids = tf.zeros((bboxes_shape[0], ), dtype=tf.int32)
         # Apply crop and resize with extracting a crop double the desired size.
         crops = tf.image.crop_and_resize(
-            pretrained, bboxes, batch_ids,
+            conv_feature_map, bboxes, batch_ids,
             [self._pooled_width * 2, self._pooled_height * 2], name="crops"
         )
 
@@ -93,18 +93,18 @@ class ROIPoolingLayer(snt.AbstractModule):
             prediction_dict['bboxes'] = bboxes
             prediction_dict['crops'] = crops
             prediction_dict['batch_ids'] = batch_ids
-            prediction_dict['pretrained'] = pretrained
+            prediction_dict['conv_feature_map'] = conv_feature_map
 
         return prediction_dict
 
-    def _roi_pooling(self, roi_proposals, pretrained, im_shape):
+    def _roi_pooling(self, roi_proposals, conv_feature_map, im_shape):
         raise NotImplemented()
 
-    def _build(self, roi_proposals, pretrained, im_shape):
+    def _build(self, roi_proposals, conv_feature_map, im_shape):
         if self._pooling_mode == CROP:
-            return self._roi_crop(roi_proposals, pretrained, im_shape)
+            return self._roi_crop(roi_proposals, conv_feature_map, im_shape)
         elif self._pooling_mode == ROI_POOLING:
-            return self._roi_pooling(roi_proposals, pretrained, im_shape)
+            return self._roi_pooling(roi_proposals, conv_feature_map, im_shape)
         else:
             raise NotImplemented(
                 'Pooling mode {} does not exist.'.format(self._pooling_mode))
