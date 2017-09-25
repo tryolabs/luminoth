@@ -1,6 +1,7 @@
 import io
 import numpy as np
 import os
+import logging
 import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
@@ -14,12 +15,16 @@ from sys import stdout
 # flake8: noqa
 
 font = ImageFont.load_default()
+logger = logging.getLogger('luminoth-vis')
 
 
 summaries_fn = {
     'fasterrcnn': {
         'rpn': {
-            'draw_anchors': None,
+            'draw_anchors': [
+                None, {'anchor_num': 0}
+            ],
+            'draw_anchor_centers': None,
             'draw_positive_anchors': None,
             'draw_top_nms_proposals': [
                 None, {'min_score': 0.9}, {'min_score': 0.75}, {'min_score': 0}
@@ -176,9 +181,9 @@ def draw_positive_anchors(pred_dict):
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    tf.logging.debug('We have {} positive_anchors'.format(positive_anchors.shape[0]))
-    # tf.logging.debug('Indices, values and bbox: {}'.format(list(zip(positive_indices, list(overlap_iou), positive_anchors))))
-    tf.logging.debug('GT boxes: {}'.format(gt_boxes))
+    logger.debug('We have {} positive_anchors'.format(positive_anchors.shape[0]))
+    # logger.debug('Indices, values and bbox: {}'.format(list(zip(positive_indices, list(overlap_iou), positive_anchors))))
+    logger.debug('GT boxes: {}'.format(gt_boxes))
 
     for label, positive_anchor in zip(list(overlap_iou), positive_anchors):
         draw.rectangle(list(positive_anchor), fill=(255, 0, 0, 40), outline=(0, 255, 0, 100))
@@ -211,19 +216,136 @@ def draw_gt_boxes(pred_dict):
     return image_pil
 
 
-def draw_anchors(pred_dict):
+def scale(image, max_size, method=Image.ANTIALIAS):
     """
-    Draws positive anchors used as "correct" in RPN
+    resize 'image' to 'max_size' keeping the aspect ratio
+    and place it in center of white 'max_size' image
     """
-    tf.logging.debug('All anchors')
+    im_aspect = float(image.size[0])/float(image.size[1])
+    out_aspect = float(max_size[0])/float(max_size[1])
+    if im_aspect >= out_aspect:
+        scaled = image.resize((max_size[0], int((float(max_size[0])/im_aspect) + 0.5)), method)
+    else:
+        scaled = image.resize((int((float(max_size[1])*im_aspect) + 0.5), max_size[1]), method)
+
+    offset = (((max_size[0] - scaled.size[0]) / 2), ((max_size[1] - scaled.size[1]) / 2))
+    back = Image.new("RGB", max_size, "white")
+    back.paste(scaled, offset)
+    return back
+
+
+def draw_anchor_centers(pred_dict):
     anchors = pred_dict['all_anchors']
+    x_min = anchors[:, 0]
+    y_min = anchors[:, 1]
+    x_max = anchors[:, 2]
+    y_max = anchors[:, 3]
+
+    center_x = x_min + (x_max - x_min) / 2.
+    center_y = y_min + (y_max - y_min) / 2.
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    for anchor_id, anchor in enumerate(anchors):
-        draw.rectangle(list(anchor), fill=(255, 0, 0, 2), outline=(0, 255, 0, 6))
+    for x, y in zip(center_x, center_y):
+        draw.rectangle(
+            [x - 1, y - 1, x + 1, y + 1],
+            fill=(255, 0, 0, 150), outline=(0, 255, 0, 200)
+        )
 
     return image_pil
+
+
+def draw_anchors(pred_dict, anchor_num=None):
+    """
+    Draws positive anchors used as "correct" in RPN
+    """
+    anchors = pred_dict['all_anchors']
+    x_min = anchors[:, 0]
+    y_min = anchors[:, 1]
+    x_max = anchors[:, 2]
+    y_max = anchors[:, 3]
+
+    height = pred_dict['image_shape'][0]
+    width = pred_dict['image_shape'][1]
+
+    areas = np.unique(np.round((x_max - x_min) * (y_max - y_min)))
+
+    inside_filter = np.logical_and.reduce((
+        (x_min >= 0),
+        (y_min >= 0),
+        (x_max < width),
+        (y_max < height)
+    ))
+
+    x_negative = x_min < 0
+    y_negative = y_min < 0
+    x_outof = x_max >= width
+    y_outof = y_max >= height
+
+    if anchor_num is None:
+        logger.debug('{} unique areas: {}'.format(len(areas), areas))
+        logger.debug('{:.2f}% valid anchors'.format(
+            100.0 * np.count_nonzero(inside_filter) /
+            inside_filter.shape[0]
+        ))
+        logger.debug('''
+{} anchors with X_min negative.
+{} anchors with Y_min negative.
+{} anchors with X_max above limit.
+{} anchors with Y_max above limit.
+        '''.format(
+            np.count_nonzero(x_negative),
+            np.count_nonzero(y_negative),
+            np.count_nonzero(x_outof),
+            np.count_nonzero(y_outof),
+        ))
+
+    moved_anchors = anchors.copy()
+    min_x = -x_min.min()
+    min_y = -y_min.min()
+
+    moved_anchors += [[min_x, min_y, min_x, min_y]]
+
+    max_x = int(moved_anchors[:, 2].max())
+    max_y = int(moved_anchors[:, 3].max())
+
+    image_pil, _ = get_image_draw(pred_dict)
+    back = Image.new('RGB', [max_x, max_y], 'white')
+    back.paste(image_pil, [int(min_x), int(min_y)])
+
+    draw = ImageDraw.Draw(back, 'RGBA')
+
+    anchor_id_to_draw = anchor_num
+    draw_every = pred_dict['anchor_reference'].shape[0]
+    first = True
+    for anchor_id, anchor in enumerate(moved_anchors):
+        if anchor_num is not None:
+            if anchor_id != anchor_id_to_draw:
+                continue
+            else:
+                anchor_id_to_draw += draw_every
+
+        if first and anchor_num is not None:
+            draw.rectangle(
+                list(anchor), fill=(255, 0, 0, 40), outline=(0, 255, 0, 120)
+            )
+            first = False
+        elif anchor_num is None:
+            draw.rectangle(
+                list(anchor), fill=(255, 0, 0, 1), outline=(0, 255, 0, 2)
+            )
+        else:
+            draw.rectangle(
+                list(anchor), fill=(255, 0, 0, 2), outline=(0, 255, 0, 4)
+            )
+
+    draw.text(
+        tuple([min_x, min_y - 10]),
+        text='{}w x {}h'.format(width, height),
+        font=font, fill=(0, 0, 0, 160)
+    )
+
+    return back
 
 
 def draw_bbox(image, bbox):
@@ -240,7 +362,7 @@ def draw_bbox(image, bbox):
 
 
 def draw_top_proposals(pred_dict):
-    tf.logging.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
+    logger.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
     scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposal_prediction']['proposals']
     targets = pred_dict['rpn_prediction']['rpn_cls_target']
@@ -255,7 +377,7 @@ def draw_top_proposals(pred_dict):
     for proposal, target, score in zip(proposals, targets, scores):
         bbox = list(proposal)
         if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
-            tf.logging.warning('Ignoring top proposal without positive area: {}, score: {}'.format(proposal, score))
+            logger.debug('Ignoring top proposal without positive area: {}, score: {}'.format(proposal, score))
             continue
 
         if target == 1:
@@ -276,9 +398,9 @@ def draw_top_proposals(pred_dict):
 
 
 def draw_batch_proposals(pred_dict, display_anchor=True):
-    tf.logging.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
-    tf.logging.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
-    tf.logging.debug('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
+    logger.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
+    logger.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
+    logger.debug('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
     scores = pred_dict['rpn_prediction']['rpn_cls_prob']
     scores = scores[:, 1]
     bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
@@ -300,7 +422,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
     for score, proposal, target, max_overlap, anchor in zip(scores, bboxes, targets, max_overlaps, all_anchors):
 
         if (proposal[2] - proposal[0] <= 0) or (proposal[3] - proposal[1] <= 0):
-            tf.logging.warning(
+            logger.debug(
                 'Ignoring proposal for target {} because of negative area => {}'.format(
                     target, proposal))
             continue
@@ -350,7 +472,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
 
 
 def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
-    tf.logging.debug('Top NMS proposals (min_score = {})'.format(min_score))
+    logger.debug('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
     # Remove batch id
@@ -370,7 +492,7 @@ def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
     for topn, (score, proposal) in enumerate(zip(scores, proposals)):
         bbox = list(proposal)
         if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
-            tf.logging.warning('Proposal has negative area: {}'.format(bbox))
+            logger.debug('Proposal has negative area: {}'.format(bbox))
             continue
 
         draw.rectangle(
@@ -405,9 +527,9 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     """
     loss = pred_dict['rpn_prediction']['cross_entropy_per_anchor']
     type_str = 'foreground' if foreground else 'background'
-    tf.logging.debug('RPN classification loss (anchors, with the softmax score) (mean softmax loss (all): {})'.format(loss.mean()))
-    tf.logging.debug('Showing {} only'.format(type_str))
-    tf.logging.debug('{} {} performers'.format('Worst' if worst else 'Best', topn))
+    logger.debug('RPN classification loss (anchors, with the softmax score) (mean softmax loss (all): {})'.format(loss.mean()))
+    logger.debug('Showing {} only'.format(type_str))
+    logger.debug('{} {} performers'.format('Worst' if worst else 'Best', topn))
     prob = pred_dict['rpn_prediction']['rpn_cls_prob']
     prob = prob.reshape([-1, 2])[:, 1]
     target = pred_dict['rpn_prediction']['rpn_cls_target']
@@ -428,7 +550,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     prob = prob[positive_indices]
     anchors = anchors[positive_indices]
 
-    tf.logging.debug('Mean loss for {}: {}'.format(type_str, loss.mean()))
+    logger.debug('Mean loss for {}: {}'.format(type_str, loss.mean()))
 
     sorted_idx = loss.argsort()
     if worst:
@@ -440,7 +562,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     prob = prob[sorted_idx]
     anchors = anchors[sorted_idx]
 
-    tf.logging.debug('Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
+    logger.debug('Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -463,7 +585,7 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
     We display the final bounding box and the anchor. Drawing lines between the
     corners.
     """
-    tf.logging.debug('RPN regression loss (bbox to original anchors, with the smoothL1Loss)')
+    logger.debug('RPN regression loss (bbox to original anchors, with the smoothL1Loss)')
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     target = target.reshape([-1, 1])
     # Get anchors with positive label.
@@ -500,14 +622,15 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
 
     return image_pil
 
+
 def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     if worst:
         draw_desc = 'worst'
     else:
         draw_desc = 'best'
 
-    tf.logging.debug('Display prediction vs original for {} performer or batch.'.format(draw_desc))
-    tf.logging.debug('green = anchor, magenta = prediction, red = anchor * target (should be GT)')
+    logger.debug('Display prediction vs original for {} performer or batch.'.format(draw_desc))
+    logger.debug('green = anchor, magenta = prediction, red = anchor * target (should be GT)')
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     target = target.reshape([-1, 1])
     # Get anchors with positive label.
@@ -554,13 +677,13 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     draw.rectangle(bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
     draw.rectangle(bbox_target, fill=(255, 0, 0, 20), outline=(255, 0, 0, 100))
 
-    tf.logging.debug('Loss is {}'.format(loss))
+    logger.debug('Loss is {}'.format(loss))
     return image_pil
 
 
 def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
-    tf.logging.debug('Show the bboxes used for training classifier. (GT labels are -1 from cls targets)')
-    tf.logging.debug('blue => GT, green => foreground, red => background')
+    logger.debug('Show the bboxes used for training classifier. (GT labels are -1 from cls targets)')
+    logger.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['target']['cls']
@@ -597,8 +720,8 @@ def draw_rcnn_cls_batch(pred_dict, foreground=True, background=True):
 
 
 def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, worst=True, n=10):
-    tf.logging.debug('Show the {} classification errors in batch used for training classifier.'.format('worst' if worst else 'best'))
-    tf.logging.debug('blue => GT, green => foreground, red => background')
+    logger.debug('Show the {} classification errors in batch used for training classifier.'.format('worst' if worst else 'best'))
+    logger.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['target']['cls']
@@ -648,8 +771,8 @@ def draw_rcnn_cls_batch_errors(pred_dict, foreground=True, background=True, wors
 
 
 def draw_rcnn_reg_batch_errors(pred_dict):
-    tf.logging.debug('Show errors in batch used for training classifier regressor.')
-    tf.logging.debug('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
+    logger.debug('Show errors in batch used for training classifier regressor.')
+    logger.debug('blue => GT, green => foreground, r`regression_loss` - c`classification_loss`.')
 
     proposals = pred_dict['rpn_prediction']['proposals'][:,1:]
     cls_targets = pred_dict['classification_prediction']['target']['cls']
@@ -733,13 +856,13 @@ def recalculate_objects(pred_dict):
 
 
 def draw_object_prediction(pred_dict, topn=50):
-    tf.logging.debug('Display top scored objects with label.')
+    logger.debug('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
     objects_labels = pred_dict['classification_prediction']['labels']
     objects_labels_prob = pred_dict['classification_prediction']['probs']
 
     if len(objects_labels) == 0:
-        tf.logging.warning('No objects detected. Probably all classified as background.')
+        logger.debug('No objects detected. Probably all classified as background.')
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -758,7 +881,7 @@ def draw_object_prediction(pred_dict, topn=50):
 
 
 def draw_rcnn_input_proposals(pred_dict):
-    tf.logging.debug('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
+    logger.debug('Display RPN proposals used in training classification. Top IoU with GT is displayed.')
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
     gt_boxes = pred_dict['gt_boxes'][:, :4]
 

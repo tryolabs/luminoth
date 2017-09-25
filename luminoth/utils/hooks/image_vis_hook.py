@@ -53,7 +53,6 @@ class ImageVisHook(tf.train.SessionRunHook):
             self._timer.update_last_triggered_step(global_step)
             prediction_dict = results.get('prediction_dict')
             if prediction_dict is not None:
-                print('Drawing images in step {}'.format(global_step))
                 summaries = image_vis_summaries(
                     prediction_dict, with_rcnn=self._with_rcnn
                 )

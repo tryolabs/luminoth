@@ -135,6 +135,9 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['image'] = image
             prediction_dict['image_shape'] = image_shape
             prediction_dict['all_anchors'] = all_anchors
+            prediction_dict['anchor_reference'] = tf.convert_to_tensor(
+                self._anchor_reference
+            )
             prediction_dict['gt_boxes'] = gt_boxes
             prediction_dict['pretrained_feature_map'] = pretrained_feature_map
 
