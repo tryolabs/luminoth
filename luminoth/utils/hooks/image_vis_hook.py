@@ -5,8 +5,8 @@ from luminoth.utils.image_vis import image_vis_summaries
 
 
 class ImageVisHook(tf.train.SessionRunHook):
-    def __init__(self, prediction_dict, every_n_steps=None, every_n_secs=None,
-                 output_dir=None, summary_writer=None):
+    def __init__(self, prediction_dict, with_rcnn=True, every_n_steps=None,
+                 every_n_secs=None, output_dir=None, summary_writer=None):
         super(ImageVisHook, self).__init__()
         if (every_n_secs is None) == (every_n_steps is None):
             raise ValueError(
@@ -20,6 +20,7 @@ class ImageVisHook(tf.train.SessionRunHook):
             every_steps=every_n_steps, every_secs=every_n_secs)
 
         self._prediction_dict = prediction_dict
+        self._with_rcnn = with_rcnn
         self._output_dir = output_dir
         self._summary_writer = summary_writer
 
@@ -53,7 +54,9 @@ class ImageVisHook(tf.train.SessionRunHook):
             prediction_dict = results.get('prediction_dict')
             if prediction_dict is not None:
                 print('Drawing images in step {}'.format(global_step))
-                summaries = image_vis_summaries(prediction_dict)
+                summaries = image_vis_summaries(
+                    prediction_dict, with_rcnn=self._with_rcnn
+                )
                 for summary in summaries:
                     self._summary_writer.add_summary(summary, global_step)
 

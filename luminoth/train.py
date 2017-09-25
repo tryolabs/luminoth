@@ -137,7 +137,8 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
             # ImageVis only runs on the chief.
             chief_only_hooks.append(
                 ImageVisHook(
-                    prediction_dict, output_dir=checkpoint_dir,
+                    prediction_dict, with_rcnn=config.network.with_rcnn,
+                    output_dir=checkpoint_dir,
                     every_n_steps=config.train.display_every_steps,
                     every_n_secs=config.train.display_every_secs
                 )
