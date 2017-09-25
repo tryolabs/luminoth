@@ -137,8 +137,13 @@ class RPN(snt.AbstractModule):
         rpn_cls_score = tf.reshape(rpn_cls_score_original, [-1, 2])
         rpn_cls_prob = tf.nn.softmax(rpn_cls_score)
 
+        prediction_dict['rpn_cls_prob'] = rpn_cls_prob
+        prediction_dict['rpn_cls_score'] = rpn_cls_score
+
         # Flatten bounding box delta prediction for easy manipulation.
         rpn_bbox_pred = tf.reshape(rpn_bbox_pred_original, [-1, 4])
+
+        prediction_dict['rpn_bbox_pred'] = rpn_bbox_pred
 
         # We have to convert bbox deltas to usable bounding boxes and remove
         # redudant bbox using non maximum suppression.
@@ -162,11 +167,6 @@ class RPN(snt.AbstractModule):
             variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
             variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
 
-        # TODO: Better way to log variable summaries.
-        # variable_summaries(self._rpn.w, 'rpn_conv_W', ['rpn'])
-        # variable_summaries(self._rpn_cls.w, 'rpn_cls_W', ['rpn'])
-        # variable_summaries(self._rpn_bbox.w, 'rpn_bbox_W', ['rpn'])
-
         variable_summaries(
             proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['rpn'])
         variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
@@ -186,10 +186,6 @@ class RPN(snt.AbstractModule):
 
         if self._debug:
             prediction_dict['proposal_prediction'] = proposal_prediction
-
-        prediction_dict['rpn_cls_prob'] = rpn_cls_prob
-        prediction_dict['rpn_cls_score'] = rpn_cls_score
-        prediction_dict['rpn_bbox_pred'] = rpn_bbox_pred
 
         return prediction_dict
 

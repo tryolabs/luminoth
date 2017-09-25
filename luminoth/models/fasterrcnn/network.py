@@ -290,19 +290,15 @@ class FasterRCNN(snt.AbstractModule):
             shifts = tf.transpose(shifts)
             # Shifts now is a (H x W, 4) Tensor
 
-            num_anchors = self._anchor_reference.shape[0]
-            num_anchor_points = tf.shape(shifts)[0]
-
+            # Expand dims to use broadcasting sum.
             all_anchors = (
-                self._anchor_reference.reshape((1, num_anchors, 4)) +
-                tf.transpose(
-                    tf.reshape(shifts, (1, num_anchor_points, 4)),
-                    (1, 0, 2)
-                )
+                np.expand_dims(self._anchor_reference, axis=0) +
+                tf.expand_dims(shifts, axis=1)
             )
 
+            # Flatten
             all_anchors = tf.reshape(
-                all_anchors, (num_anchors * num_anchor_points, 4)
+                all_anchors, (-1, 4)
             )
             return all_anchors
 

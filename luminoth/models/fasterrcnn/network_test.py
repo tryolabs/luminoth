@@ -6,10 +6,10 @@ from luminoth.models.fasterrcnn.network import FasterRCNN
 from luminoth.utils.bbox_transform import clip_boxes
 
 
-class FasterRCNNetworkTest(tf.test.TestCase):
+class FasterRCNNNetworkTest(tf.test.TestCase):
 
     def setUp(self):
-        super(FasterRCNNetworkTest, self).setUp()
+        super(FasterRCNNNetworkTest, self).setUp()
         # Setup
         self.config = EasyDict({
             'network': {
@@ -124,17 +124,13 @@ class FasterRCNNetworkTest(tf.test.TestCase):
             return results
 
     def _gen_anchors(self, config, feature_map):
-        feature_map_tf = tf.placeholder(
-            tf.float32, shape=feature_map.shape)
         model = FasterRCNN(config)
 
-        results = model._generate_anchors(feature_map)
+        results = model._generate_anchors(tf.constant(feature_map))
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
-            results = sess.run(results, feed_dict={
-                feature_map_tf: feature_map
-            })
+            results = sess.run(results)
             return results
 
     def testBasic(self):
@@ -233,17 +229,17 @@ class FasterRCNNetworkTest(tf.test.TestCase):
 
         # Check the anchors cover all the image.
         # TODO: Check with values calculated from config.
-        self.assertEqual(np.min(anchors[:, 0]), -14)
-        self.assertEqual(np.max(anchors[:, 0]), 36)
+        self.assertEqual(np.min(anchors[:, 0]), -22)
+        self.assertEqual(np.max(anchors[:, 0]), 29)
 
-        self.assertEqual(np.min(anchors[:, 1]), -14)
-        self.assertEqual(np.max(anchors[:, 1]), 36)
+        self.assertEqual(np.min(anchors[:, 1]), -22)
+        self.assertEqual(np.max(anchors[:, 1]), 29)
 
-        self.assertEqual(np.min(anchors[:, 2]), 9)
-        self.assertEqual(np.max(anchors[:, 2]), 60)
+        self.assertEqual(np.min(anchors[:, 2]), 2)
+        self.assertEqual(np.max(anchors[:, 2]), 53)
 
-        self.assertEqual(np.min(anchors[:, 3]), 9)
-        self.assertEqual(np.max(anchors[:, 3]), 60)
+        self.assertEqual(np.min(anchors[:, 3]), 2)
+        self.assertEqual(np.max(anchors[:, 3]), 53)
 
         # Check values are sequential.
         self._assert_sequential_values(anchors[:, 0], config.anchors.stride)

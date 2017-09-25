@@ -26,7 +26,11 @@ class AnchorsTest(tf.test.TestCase):
         # Should return a single anchor.
         self.assertEqual(anchor_reference.shape, (1, 4))
         self.assertAllEqual(
-            anchor_reference[0], [0, 0, base_size - 1, base_size - 1]
+            anchor_reference[0],
+            [
+                -(base_size - 1)/2.0, -(base_size - 1)/2.0,
+                (base_size - 1)/2.0, (base_size - 1)/2.0
+            ]
         )
 
         # Test with fixed ratio and different scales.
@@ -47,10 +51,12 @@ class AnchorsTest(tf.test.TestCase):
         # Check exact values.
         self.assertAllEqual(
             anchor_reference,
-            np.array([[64., 64., 191., 191.],
-                      [0., 0., 255., 255.],
-                      [-128., -128., 383., 383.],
-                      [-384., -384., 639., 639.]])
+            np.array([
+                [-63.5, -63.5, 63.5, 63.5],
+                [-127.5, -127.5, 127.5, 127.5],
+                [-255.5, -255.5, 255.5, 255.5],
+                [-511.5, -511.5, 511.5, 511.5]
+            ])
         )
 
         # Test with different ratios and scales.
@@ -86,6 +92,8 @@ class AnchorsTest(tf.test.TestCase):
         )
 
     def testInvalidValues(self):
+        # Should fail because base_size is too small to for that scale and
+        # ratio.
         base_size = 1
         aspect_ratios = [0.5]
         scales = [0.5]

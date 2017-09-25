@@ -29,7 +29,7 @@ def generate_anchors_reference(base_size, aspect_ratios, scales):
     widths = base_scales / aspect_ratio_sqrts * base_size
 
     # Center point has the same X, Y value.
-    center_xy = (base_size - 1) / 2.0
+    center_xy = 0
 
     # Create anchor reference.
     anchors = np.column_stack([
