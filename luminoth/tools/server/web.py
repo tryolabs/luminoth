@@ -49,7 +49,7 @@ def get_prediction(model_name, image, checkpoint_file=None):
             image_tensor = tf.placeholder(tf.float32, (1, None, None, 3))
             model = model_class(model_class.base_config)
             output = model(image_tensor)
-            if (checkpoint_file):
+            if checkpoint_file:
                 saver = tf.train.Saver(sharded=True, allow_empty=True)
                 saver.restore(session, checkpoint_file)
             else:
