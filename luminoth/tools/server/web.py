@@ -32,15 +32,13 @@ def resize_image(image, min_size, max_size):
     new_height = int(upscale * downscale * image.height)
 
     image = image.resize((new_width, new_height))
-
-    image_array = np.array(image)
+    image_array = np.array(image)[:, :, :3]  # TODO Read RGB
     image_array = np.expand_dims(image_array, axis=0)
     return image_array, upscale * downscale
 
 
-def get_prediction(model_name, image):
+def get_prediction(model_name, image, checkpoint_file=None):
     model_class = get_model(model_name)
-
     if model_name in LOADED_MODELS:
         image_tensor, output, graph, session = LOADED_MODELS[model_name]
     else:
@@ -49,19 +47,24 @@ def get_prediction(model_name, image):
 
         with graph.as_default():
             image_tensor = tf.placeholder(tf.float32, (1, None, None, 3))
-
             model = model_class(model_class.base_config)
             output = model(image_tensor)
-            saver = model.get_saver()
+            if (checkpoint_file):
+                saver = tf.train.Saver(sharded=True, allow_empty=True)
+                saver.restore(session, checkpoint_file)
+            else:
+                init_op = tf.group(
+                    tf.global_variables_initializer(),
+                    tf.local_variables_initializer()
+                )
+                session.run(init_op)
 
-            saver.restore(session, app.config['checkpoint_file'])
-            LOADED_MODELS[model_name] = (image_tensor, output, graph, session)
+        LOADED_MODELS[model_name] = (image_tensor, output, graph, session)
 
     classification_prediction = output['classification_prediction']
     objects_tf = classification_prediction['objects']
-    objects_labels_tf = classification_prediction['objects_labels']
-    objects_labels_prob_tf = classification_prediction['objects_labels_prob']
-
+    objects_labels_tf = classification_prediction['labels']
+    objects_labels_prob_tf = classification_prediction['probs']
     image_resize_config = model_class.base_config.dataset.image_preprocessing
     image_array, scale_factor = resize_image(
         image, image_resize_config.min_size, image_resize_config.max_size
@@ -98,13 +101,14 @@ def predict(model_name):
     if image_array is None:
         return jsonify(error='Missing image.')
 
-    pred = get_prediction(model_name, image_array)
+    pred = get_prediction(
+        model_name, image_array, app.config['checkpoint_file'])
 
     return jsonify(pred)
 
 
 @click.command(help='Start basic web application.')
 @click.option('--checkpoint-file')
-def http_api(checkpoint_file):
+def web(checkpoint_file):
     app.config['checkpoint_file'] = checkpoint_file
     app.run(debug=True)

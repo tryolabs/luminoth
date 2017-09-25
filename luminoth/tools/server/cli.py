@@ -1,6 +1,6 @@
 import click
 
-from .http_api import http_api
+from .web import web
 
 
 @click.group(help='Groups of commands to serve models')
@@ -8,4 +8,4 @@ def server():
     pass
 
 
-server.add_command(http_api)
+server.add_command(web)
