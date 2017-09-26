@@ -332,8 +332,4 @@ class RPNTarget(snt.AbstractModule):
             shape=[tf.shape(all_anchors)[0]]
         )
 
-        labels = tf.stop_gradient(labels)
-        bbox_targets = tf.stop_gradient(bbox_targets)
-        max_overlaps = tf.stop_gradient(max_overlaps)
-
         return labels, bbox_targets, max_overlaps

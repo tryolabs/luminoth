@@ -284,7 +284,7 @@ class RCNNTarget(snt.AbstractModule):
             shape=tf.cast(tf.shape(proposals), tf.int64)
         )
 
-        proposals_label = tf.stop_gradient(proposals_label)
-        bbox_targets = tf.stop_gradient(bbox_targets)
+        proposals_label = proposals_label
+        bbox_targets = bbox_targets
 
         return proposals_label, bbox_targets

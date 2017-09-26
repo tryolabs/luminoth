@@ -132,8 +132,8 @@ class RPNProposal(snt.AbstractModule):
         nms_proposals = tf.concat([batch_inds, nms_proposals], axis=1)
 
         return {
-            'nms_proposals': nms_proposals,
-            'nms_proposals_scores': nms_proposals_scores,
+            'nms_proposals': tf.stop_gradient(nms_proposals),
+            'nms_proposals_scores': tf.stop_gradient(nms_proposals_scores),
             'proposals': top_k_proposals,
             'scores': top_k_scores,
         }
