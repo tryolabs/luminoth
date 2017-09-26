@@ -1,4 +1,5 @@
 import os
+import json
 import tensorflow as tf
 
 from PIL import Image
@@ -49,14 +50,14 @@ class ImageNet(DatasetTool):
             raise InvalidDataDirectory('Annotations path is missing')
 
     def read_classes(self):
-        path = os.path.join(
-            self._annotations_path, 'train', 'ILSVRC2013_train'
+        jsonpath = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            'data',
+            'imagenet_wnids.json'
         )
-        classes = set()
-        for entry in tf.gfile.ListDirectory(path):
-            classes.add(entry)
-
-        return list(sorted(classes))
+        with open(jsonpath) as wnidsjson:
+            self._wnids = json.load(wnidsjson)
+            return list(self._wnids.values())
 
     def get_split_path(self, split):
         if split not in self.VALID_SPLITS:
@@ -118,7 +119,7 @@ class ImageNet(DatasetTool):
             return
         for b in annotation['object']:
             try:
-                label_id = classes.index(b['name'])
+                label_id = classes.index(self._wnids[b['name']])
             except ValueError:
                 continue
 
