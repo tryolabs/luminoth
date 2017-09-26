@@ -1,4 +1,5 @@
 import click
+import json
 import time
 import numpy as np
 import tensorflow as tf
@@ -37,8 +38,9 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_name, image, checkpoint_file=None):
+def get_prediction(model_name, image, checkpoint_file=None, class_names=None):
     model_class = get_model(model_name)
+
     if model_name in LOADED_MODELS:
         image_tensor, output, graph, session = LOADED_MODELS[model_name]
     else:
@@ -67,7 +69,8 @@ def get_prediction(model_name, image, checkpoint_file=None):
     objects_labels_prob_tf = classification_prediction['probs']
     image_resize_config = model_class.base_config.dataset.image_preprocessing
     image_array, scale_factor = resize_image(
-        image, image_resize_config.min_size, image_resize_config.max_size
+        image, float(image_resize_config.min_size),
+        float(image_resize_config.max_size)
     )
 
     start_time = time.time()
@@ -78,9 +81,17 @@ def get_prediction(model_name, image, checkpoint_file=None):
     })
     end_time = time.time()
 
+    if class_names:
+        # Gets the names of the classes
+        class_labels = json.load(open(class_names))
+        objects_labels = [class_labels[obj] for obj in objects_labels]
+
+    else:
+        objects_labels = objects_labels.tolist()
+
     return {
         'objects': objects.tolist(),
-        'objects_labels': objects_labels.tolist(),
+        'objects_labels': objects_labels,
         'objects_labels_prob': objects_labels_prob.tolist(),
         'inference_time': end_time - start_time,
         'scale_factor': scale_factor,
@@ -102,13 +113,17 @@ def predict(model_name):
         return jsonify(error='Missing image.')
 
     pred = get_prediction(
-        model_name, image_array, app.config['checkpoint_file'])
+        model_name, image_array, app.config['checkpoint_file'],
+        app.config['class_names']
+    )
 
     return jsonify(pred)
 
 
 @click.command(help='Start basic web application.')
 @click.option('--checkpoint-file')
-def web(checkpoint_file):
+@click.option('--class-names')
+def web(checkpoint_file, class_names):
     app.config['checkpoint_file'] = checkpoint_file
+    app.config['class_names'] = class_names
     app.run(debug=True)
