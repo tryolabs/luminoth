@@ -1,3 +1,6 @@
+import json
+import os
+
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
@@ -33,7 +36,8 @@ class FasterRCNN(snt.AbstractModule):
 
         # Total number of classes to classify. If not using RCNN then it is not
         # used. TODO: Make it *more* optional.
-        self._num_classes = config.network.num_classes
+        with open(os.path.join(config.dataset.dir, 'classes.json')) as classf:
+            self._num_classes = len(json.loads(classf.read()))
 
         # Generate network with RCNN thus allowing for classification of
         # objects and not just finding them.
