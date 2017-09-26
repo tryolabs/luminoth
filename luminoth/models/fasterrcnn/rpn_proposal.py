@@ -66,45 +66,17 @@ class RPNProposal(snt.AbstractModule):
         # Force flatten the scores (it should be already be flatten).
         scores = tf.reshape(scores, [-1])
 
-        # We first, remove anchor that partially fall ouside an image.
-        height = im_shape[0]
-        width = im_shape[1]
-
-        (x_min_anchor, y_min_anchor,
-         x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
-
-        # Filter anchors that are partially outside the image.
-        anchor_filter = tf.logical_and(
-            tf.logical_and(
-                tf.greater_equal(x_min_anchor, 0),
-                tf.greater_equal(y_min_anchor, 0)
-            ),
-            tf.logical_and(
-                tf.less(x_max_anchor, width),
-                tf.less(y_max_anchor, height)
-            )
-        )
-
-        # We (force) reshape the filter so that we can use it as a boolean mask
-        anchor_filter = tf.reshape(anchor_filter, [-1])
-
-        # Filter anchors, predictions and scores.
-        all_anchors = tf.boolean_mask(
-            all_anchors, anchor_filter, name='filter_anchors')
-        scores = tf.boolean_mask(scores, anchor_filter, name='filter_scores')
-        rpn_bbox_pred = tf.boolean_mask(
-            tf.cast(rpn_bbox_pred, tf.float32), anchor_filter,
-            name='filter_rpn_bbox_pred'
-        )
-
         # Decode boxes
         proposals = decode(all_anchors, rpn_bbox_pred)
+        # Clip proposals to the image.
         proposals = clip_boxes(proposals, im_shape)
 
         # Filter proposals with negative area.
         (x_min, y_min, x_max, y_max) = tf.unstack(proposals, axis=1)
-        proposal_filter = tf.greater_equal(
-            (x_max - x_min) * (y_max - y_min), 0)
+        proposal_filter = tf.greater(
+            tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
+            0.0
+        )
         proposal_filter = tf.reshape(proposal_filter, [-1])
 
         # Filter proposals and scores.

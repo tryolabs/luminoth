@@ -20,25 +20,38 @@ class RPNProposalTest(tf.test.TestCase):
         })
         tf.reset_default_graph()
 
-    def _run_rpn_proposal(self, all_anchors, gt_boxes, rpn_cls_prob, config):
+    def _run_rpn_proposal(self, all_anchors, rpn_cls_prob, config,
+                          gt_boxes=None, rpn_bbox_pred=None):
+        """
+        Define one of gt_boxes or rpn_bbox_pred.
+
+        If using gt_boxes, the correct rpn_bbox_pred for those gt_boxes will
+        be used.
+        """
+        feed_dict = {}
         rpn_cls_prob_tf = tf.placeholder(
             tf.float32, shape=(all_anchors.shape[0], 2))
+        feed_dict[rpn_cls_prob_tf] = rpn_cls_prob
         im_size_tf = tf.placeholder(tf.float32, shape=(2,))
+        feed_dict[im_size_tf] = self.im_size
         all_anchors_tf = tf.placeholder(tf.float32, shape=all_anchors.shape)
-        # Here we encode 'all_anchors' and 'gt_boxes' to get corrects
-        # predictions that RPNProposal can decodes.
-        rpn_bbox_pred = encode(all_anchors, gt_boxes)
+        feed_dict[all_anchors_tf] = all_anchors
+        if rpn_bbox_pred is None and gt_boxes is not None:
+            # Here we encode 'all_anchors' and 'gt_boxes' to get corrects
+            # predictions that RPNProposal can decodes.
+            rpn_bbox_pred_tf = encode(all_anchors, gt_boxes)
+        else:
+            rpn_bbox_pred_tf = tf.placeholder(
+                tf.float32, shape=rpn_bbox_pred.shape
+            )
+            feed_dict[rpn_bbox_pred_tf] = rpn_bbox_pred
 
         model = RPNProposal(all_anchors.shape[0], config)
         results = model(
-            rpn_cls_prob_tf, rpn_bbox_pred, all_anchors_tf, im_size_tf)
+            rpn_cls_prob_tf, rpn_bbox_pred_tf, all_anchors_tf, im_size_tf)
 
         with self.test_session() as sess:
-            results = sess.run(results, feed_dict={
-                rpn_cls_prob_tf: rpn_cls_prob,
-                all_anchors_tf: all_anchors,
-                im_size_tf: self.im_size,
-            })
+            results = sess.run(results, feed_dict=feed_dict)
             return results
 
     def testNMSThreshold(self):
@@ -75,7 +88,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['nms_threshold'] = 0.0
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 2 'nms proposals' because 2 IoU equals to 0.
         # Also check that we get the corrects scores.
@@ -92,7 +105,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['nms_threshold'] = 0.3
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
         # Also check that we get the corrects scores.
@@ -109,7 +122,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['nms_threshold'] = 0.6
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
         # Also check that we get the corrects scores.
@@ -126,7 +139,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['nms_threshold'] = 0.8
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.8.
         # Also check that we get the corrects scores.
@@ -143,7 +156,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['nms_threshold'] = 1.0
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get 'post_nms_top_n' nms proposals because
         # 'nms_threshold' = 1 and this only removes duplicates.
@@ -176,7 +189,7 @@ class RPNProposalTest(tf.test.TestCase):
         ])
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 3 'nms proposals' and 3 'proposals' because
         # we have 4 gt_boxes, but 1 outsider (and nms_threshold = 1).
@@ -185,9 +198,10 @@ class RPNProposalTest(tf.test.TestCase):
             (3, 5)
         )
 
+        # We don't remove proposals outside, we just clip them.
         self.assertEqual(
             results['proposals'].shape,
-            (3, 4)
+            (4, 4)
         )
 
         # Also check that we get the corrects scores.
@@ -200,7 +214,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['post_nms_top_n'] = 2
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, config)
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 2 we have only 2 'nms proposals'
         # but 3 'proposals'.
@@ -211,7 +225,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertEqual(
             results['proposals'].shape,
-            (3, 4)
+            (4, 4)
         )
 
         # Also check that we get the corrects scores.
@@ -222,7 +236,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         self.assertAllClose(
             results['scores'],
-            [0.7, 0.6, 0.2]
+            [0.7, 0.6, 0.2, 0.1]
         )
 
         # Check that we only filter by pre_nms_top_n
@@ -230,7 +244,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['pre_nms_top_n'] = 2
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, config)
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 3 and pre_nms_top = 2
         # we have only 2 'nms proposals' and 2 'proposals'.
@@ -240,6 +254,7 @@ class RPNProposalTest(tf.test.TestCase):
             (2, 5)
         )
 
+        # Filter pre nms
         self.assertEqual(
             results['proposals'].shape,
             (2, 4)
@@ -260,7 +275,7 @@ class RPNProposalTest(tf.test.TestCase):
         config['pre_nms_top_n'] = 2
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, config)
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 1 and pre_nms_top = 2
         # we have only 1 'nms proposals' and 2 'proposals'.
@@ -309,7 +324,7 @@ class RPNProposalTest(tf.test.TestCase):
         ])
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         # Check we get exactly 2 'nms proposals' and 2 'proposals' because
         # we have 4 gt_boxes, but 2 with negative area (and nms_threshold = 1).
@@ -321,6 +336,36 @@ class RPNProposalTest(tf.test.TestCase):
         self.assertEqual(
             results['proposals'].shape,
             (2, 4)
+        )
+
+    def testNegativeAreaProposals(self):
+        all_anchors = np.array([
+            [11, 13, 12, 16],
+            [10, 10, 9, 9],  # invalid anchor will transform to an invalid
+            [11, 13, 12, 28],  # proposal. we are cheating here but it's almost
+            [7, 13, 34, 30],  # the same.
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.9, 0.1],
+            [0.8, 0.2]
+        ])
+        rpn_bbox_pred = np.array([
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+        ])
+
+        results = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, self.config,
+            rpn_bbox_pred=rpn_bbox_pred
+        )
+
+        self.assertEqual(
+            results['proposals'].shape,
+            (3, 4)
         )
 
     def testClippingOfProposals(self):
@@ -347,7 +392,7 @@ class RPNProposalTest(tf.test.TestCase):
         ])
 
         results = self._run_rpn_proposal(
-            all_anchors, gt_boxes, rpn_cls_prob, self.config)
+            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
