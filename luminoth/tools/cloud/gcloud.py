@@ -145,7 +145,7 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
     # list of regions is subject to change in the future.
     if region not in RECOGNIZED_REGIONS:
         tf.logging.warn('"{}" is not a recognized region. Was your region '
-                        'recently added to the GCP?')
+                        'recently added to the GCP?'.format(region))
 
     project_id = get_project_id(service_account_json)
     if project_id is None:
