@@ -19,6 +19,11 @@ MACHINE_TYPES = [
     'complex_model_l', 'standard_gpu', 'complex_model_m_gpu',
     'complex_model_l_gpu'
 ]
+RECOGNIZED_REGIONS = [
+    'asia-east1', 'asia-northeast1', 'asia-southeast1', 'australia-southeast1',
+    'europe-west1', 'europe-west2', 'europe-west3', 'southamerica-east1',
+    'us-central1', 'us-east1', 'us-east4', 'us-west1'
+]
 
 DEFAULT_SCALE_TIER = 'BASIC_GPU'
 DEFAULT_MASTER_TYPE = 'standard_gpu'
@@ -125,15 +130,22 @@ def cloud_service(credentials, service, version='v1'):
 @click.option('--job-id', help='JobId for saving models and logs.')
 @click.option('--service-account-json', required=True)
 @click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
+@click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
 @click.option('--dataset', required=True, help='Bucket where the dataset is located.')  # noqa
 @click.option('--config', help='Path to config to use in training.')
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
-def train(job_id, service_account_json, bucket_name, config, dataset,
+def train(job_id, service_account_json, bucket_name, region, config, dataset,
           scale_tier, master_type, worker_type, worker_count):
     args = []
+
+    # We're only warning instead of forcing it with click.Choice because the
+    # list of regions is subject to change in the future.
+    if region not in RECOGNIZED_REGIONS:
+        tf.logging.warn('"{}" is not a recognized region. Was your region '
+                        'recently added to the GCP?')
 
     project_id = get_project_id(service_account_json)
     if project_id is None:
@@ -185,7 +197,7 @@ def train(job_id, service_account_json, bucket_name, config, dataset,
         ],
         'pythonModule': 'luminoth.train',
         'args': args,
-        'region': 'us-central1',
+        'region': region,
         'jobDir': 'gs://{}/{}/train/'.format(bucket_name, base_path),
         'runtimeVersion': '1.2'
     }
