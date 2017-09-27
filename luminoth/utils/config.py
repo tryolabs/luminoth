@@ -33,9 +33,18 @@ def merge_into(new_config, base_config):
         if key not in base_config:
             raise KeyError('Key "{}" is not a valid config key.'.format(key))
 
+        # For Python2 and Python3 compatibility.
+        try:
+            basestring
+        except NameError:
+            basestring = str
         # Since we already have the values of base_config we check against them
         if (base_config[key] is not None and
-           type(base_config[key]) is not type(value)):
+           not isinstance(value, type(base_config[key])) and
+            # For Python2 compatibility. We don't want to throw an error when
+            # both are basestrings (e.g. unicode and str).
+           not isinstance(value, basestring) and
+           not isinstance(base_config[key], basestring)):
             raise ValueError(
                 'Incorrect type "{}" for key "{}". Must be "{}"'.format(
                     type(value), key, type(base_config[key])))
