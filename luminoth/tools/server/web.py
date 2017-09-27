@@ -38,7 +38,8 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_name, image, checkpoint_file=None, class_names=None):
+def get_prediction(model_name, image, checkpoint_file=None, classes_file=None):
+
     model_class = get_model(model_name)
 
     if model_name in LOADED_MODELS:
@@ -68,6 +69,7 @@ def get_prediction(model_name, image, checkpoint_file=None, class_names=None):
     objects_labels_tf = classification_prediction['labels']
     objects_labels_prob_tf = classification_prediction['probs']
     image_resize_config = model_class.base_config.dataset.image_preprocessing
+
     image_array, scale_factor = resize_image(
         image, float(image_resize_config.min_size),
         float(image_resize_config.max_size)
@@ -81,9 +83,9 @@ def get_prediction(model_name, image, checkpoint_file=None, class_names=None):
     })
     end_time = time.time()
 
-    if class_names:
+    if classes_file:
         # Gets the names of the classes
-        class_labels = json.load(open(class_names))
+        class_labels = json.load(tf.gfile.GFile(classes_file))
         objects_labels = [class_labels[obj] for obj in objects_labels]
 
     else:
@@ -114,7 +116,7 @@ def predict(model_name):
 
     pred = get_prediction(
         model_name, image_array, app.config['checkpoint_file'],
-        app.config['class_names']
+        app.config['classes_file']
     )
 
     return jsonify(pred)
@@ -122,8 +124,8 @@ def predict(model_name):
 
 @click.command(help='Start basic web application.')
 @click.option('--checkpoint-file')
-@click.option('--class-names')
-def web(checkpoint_file, class_names):
+@click.option('--classes-file')
+def web(checkpoint_file, classes_file):
     app.config['checkpoint_file'] = checkpoint_file
-    app.config['class_names'] = class_names
+    app.config['classes_file'] = classes_file
     app.run(debug=True)
