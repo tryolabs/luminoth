@@ -35,16 +35,25 @@ def merge_into(new_config, base_config):
 
         # For Python2 and Python3 compatibility.
         try:
-            basestring
+            unicode
         except NameError:
-            basestring = str
+            # If 'unicode' isn't defined, set it as the type of a unicode
+            # string.
+            # TODO: unicode = str is causing an error later on in Python2,
+            # although this block should only run on Python3 and `type(u'u')`
+            # should be `str` in that case, anyway.
+            # Possible Python2 overoptimization bug?
+            unicode = type(u'u')
         # Since we already have the values of base_config we check against them
         if (base_config[key] is not None and
+            # Allow all values to be None or False.
+            # TODO: reconsider this.
+           value is not None and value is not False and
            not isinstance(value, type(base_config[key])) and
             # For Python2 compatibility. We don't want to throw an error when
             # both are basestrings (e.g. unicode and str).
-           not isinstance(value, basestring) and
-           not isinstance(base_config[key], basestring)):
+           (not isinstance(value, (unicode, str)) or
+           not isinstance(base_config[key], (unicode, str)))):
             raise ValueError(
                 'Incorrect type "{}" for key "{}". Must be "{}"'.format(
                     type(value), key, type(base_config[key])))
