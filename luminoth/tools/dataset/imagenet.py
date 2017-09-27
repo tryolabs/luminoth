@@ -9,6 +9,8 @@ from luminoth.utils.dataset import (
 )
 from .dataset import DatasetTool, InvalidDataDirectory
 
+WNIDS_FILE = 'imagenet_wnids.json'
+
 
 def adjust_bbox(xmin, ymin, xmax, ymax, old_width, old_height,
                 new_width, new_height):
@@ -53,9 +55,9 @@ class ImageNet(DatasetTool):
         jsonpath = os.path.join(
             os.path.dirname(os.path.realpath(__file__)),
             'data',
-            'imagenet_wnids.json'
+            WNIDS_FILE
         )
-        with open(jsonpath) as wnidsjson:
+        with tf.gfile.GFile(jsonpath) as wnidsjson:
             self._wnids = json.load(wnidsjson)
             return list(self._wnids.values())
 
