@@ -46,6 +46,9 @@ class RPNTest(tf.test.TestCase):
         self.ratios = np.array([0.5, 1, 2])
         self.stride = 16
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def testBasic(self):
         """Tests shapes are consistent with anchor generation.
         """

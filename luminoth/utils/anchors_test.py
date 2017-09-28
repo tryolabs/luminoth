@@ -5,6 +5,8 @@ from luminoth.utils.anchors import generate_anchors_reference
 
 
 class AnchorsTest(tf.test.TestCase):
+    def tearDown(self):
+        tf.reset_default_graph()
 
     def _get_widths_heights(self, anchor_reference):
         return np.column_stack((

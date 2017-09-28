@@ -21,6 +21,9 @@ class RPNTargetTest(tf.test.TestCase):
             'minibatch_size': 2
         })
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_rpn_target(self, anchors, gt_boxes, config):
         gt_boxes_tf = tf.placeholder(tf.float32, shape=gt_boxes.shape)
         im_size = tf.placeholder(tf.float32, shape=(2,))

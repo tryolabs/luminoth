@@ -19,6 +19,9 @@ class RPNProposalTest(tf.test.TestCase):
             'min_size': 0,
         })
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_rpn_proposal(self, all_anchors, gt_boxes, rpn_cls_prob, config):
         rpn_cls_prob_tf = tf.placeholder(
             tf.float32, shape=(all_anchors.shape[0], 2))

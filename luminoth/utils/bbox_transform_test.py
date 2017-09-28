@@ -11,6 +11,8 @@ from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
 
 class BBoxTransformTest(tf.test.TestCase):
+    def tearDown(self):
+        tf.reset_default_graph()
 
     def _encode(self, proposals, gt_boxes):
         """

@@ -107,6 +107,9 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             [19, 30, 31, 33, 1],
         ])
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_network(self):
         image = tf.placeholder(
             tf.float32, shape=self.image.shape)
