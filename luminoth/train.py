@@ -59,7 +59,7 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
         # TODO: DEFINITELY NOT THE BEST PLACE
         train_image = tf.expand_dims(train_image, 0)
 
-        prediction_dict = model(train_image, train_bboxes, training=True)
+        prediction_dict = model(train_image, train_bboxes, is_training=True)
         total_loss = model.loss(prediction_dict)
 
         global_step = tf.contrib.framework.get_or_create_global_step()

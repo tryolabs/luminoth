@@ -32,6 +32,9 @@ class RCNNTargetTest(tf.test.TestCase):
             self._num_classes, self._config, seed=0
         )
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_rcnn_target(self, model, gt_boxes, proposed_boxes):
         """Runs an instance of RCNNTarget
 

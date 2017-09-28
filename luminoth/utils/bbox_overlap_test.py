@@ -11,6 +11,9 @@ class BBoxOverlapTest(tf.test.TestCase):
     We test both at the same time by getting both values and making sure they
     are both equal before doing any assertions.
     """
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _get_iou(self, bbox1_val, bbox2_val):
         """Get IoU for two sets of bounding boxes.
 

@@ -78,6 +78,9 @@ class RCNNTest(tf.test.TestCase):
             tf.float32, shape=self._gt_boxes_shape
         )
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_net_with_feed_dict(self, net, feed_dict):
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())

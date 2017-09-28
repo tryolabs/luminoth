@@ -24,6 +24,9 @@ class RCNNProposalTest(tf.test.TestCase):
 
         self._shared_model = RCNNProposal(self._num_classes, self._config)
 
+    def tearDown(self):
+        tf.reset_default_graph()
+
     def _run_rcnn_proposal(self, model, proposals, bbox_pred, cls_prob,
                            image_shape=None):
         if image_shape is None:
