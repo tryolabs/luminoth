@@ -28,6 +28,7 @@ RECOGNIZED_REGIONS = [
 DEFAULT_SCALE_TIER = 'BASIC_GPU'
 DEFAULT_MASTER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_TYPE = 'standard_gpu'
+DEFAULT_PARAMETER_SERVER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_COUNT = 2
 
 VGG_WEIGHTS = 'gs://luminoth-pretrained/vgg_16.ckpt'
@@ -137,8 +138,11 @@ def cloud_service(credentials, service, version='v1'):
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
+@click.option('--parameter-server-type', default=DEFAULT_PARAMETER_SERVER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
+@click.option('--parameter-server-count', default=0, type=int)
 def train(job_id, service_account_json, bucket_name, region, config, dataset,
-          scale_tier, master_type, worker_type, worker_count):
+          scale_tier, master_type, worker_type, worker_count,
+          parameter_server_type, parameter_server_count):
     args = []
 
     # We're only warning instead of forcing it with click.Choice because the
@@ -206,6 +210,9 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
         training_inputs['masterType'] = master_type
         training_inputs['workerType'] = worker_type
         training_inputs['workerCount'] = worker_count
+        if parameter_server_count > 0:
+            training_inputs['parameterServerCount'] = parameter_server_count
+            training_inputs['parameterServerType'] = parameter_server_type
 
     job_spec = {
         'jobId': job_id,
