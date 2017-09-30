@@ -118,20 +118,21 @@ class BaseNetwork(snt.AbstractModule):
         Returns:
             outputs: A Tensor of images normalized with the means.
                 Its shape is the same as the input.
-
         """
-        num_channels = len(means)
-        channels = tf.split(
-            axis=3, num_or_size_splits=num_channels, value=inputs
-        )
-        for i in range(num_channels):
-            channels[i] -= means[i]
-        return tf.concat(axis=3, values=channels)
+        return inputs - [means]
 
     def _normalize(self, inputs):
-        inputs = tf.image.convert_image_dtype(inputs, tf.float32)
-        inputs -= 0.5
-        inputs *= 2.
+        """Normalize between -1.0 to 1.0.
+
+        Args:
+            inputs: A Tensor of images we want to normalize. Its shape is
+                (1, height, width, num_channels).
+        Returns:
+            outputs: A Tensor of images normalized between -1 and 1.
+                Its shape is the same as the input.
+        """
+        inputs = inputs / 255.
+        inputs = (inputs - 0.5) * 2.
         return inputs
 
     def load_weights(self):
