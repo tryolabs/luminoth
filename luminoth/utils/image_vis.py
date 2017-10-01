@@ -25,12 +25,16 @@ summaries_fn = {
                 None, {'anchor_num': 0}
             ],
             'draw_anchor_centers': None,
+            'draw_anchor_batch': None,
             'draw_positive_anchors': None,
+            'draw_top_proposals': [
+                None, {'top_k': False}, {'max_display': 50},
+            ],
             'draw_top_nms_proposals': [
                 None, {'min_score': 0.9}, {'min_score': 0.75}, {'min_score': 0}
             ],
             'draw_batch_proposals': [
-                {'display_anchor': True}, {'display_anchor': False}
+                {'display': 'anchor'}, {'display': 'proposal'}
             ],
             'draw_rpn_cls_loss': [
                 {'foreground': True, 'topn': 10, 'worst': True},
@@ -225,24 +229,6 @@ def draw_gt_boxes(pred_dict):
     return image_pil
 
 
-def scale(image, max_size, method=Image.ANTIALIAS):
-    """
-    resize 'image' to 'max_size' keeping the aspect ratio
-    and place it in center of white 'max_size' image
-    """
-    im_aspect = float(image.size[0])/float(image.size[1])
-    out_aspect = float(max_size[0])/float(max_size[1])
-    if im_aspect >= out_aspect:
-        scaled = image.resize((max_size[0], int((float(max_size[0])/im_aspect) + 0.5)), method)
-    else:
-        scaled = image.resize((int((float(max_size[1])*im_aspect) + 0.5), max_size[1]), method)
-
-    offset = (((max_size[0] - scaled.size[0]) / 2), ((max_size[1] - scaled.size[1]) / 2))
-    back = Image.new("RGB", max_size, "white")
-    back.paste(scaled, offset)
-    return back
-
-
 def draw_anchor_centers(pred_dict):
     anchors = pred_dict['all_anchors']
     x_min = anchors[:, 0]
@@ -357,6 +343,28 @@ def draw_anchors(pred_dict, anchor_num=None):
     return back
 
 
+def draw_anchor_batch(pred_dict):
+    """
+    Draw anchors used in the batch for RPN.
+    """
+    anchors = pred_dict['all_anchors']
+    targets = pred_dict['rpn_prediction']['rpn_cls_target']
+
+    in_batch_idx = targets >= 0
+    anchors = anchors[in_batch_idx]
+    targets = targets[in_batch_idx]
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for anchor, target in zip(anchors, targets):
+        if target == 1:
+            draw.rectangle(list(anchor), fill=(20, 200, 10, 15), outline=(20, 200, 10, 30))
+        else:
+            draw.rectangle(list(anchor), fill=(200, 10, 170, 10), outline=(200, 10, 170, 30))
+
+    return image_pil
+
+
 def draw_bbox(image, bbox):
     """
     bbox: x1,y1,x2,y2
@@ -370,46 +378,46 @@ def draw_bbox(image, bbox):
     return image_pil
 
 
-def draw_top_proposals(pred_dict):
-    logger.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
-    scores = pred_dict['rpn_prediction']['proposal_prediction']['scores']
-    proposals = pred_dict['rpn_prediction']['proposal_prediction']['proposals']
-    targets = pred_dict['rpn_prediction']['rpn_cls_target']
+def draw_top_proposals(pred_dict, min_score=0.8, max_display=20, top_k=True):
+    tf.logging.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
+    proposal_prediction = pred_dict['rpn_prediction']['proposal_prediction']
+    if top_k:
+        scores = proposal_prediction['top_k_scores']
+        proposals = proposal_prediction['top_k_proposals']
+    else:
+        scores = proposal_prediction['scores']
+        proposals = proposal_prediction['proposals']
 
-    top_proposals_idx = np.where(scores == scores.max())[0]
-    scores = scores[top_proposals_idx]
-    proposals = proposals[top_proposals_idx]
-    targets = targets[top_proposals_idx]
+    min_score_idx = scores > min_score
+    scores = scores[min_score_idx]
+    proposals = proposals[min_score_idx]
+
+    top_scores_idx = np.argsort(scores)[::-1][:max_display]
+    scores = scores[top_scores_idx]
+    proposals = proposals[top_scores_idx]
 
     image_pil, draw = get_image_draw(pred_dict)
 
-    for proposal, target, score in zip(proposals, targets, scores):
+    for proposal, score in zip(proposals, scores):
         bbox = list(proposal)
         if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
             logger.debug('Ignoring top proposal without positive area: {}, score: {}'.format(proposal, score))
             continue
 
-        if target == 1:
-            fill = (0, 0, 255, 20)
-        elif target == 0:
-            fill = (0, 255, 0, 20)
-        else:
-            fill = (255, 0, 0, 20)
-
-        draw.rectangle(list(bbox), fill=fill, outline=fill)
+        draw.rectangle(list(bbox), fill=(0, 255, 0, 20), outline=(0, 255, 0, 80))
         x, y = bbox[:2]
         x = max(x, 0)
         y = max(y, 0)
 
-        draw.text(tuple([x, y]), text=str(target), font=font, fill=fill)
+        draw.text(tuple([x, y]), text=str(score), font=font, fill=(30, 30, 30, 80))
 
     return image_pil
 
 
-def draw_batch_proposals(pred_dict, display_anchor=True):
-    logger.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
-    logger.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
-    logger.debug('{} are displayed'.format('Anchors' if display_anchor else 'Final proposals'))
+def draw_batch_proposals(pred_dict, display='proposal'):
+    tf.logging.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
+    tf.logging.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
+    tf.logging.debug('{} are displayed'.format('Anchors' if display == 'anchor' else 'Final proposals'))
     scores = pred_dict['rpn_prediction']['rpn_cls_prob']
     scores = scores[:, 1]
     bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
@@ -459,7 +467,7 @@ def draw_batch_proposals(pred_dict, display_anchor=True):
         else:
             font_txt = '{:.2f}'.format(score)[1:]
 
-        if display_anchor:
+        if display == 'anchor':
             box = list(anchor)
         else:
             box = list(proposal)
@@ -507,7 +515,7 @@ def draw_top_nms_proposals(pred_dict, min_score=0.8, draw_gt=False):
         draw.rectangle(
             bbox, fill=(0, 255, 0, fill_alpha), outline=(0, 255, 0, 50))
 
-        if np.abs(score - 1.0) <= 0.0001:
+        if np.abs(score - 1.0) <= 0.01:
             font_txt = '1'
         else:
             font_txt = '{:.2f}'.format(score)[1:]

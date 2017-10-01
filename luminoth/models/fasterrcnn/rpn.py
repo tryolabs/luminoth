@@ -120,7 +120,9 @@ class RPN(snt.AbstractModule):
         """
         # We start with a common conv layer applied to the feature map.
         self._instantiate_layers()
-        self._proposal = RPNProposal(self._num_anchors, self._config.proposals)
+        self._proposal = RPNProposal(
+            self._num_anchors, self._config.proposals, debug=self._debug
+        )
         self._anchor_target = RPNTarget(
             self._num_anchors, self._config.target, seed=self._seed
         )

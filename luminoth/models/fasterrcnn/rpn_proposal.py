@@ -15,7 +15,8 @@ class RPNProposal(snt.AbstractModule):
     it tries to get rid of duplicate proposals by using non maximum supression
     (NMS).
     """
-    def __init__(self, num_anchors, config, name='proposal_layer'):
+    def __init__(self, num_anchors, config, debug=False,
+                 name='proposal_layer'):
         super(RPNProposal, self).__init__(name=name)
         self._num_anchors = num_anchors
 
@@ -31,6 +32,7 @@ class RPNProposal(snt.AbstractModule):
         self._nms_threshold = config.nms_threshold
         # Currently we do not filter out proposals by size.
         self._min_size = config.min_size
+        self._debug = debug
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
         """
@@ -131,9 +133,17 @@ class RPNProposal(snt.AbstractModule):
         )
         nms_proposals = tf.concat([batch_inds, nms_proposals], axis=1)
 
-        return {
+        pred = {
             'nms_proposals': tf.stop_gradient(nms_proposals),
             'nms_proposals_scores': tf.stop_gradient(nms_proposals_scores),
-            'proposals': top_k_proposals,
-            'scores': top_k_scores,
         }
+
+        if self._debug:
+            pred.update({
+                'proposals': proposals,
+                'scores': scores,
+                'top_k_proposals': top_k_proposals,
+                'top_k_scores': top_k_scores,
+            })
+
+        return pred
