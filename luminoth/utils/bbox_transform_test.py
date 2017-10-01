@@ -11,6 +11,7 @@ from luminoth.utils.test.gt_boxes import generate_gt_boxes
 
 
 class BBoxTransformTest(tf.test.TestCase):
+
     def _encode(self, proposals, gt_boxes):
         """
         Encodes the adjustment from proposals to GT boxes using both the
@@ -54,6 +55,22 @@ class BBoxTransformTest(tf.test.TestCase):
 
         self.assertAllClose(decoded_np, decoded_tf_val)
         return decoded_np
+
+    def _encode_decode(self, proposals, gt_boxes):
+        """
+        Encode and decode to check inverse.
+        """
+        proposals_tf = tf.placeholder(tf.float32, shape=proposals.shape)
+        gt_boxes_tf = tf.placeholder(tf.float32, shape=gt_boxes.shape)
+        deltas_tf = encode_tf(proposals_tf, gt_boxes_tf)
+        decoded_gt_boxes_tf = decode_tf(proposals_tf, deltas_tf)
+
+        with self.test_session() as sess:
+            decoded_gt_boxes = sess.run(decoded_gt_boxes_tf, feed_dict={
+                proposals_tf: proposals,
+                gt_boxes_tf: gt_boxes,
+            })
+            self.assertAllClose(decoded_gt_boxes, gt_boxes, atol=1e-04)
 
     def _clip_boxes(self, proposals, image_shape):
         """
@@ -125,6 +142,12 @@ class BBoxTransformTest(tf.test.TestCase):
             [10, 10, 20, 20],
             [59, 49, 59, 49],
         ])
+
+    def testEncodeDecodeRandomizedValues(self):
+        for i in range(1, 2000, 117):
+            gt_boxes = generate_gt_boxes(i, image_size=800)
+            proposals = generate_gt_boxes(i, image_size=800)
+            self._encode_decode(proposals, gt_boxes)
 
 
 if __name__ == '__main__':
