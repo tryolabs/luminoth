@@ -128,11 +128,11 @@ class Pretrained(snt.AbstractModule):
             i for i, name in enumerate(var_names) if self._endpoint in name
         ][0]
 
-        limit_finetune = (
+        nolimit_finetune = (
             not hasattr(self, '_finetune_num_layers') or
-            not self._finetune_num_layers
+            self._finetune_num_layers is None
         )
-        if limit_finetune:
+        if nolimit_finetune:
             return all_variables
         else:
             return all_variables[
