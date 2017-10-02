@@ -21,6 +21,22 @@ def kwargs_to_config(kwargs):
     ))
 
 
+def types_compatible(new_config_value, base_config_value):
+    if base_config_value is None:
+        return True
+    # Allow all None and False values.
+    # TODO: reconsider this.
+    if new_config_value is None or new_config_value is False:
+        return True
+    # For Python2 compatibility. We want to allow the case when both are
+    # basestrings (e.g. unicode and str).
+    if (isinstance(new_config_value, (type(u''), str))
+       and isinstance(base_config_value, (type(u''), str))):
+        return True
+
+    return isinstance(new_config_value, type(base_config_value))
+
+
 def merge_into(new_config, base_config):
     if type(new_config) is not easydict.EasyDict:
         return
@@ -32,28 +48,8 @@ def merge_into(new_config, base_config):
         # All keys in new_config must be overwriting values in base_config
         if key not in base_config:
             raise KeyError('Key "{}" is not a valid config key.'.format(key))
-
-        # For Python2 and Python3 compatibility.
-        try:
-            unicode
-        except NameError:
-            # If 'unicode' isn't defined, set it as the type of a unicode
-            # string.
-            # TODO: unicode = str is causing an error later on in Python2,
-            # although this block should only run on Python3 and `type(u'u')`
-            # should be `str` in that case, anyway.
-            # Possible Python2 overoptimization bug?
-            unicode = type(u'u')
         # Since we already have the values of base_config we check against them
-        if (base_config[key] is not None and
-            # Allow all values to be None or False.
-            # TODO: reconsider this.
-           value is not None and value is not False and
-           not isinstance(value, type(base_config[key])) and
-            # For Python2 compatibility. We don't want to throw an error when
-            # both are basestrings (e.g. unicode and str).
-           (not isinstance(value, (unicode, str)) or
-           not isinstance(base_config[key], (unicode, str)))):
+        if (not types_compatible(value, base_config[key])):
             raise ValueError(
                 'Incorrect type "{}" for key "{}". Must be "{}"'.format(
                     type(value), key, type(base_config[key])))
