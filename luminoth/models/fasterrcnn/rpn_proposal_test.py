@@ -46,7 +46,7 @@ class RPNProposalTest(tf.test.TestCase):
             )
             feed_dict[rpn_bbox_pred_tf] = rpn_bbox_pred
 
-        model = RPNProposal(all_anchors.shape[0], config)
+        model = RPNProposal(all_anchors.shape[0], config, debug=True)
         results = model(
             rpn_cls_prob_tf, rpn_bbox_pred_tf, all_anchors_tf, im_size_tf)
 
@@ -234,8 +234,9 @@ class RPNProposalTest(tf.test.TestCase):
             [0.7, 0.6]
         )
 
+        # Sorted
         self.assertAllClose(
-            results['scores'],
+            results['top_k_scores'],
             [0.7, 0.6, 0.2, 0.1]
         )
 
@@ -256,7 +257,7 @@ class RPNProposalTest(tf.test.TestCase):
 
         # Filter pre nms
         self.assertEqual(
-            results['proposals'].shape,
+            results['top_k_proposals'].shape,
             (2, 4)
         )
 
@@ -267,7 +268,7 @@ class RPNProposalTest(tf.test.TestCase):
         )
 
         self.assertAllClose(
-            results['scores'],
+            results['top_k_scores'],
             [0.7, 0.6]
         )
 
@@ -285,7 +286,7 @@ class RPNProposalTest(tf.test.TestCase):
         )
 
         self.assertEqual(
-            results['proposals'].shape,
+            results['top_k_proposals'].shape,
             (2, 4)
         )
 
@@ -296,7 +297,7 @@ class RPNProposalTest(tf.test.TestCase):
         )
 
         self.assertAllClose(
-            results['scores'],
+            results['top_k_scores'],
             [0.7, 0.6]
         )
 
@@ -396,19 +397,19 @@ class RPNProposalTest(tf.test.TestCase):
 
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results['proposals'].shape))
+            tf.float32, shape=(results['all_proposals_clipped'].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results['proposals'],
+                proposals: results['all_proposals_clipped'],
                 im_size: self.im_size
             })
 
         # Check we get proposals clipped to the image.
         self.assertAllEqual(
-            results['proposals'],
+            results['all_proposals_clipped'],
             clipped_proposals
         )
 

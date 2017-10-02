@@ -69,12 +69,14 @@ class RPNProposal(snt.AbstractModule):
         scores = tf.reshape(scores, [-1])
 
         # Decode boxes
-        proposals = decode(all_anchors, rpn_bbox_pred)
+        all_proposals = decode(all_anchors, rpn_bbox_pred)
         # Clip proposals to the image.
-        proposals = clip_boxes(proposals, im_shape)
+        all_proposals_clipped = clip_boxes(all_proposals, im_shape)
 
-        # Filter proposals with negative area.
-        (x_min, y_min, x_max, y_max) = tf.unstack(proposals, axis=1)
+        # Filter proposals with negative or zero area.
+        (x_min, y_min, x_max, y_max) = tf.unstack(
+            all_proposals_clipped, axis=1
+        )
         proposal_filter = tf.greater(
             tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
             0.0
@@ -84,9 +86,13 @@ class RPNProposal(snt.AbstractModule):
         # Filter proposals and scores.
         total_proposals = tf.shape(scores)[0]
         scores = tf.boolean_mask(
-            scores, proposal_filter, name='filter_invalid_scores')
+            scores, proposal_filter,
+            name='filter_invalid_scores'
+        )
         proposals = tf.boolean_mask(
-            proposals, proposal_filter, name='filter_invalid_proposals')
+            all_proposals_clipped, proposal_filter,
+            name='filter_invalid_proposals'
+        )
         filtered_proposals = tf.shape(scores)[0]
 
         tf.summary.scalar(
@@ -144,6 +150,8 @@ class RPNProposal(snt.AbstractModule):
                 'scores': scores,
                 'top_k_proposals': top_k_proposals,
                 'top_k_scores': top_k_scores,
+                'all_proposals': all_proposals,
+                'all_proposals_clipped': all_proposals_clipped,
             })
 
         return pred
