@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 
 from google.cloud import storage
+from googleapiclient.errors import HttpError
 from oauth2client import service_account
 
 
@@ -19,17 +20,13 @@ MACHINE_TYPES = [
     'complex_model_l', 'standard_gpu', 'complex_model_m_gpu',
     'complex_model_l_gpu'
 ]
-RECOGNIZED_REGIONS = [
-    'asia-east1', 'asia-northeast1', 'asia-southeast1', 'australia-southeast1',
-    'europe-west1', 'europe-west2', 'europe-west3', 'southamerica-east1',
-    'us-central1', 'us-east1', 'us-east4', 'us-west1'
-]
 
 DEFAULT_SCALE_TIER = 'BASIC_GPU'
 DEFAULT_MASTER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_TYPE = 'standard_gpu'
-DEFAULT_PARAMETER_SERVER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_COUNT = 2
+DEFAULT_PS_TYPE = 'large_model'
+DEFAULT_PS_COUNT = 0
 
 VGG_WEIGHTS = 'gs://luminoth-pretrained/vgg_16.ckpt'
 
@@ -138,18 +135,13 @@ def cloud_service(credentials, service, version='v1'):
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
-@click.option('--parameter-server-type', default=DEFAULT_PARAMETER_SERVER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
-@click.option('--parameter-server-count', default=0, type=int)
+@click.option('--parameter-server-type', default=DEFAULT_PS_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
+@click.option('--parameter-server-count', default=DEFAULT_PS_COUNT, type=int)
 def train(job_id, service_account_json, bucket_name, region, config, dataset,
           scale_tier, master_type, worker_type, worker_count,
           parameter_server_type, parameter_server_count):
-    args = []
 
-    # We're only warning instead of forcing it with click.Choice because the
-    # list of regions is subject to change in the future.
-    if region not in RECOGNIZED_REGIONS:
-        tf.logging.warn('"{}" is not a recognized region. Was your region '
-                        'recently added to the GCP?'.format(region))
+    args = []
 
     project_id = get_project_id(service_account_json)
     if project_id is None:
@@ -193,6 +185,16 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
 
     credentials = get_credentials(service_account_json)
     cloudml = cloud_service(credentials, 'ml')
+    cloudcompute = cloud_service(credentials, 'compute')
+
+    regionrequest = cloudcompute.regions().get(
+        region=region, project=project_id
+    )
+    try:
+        regionrequest.execute()
+    except HttpError as err:
+        tf.logging.error("Couldn't find region.")
+        tf.logging.error(err)
 
     training_inputs = {
         'scaleTier': scale_tier,
@@ -219,12 +221,12 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
         'trainingInput': training_inputs
     }
 
-    request = cloudml.projects().jobs().create(
+    jobrequest = cloudml.projects().jobs().create(
         body=job_spec, parent='projects/{}'.format(project_id))
 
     try:
         click.echo('Submitting training job.')
-        res = request.execute()
+        res = jobrequest.execute()
         click.echo('Job {} submitted successfully.'.format(job_id))
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
