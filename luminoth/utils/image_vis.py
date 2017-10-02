@@ -34,20 +34,37 @@ summaries_fn = {
                 None, {'min_score': 0.9}, {'min_score': 0.75}, {'min_score': 0}
             ],
             'draw_batch_proposals': [
-                {'display': 'anchor'}, {'display': 'proposal'}
+                {'display': 'anchor'}, {'display': 'proposal'},
+                {'display': 'proposal', 'draw_all': False},
+                {'display': 'proposal', 'top_k': 10, 'draw_all': False},
+                {'display': 'proposal', 'top_k': 20, 'draw_all': False},
+                {'display': 'anchor', 'top_k': 20, 'draw_all': False},
+                {'display': 'anchor', 'top_k': 20, 'draw_all': False},
             ],
             'draw_rpn_cls_loss': [
                 {'foreground': True, 'topn': 10, 'worst': True},
                 {'foreground': True, 'topn': 10, 'worst': False},
                 {'foreground': False, 'topn': 10, 'worst': True},
                 {'foreground': False, 'topn': 10, 'worst': False},
+                {'foreground': True, 'topn': 20, 'worst': True},
+                {'foreground': True, 'topn': 20, 'worst': False},
+                {'foreground': False, 'topn': 20, 'worst': True},
+                {'foreground': False, 'topn': 20, 'worst': False},
             ],
-            'draw_rpn_bbox_pred': None,
+            'draw_rpn_bbox_targets': None,
+            'draw_rpn_bbox_pred': [
+                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
+                {'top_k': 40}, {'top_k': 80}
+            ],
             'draw_rpn_bbox_pred_with_target': [
                 {'worst': True}, {'worst': False}
             ],
             'draw_gt_boxes': None,
             'draw_correct_rpn_proposals_anchors': None,
+            'draw_rpn_pred_combined_loss': [
+                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
+                {'top_k': 50}
+            ],
         },
         'rcnn': {
             'draw_rcnn_cls_batch': None,
@@ -378,7 +395,7 @@ def draw_bbox(image, bbox):
     return image_pil
 
 
-def draw_top_proposals(pred_dict, min_score=0.8, max_display=20, top_k=True):
+def draw_top_proposals(pred_dict, min_score=0.8, max_display=20, top_k=True, used_in_batch=False):
     tf.logging.debug('Top proposals (blue = matches target in batch, green = matches background in batch, red = ignored in batch)')
     proposal_prediction = pred_dict['rpn_prediction']['proposal_prediction']
     if top_k:
@@ -414,7 +431,7 @@ def draw_top_proposals(pred_dict, min_score=0.8, max_display=20, top_k=True):
     return image_pil
 
 
-def draw_batch_proposals(pred_dict, display='proposal'):
+def draw_batch_proposals(pred_dict, display='proposal', top_k=None, draw_all=True):
     tf.logging.debug('Batch proposals (background or foreground) (score is classification, blue = foreground, red = background, green = GT)')
     tf.logging.debug('This only displays the images on the batch (256). The number displayed is the classification score (green is > 0.5, red <= 0.5)')
     tf.logging.debug('{} are displayed'.format('Anchors' if display == 'anchor' else 'Final proposals'))
@@ -433,6 +450,23 @@ def draw_batch_proposals(pred_dict, display='proposal'):
     targets = targets[batch_idx]
 
     bboxes = decode(all_anchors, bbox_pred)
+
+    if top_k:
+        top_scores_idx = np.argsort(scores)[::-1][:top_k]
+        scores = scores[top_scores_idx]
+        bbox_pred = bbox_pred[top_scores_idx]
+        max_overlaps = max_overlaps[top_scores_idx]
+        all_anchors = all_anchors[top_scores_idx]
+        targets = targets[top_scores_idx]
+
+    if not draw_all:
+        # Only batch foreground.
+        foreground_idx = targets > 0
+        scores = scores[foreground_idx]
+        bbox_pred = bbox_pred[foreground_idx]
+        max_overlaps = max_overlaps[foreground_idx]
+        all_anchors = all_anchors[foreground_idx]
+        targets = targets[foreground_idx]
 
     image_pil, draw = get_image_draw(pred_dict)
 
@@ -586,7 +620,7 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     for anchor_prob, anchor, anchor_loss in zip(prob, anchors, loss):
         anchor = list(anchor)
         draw.rectangle(anchor, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
-        draw.text(tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(anchor_loss)[1:], font=font, fill=(0, 0, 0, 255))
+        draw.text(tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(anchor_loss), font=font, fill=(0, 0, 0, 255))
 
     gt_boxes = pred_dict['gt_boxes']
     for gt_box in gt_boxes:
@@ -595,7 +629,37 @@ def draw_rpn_cls_loss(pred_dict, foreground=True, topn=10, worst=True):
     return image_pil
 
 
-def draw_rpn_bbox_pred(pred_dict, n=5):
+def draw_rpn_pred_combined_loss(pred_dict, top_k=10):
+    target = pred_dict['rpn_prediction']['rpn_cls_target']
+    in_target = target >= 0
+    bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred'][in_target]
+    all_anchors = pred_dict['all_anchors'][in_target]
+    target = target[in_target]
+
+    in_foreground = target > 0
+
+    ce_loss = pred_dict['rpn_prediction']['cross_entropy_per_anchor'][in_foreground]
+
+    bbox_pred = bbox_pred[in_foreground]
+    all_anchors = all_anchors[in_foreground]
+
+    reg_loss = pred_dict['rpn_prediction']['reg_loss_per_anchor']
+
+    combined_loss = ce_loss + reg_loss
+
+    bbox_final = decode(all_anchors, bbox_pred)
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for bbox, loss in zip(bbox_final, combined_loss):
+        bbox = list(bbox)
+        draw.rectangle(bbox, fill=(30, 0, 240, 20), outline=(30, 0, 240, 100))
+        draw.text(tuple([bbox[0], bbox[1]]), text='{:.2f}'.format(loss), font=font, fill=(0, 0, 0, 255))
+
+    return image_pil
+
+
+def draw_rpn_bbox_pred(pred_dict, top_k=5):
     """
     For each bounding box labeled object. We wan't to display the bbox_reg_error
 
@@ -604,23 +668,21 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
     """
     logger.debug('RPN regression loss (bbox to original anchors, with the smoothL1Loss)')
     target = pred_dict['rpn_prediction']['rpn_cls_target']
-    target = target.reshape([-1, 1])
+    bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
+    all_anchors = pred_dict['all_anchors']
     # Get anchors with positive label.
-    positive_indices = np.nonzero(np.squeeze(target) > 0)[0]
-    random_indices = np.random.choice(np.arange(len(positive_indices)), n)
+    positive_indices = target > 0
+
+    bbox_pred = bbox_pred[positive_indices]
+    all_anchors = all_anchors[positive_indices]
 
     loss_per_anchor = pred_dict['rpn_prediction']['reg_loss_per_anchor']
 
-    # Get only n random to avoid overloading image.
-    positive_indices = positive_indices[random_indices]
-    loss_per_anchor = loss_per_anchor[random_indices]
-    target = target[positive_indices]
+    top_losses_idx = np.argsort(loss_per_anchor)[::-1][:top_k]
 
-    bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
-    bbox_pred = bbox_pred.reshape([-1, 4])
-    bbox_pred = bbox_pred[positive_indices]
-    all_anchors = pred_dict['all_anchors']
-    all_anchors = all_anchors[positive_indices]
+    loss_per_anchor = loss_per_anchor[top_losses_idx]
+    bbox_pred = bbox_pred[top_losses_idx]
+    all_anchors = all_anchors[top_losses_idx]
 
     bbox_final = decode(all_anchors, bbox_pred)
 
@@ -636,6 +698,25 @@ def draw_rpn_bbox_pred(pred_dict, n=5):
         draw.line([(anchor[2], anchor[1]), (bbox[2], bbox[1])], fill=(0,0,0,170), width=1)
         draw.line([(anchor[2], anchor[3]), (bbox[2], bbox[3])], fill=(0,0,0,170), width=1)
         draw.line([(anchor[0], anchor[3]), (bbox[0], bbox[3])], fill=(0,0,0,170), width=1)
+
+    return image_pil
+
+
+def draw_rpn_bbox_targets(pred_dict):
+    target = pred_dict['rpn_prediction']['rpn_cls_target']
+    bbox_target = pred_dict['rpn_prediction']['rpn_bbox_target']
+    all_anchors = pred_dict['all_anchors']
+
+    batch_foreground_idxs = target == 1
+    bbox_target = bbox_target[batch_foreground_idxs]
+    all_anchors = all_anchors[batch_foreground_idxs]
+
+    gt_boxes = decode(all_anchors, bbox_target)
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for gt_box in gt_boxes:
+        draw.rectangle(list(gt_box), fill=(30, 0, 240, 20), outline=(30, 0, 240, 100))
 
     return image_pil
 
@@ -683,16 +764,16 @@ def draw_rpn_bbox_pred_with_target(pred_dict, worst=True):
     bbox_target = bbox_target[loss_idx]
 
     bbox = decode(np.array([anchor]), np.array([bbox_pred]))[0]
-    bbox_target = decode(np.array([anchor]), np.array([bbox_target]))[0]
+    gt_box = decode(np.array([anchor]), np.array([bbox_target]))[0]
 
     image_pil, draw = get_image_draw(pred_dict)
 
     anchor = list(anchor)
     bbox = list(bbox)
-    bbox_target = list(bbox_target)
+    gt_box = list(gt_box)
     draw.rectangle(anchor, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
     draw.rectangle(bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
-    draw.rectangle(bbox_target, fill=(255, 0, 0, 20), outline=(255, 0, 0, 100))
+    draw.rectangle(gt_box, fill=(255, 0, 0, 20), outline=(255, 0, 0, 100))
 
     logger.debug('Loss is {}'.format(loss))
     return image_pil
@@ -924,6 +1005,25 @@ def draw_correct_rpn_proposals_anchors(pred_dict, top_k=5):
         )
 
     return image_pil
+
+
+def draw_rpn_correct_proposals(pred_dict):
+    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    gt_boxes = pred_dict['gt_boxes'][:, :4]
+
+    overlaps = bbox_overlap(proposals, gt_boxes)
+
+    top_overlap = overlaps.max(axis=1)
+
+    top_overlap_idx = top_overlap >= 0.95
+
+    proposals = proposals[top_overlap_idx]
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for proposal in proposals:
+        proposal = list(proposal)
+        draw.rectangle(proposal, fill=(0, 255, 50, 20), outline=(0, 255, 50, 100))
 
 
 def draw_rcnn_input_proposals(pred_dict):
