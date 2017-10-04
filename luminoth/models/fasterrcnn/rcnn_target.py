@@ -132,17 +132,29 @@ class RCNNTarget(snt.AbstractModule):
             output_shape=tf.cast(proposals_label_shape, tf.int64),
             validate_indices=False
         )
-
-        fg_condition = tf.logical_or(
-            iou_is_fg, is_best_box
-        )
         # We update proposals_label with the value in
-        # best_fg_labels_for_proposals only when the box is foreground, or it
-        # is the best proposal for a certain gt_box.
+        # best_fg_labels_for_proposals only when the box is foreground.
         proposals_label = tf.where(
-            condition=fg_condition,
+            condition=iou_is_fg,
             x=best_fg_labels_for_proposals,
             y=proposals_label
+        )
+        # Now we need to find the proposals that are the best for each of the
+        # gt_boxes. We overwrite the previous proposals_label with this
+        # because setting the best proposal for each gt_box has priority.
+        best_proposals_gt_labels = tf.sparse_to_dense(
+            sparse_indices=tf.reshape(best_proposals_idxs, [-1]),
+            sparse_values=gt_boxes[:, 4] + 1,
+            default_value=0.,
+            output_shape=tf.cast(proposals_label_shape, tf.int64),
+            validate_indices=False,
+            name="get_right_labels_for_bestboxes"
+        )
+        proposals_label = tf.where(
+            condition=is_best_box,
+            x=best_proposals_gt_labels,
+            y=proposals_label,
+            name="update_labels_for_bestbox_proposals"
         )
 
         # proposals_label now has a value in [0, num_classes + 1] for
@@ -150,6 +162,9 @@ class RCNNTarget(snt.AbstractModule):
         # But we still need to make sure we don't have a number of proposals
         # higher than minibatch_size * foreground_fraction.
         max_fg = int(self._foreground_fraction * self._minibatch_size)
+        fg_condition = tf.logical_or(
+            iou_is_fg, is_best_box
+        )
         fg_inds = tf.where(
             condition=fg_condition
         )
