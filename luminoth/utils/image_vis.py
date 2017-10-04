@@ -43,6 +43,7 @@ summaries_fn = {
                 {'worst': True}, {'worst': False}
             ],
             'draw_gt_boxes': None,
+            'draw_correct_rpn_proposals_anchors': None,
         },
         'rcnn': {
             'draw_rcnn_cls_batch': None,
@@ -876,6 +877,35 @@ def draw_object_prediction(pred_dict, topn=50):
     #     bbox = list(bbox)
     #     draw.rectangle(bbox, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
     #     draw.text(tuple([bbox[0], bbox[1]]), text='{}'.format(label), font=font, fill=(0, 0, 0, 255))
+
+    return image_pil
+
+
+def draw_correct_rpn_proposals_anchors(pred_dict, top_k=5):
+    scores = pred_dict['rpn_prediction']['rpn_cls_prob']
+    scores = scores[:, 1]
+    bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
+    all_anchors = pred_dict['all_anchors']
+
+    bboxes = decode(all_anchors, bbox_pred)
+
+    gt_overlap = bbox_overlap(bboxes, pred_dict['gt_boxes'][:, :4])
+    top_idxs = gt_overlap.max(axis=1).argsort()[::-1][:top_k]
+    bboxes = bboxes[top_idxs]
+    all_anchors = all_anchors[top_idxs]
+    scores = scores[top_idxs]
+
+    image_pil, draw = get_image_draw(pred_dict)
+
+    for bbox, anchor, score in zip(bboxes, all_anchors, scores):
+        bbox = list(bbox)
+        anchor = list(anchor)
+        draw.rectangle(bbox, fill=(0, 255, 50, 20), outline=(0, 255, 50, 100))
+        draw.rectangle(anchor, fill=(0, 50, 255, 20), outline=(0, 50, 255, 100))
+        draw.text(
+            tuple([bbox[0], bbox[1]]), text='{:.2f}'.format(score)[1:],
+            font=font, fill=(0, 0, 0, 255)
+        )
 
     return image_pil
 
