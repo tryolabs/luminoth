@@ -168,9 +168,9 @@ class RCNNTargetTest(tf.test.TestCase):
             foreground_number,
             np.floor(foreground_fraction * minibatch_size)
         )
-        self.assertLess(
+        self.assertLessEqual(
             background_number,
-            np.ceil(foreground_fraction * minibatch_size)
+            minibatch_size - foreground_number
         )
 
     def testMultipleOverlap(self):
@@ -208,15 +208,13 @@ class RCNNTargetTest(tf.test.TestCase):
 
         foreground_fraction = self._config.foreground_fraction
 
-        self.assertAlmostEqual(
+        self.assertEqual(
             foreground_number,
             np.floor(self._config.minibatch_size * foreground_fraction),
-            delta=self._equality_delta
         )
-        self.assertAlmostEqual(
+        self.assertEqual(
             background_number,
-            np.ceil(self._config.minibatch_size * foreground_fraction),
-            delta=self._equality_delta
+            self._config.minibatch_size - foreground_number,
         )
 
         foreground_idxs = np.nonzero(proposals_label >= 1)
@@ -284,7 +282,7 @@ class RCNNTargetTest(tf.test.TestCase):
         self.assertGreater(foreground_number, 0)
         self.assertLessEqual(
             background_number,
-            np.ceil(foreground_fraction * minibatch_size)
+            minibatch_size - foreground_number
         )
 
         self.assertEqual(
@@ -477,6 +475,57 @@ class RCNNTargetTest(tf.test.TestCase):
             proposals_label[proposals_label >= 0].shape[0],
             config.minibatch_size
         )
+
+    def testLabelPriority(self):
+        """Tests we're prioritizing being the best proposal for a gt_box in
+        label selection.
+        """
+
+        first_label = self._placeholder_label
+        second_label = self._placeholder_label + 1
+
+        num_classes = second_label + 10
+
+        # We need a custom config to have a larger minibatch_size.
+        config = EasyDict({
+            'foreground_threshold': 0.5,
+            'background_threshold_high': 0.5,
+            # Use zero to get all non matching as backgrounds.
+            'background_threshold_low': 0.0,
+            'foreground_fraction': 0.5,
+            # We change the minibatch_size the catch all our foregrounds
+            'minibatch_size': 64,
+        })
+        model = RCNNTarget(num_classes, config, seed=0)
+
+        gt_boxes = tf.constant([
+            [10, 10, 20, 20, first_label],
+            [10, 10, 30, 30, second_label]
+        ], dtype=tf.float32)
+
+        # Both proposals have the first gt_box as the best match, but one of
+        # them should be assigned to the label of the second gt_box anyway.
+        proposed_boxes = tf.constant([
+            [self._batch_number, 10, 10, 20, 20],
+            [self._batch_number, 12, 10, 20, 20],
+        ], dtype=tf.float32)
+
+        (proposals_label, _) = self._run_rcnn_target(
+            model,
+            gt_boxes,
+            proposed_boxes
+        )
+
+        num_first_label = len(
+            proposals_label[proposals_label == first_label + 1]
+        )
+        num_second_label = len(
+            proposals_label[proposals_label == second_label + 1]
+        )
+
+        # Assertions
+        self.assertEqual(num_first_label, 1)
+        self.assertEqual(num_second_label, 1)
 
 
 if __name__ == '__main__':
