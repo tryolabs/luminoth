@@ -25,8 +25,6 @@ class ObjectDetectionDatasetTest(tf.test.TestCase):
                 'seed': None,
             }
         })
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_augment(self, augment_config, image, bboxes):

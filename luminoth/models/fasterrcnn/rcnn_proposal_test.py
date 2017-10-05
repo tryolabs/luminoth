@@ -23,8 +23,6 @@ class RCNNProposalTest(tf.test.TestCase):
         self._equality_delta = 1e-03
 
         self._shared_model = RCNNProposal(self._num_classes, self._config)
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_rcnn_proposal(self, model, proposals, bbox_pred, cls_prob,

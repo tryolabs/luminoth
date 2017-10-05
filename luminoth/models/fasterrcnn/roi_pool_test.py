@@ -34,8 +34,6 @@ class ROIPoolingTest(tf.test.TestCase):
         #           mat_a | mat_b
         #           -------------
         #           mat_c | mat_d
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_roi_pooling(self, roi_proposals, pretrained, config):

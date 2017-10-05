@@ -36,8 +36,6 @@ class ImageTest(tf.test.TestCase):
             'min_height': 600,
             'min_width': 600,
         })
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _gen_image(self, *shape):

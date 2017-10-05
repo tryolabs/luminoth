@@ -18,8 +18,6 @@ class RPNProposalTest(tf.test.TestCase):
             'nms_threshold': 1,
             'min_size': 0,
         })
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_rpn_proposal(self, all_anchors, gt_boxes, rpn_cls_prob, config):
