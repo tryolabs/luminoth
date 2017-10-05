@@ -106,8 +106,6 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             [10, 11, 20, 21, 1],
             [19, 30, 31, 33, 1],
         ])
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_network(self):

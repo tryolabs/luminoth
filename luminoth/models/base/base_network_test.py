@@ -1,9 +1,10 @@
+import gc
 import easydict
 import numpy as np
 import tensorflow as tf
 
 from luminoth.models.base.base_network import (
-    BaseNetwork, _R_MEAN, _G_MEAN, _B_MEAN,  # VALID_ARCHITECTURES
+    BaseNetwork, _R_MEAN, _G_MEAN, _B_MEAN,  VALID_ARCHITECTURES
 )
 
 
@@ -12,8 +13,6 @@ class BaseNetworkTest(tf.test.TestCase):
         self.config = easydict.EasyDict({
             'architecture': 'vgg_16',
         })
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def testSubstractChannels(self):
@@ -36,15 +35,16 @@ class BaseNetworkTest(tf.test.TestCase):
                 np.ones([1, 2, 2, 3]) * [r, g, b]
             )
 
-    # This test failed in Travis' build environment,
-    # probably the problem is "ran out of memory".
-    # def testAllArchitectures(self):
-    #     for architecture in VALID_ARCHITECTURES:
-    #         self.config.architecture = architecture
-    #         m = BaseNetwork(self.config)
-    #         inputs = tf.placeholder(tf.float32, [1, None, None, 3])
-    #         # Should not fail.
-    #         m(inputs)
+    def testAllArchitectures(self):
+        for architecture in VALID_ARCHITECTURES:
+            self.config.architecture = architecture
+            m = BaseNetwork(self.config)
+            inputs = tf.placeholder(tf.float32, [1, None, None, 3])
+            # Should not fail.
+            m(inputs)
+            # Free up memory for Travis
+            tf.reset_default_graph()
+            gc.collect(generation=2)
 
 
 if __name__ == '__main__':

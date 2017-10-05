@@ -20,8 +20,6 @@ class RPNTargetTest(tf.test.TestCase):
             'foreground_fraction': 0.5,
             'minibatch_size': 2
         })
-
-    def tearDown(self):
         tf.reset_default_graph()
 
     def _run_rpn_target(self, anchors, gt_boxes, config):

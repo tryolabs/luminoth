@@ -7,6 +7,8 @@ from luminoth.models.fasterrcnn.rcnn import RCNN
 
 class RCNNTest(tf.test.TestCase):
     def setUp(self):
+        tf.reset_default_graph()
+
         self._num_classes = 5
         self._num_proposals = 256
         self._total_num_gt = 128
@@ -49,6 +51,7 @@ class RCNNTest(tf.test.TestCase):
             },
 
         })
+
         self._shared_model = RCNN(self._num_classes, self._config)
 
         # Declare placeholders
@@ -77,9 +80,6 @@ class RCNNTest(tf.test.TestCase):
         self._gt_boxes_ph = tf.placeholder(
             tf.float32, shape=self._gt_boxes_shape
         )
-
-    def tearDown(self):
-        tf.reset_default_graph()
 
     def _run_net_with_feed_dict(self, net, feed_dict):
         with self.test_session() as sess:
