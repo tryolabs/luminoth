@@ -155,6 +155,20 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
         click.echo(
             'Bucket name not specified. Using "{}".'.format(bucket_name))
 
+    credentials = get_credentials(service_account_json)
+    cloudcompute = cloud_service(credentials, 'compute')
+
+    regionrequest = cloudcompute.regions().get(
+        region=region, project=project_id
+    )
+    try:
+        regionrequest.execute()
+    except HttpError as err:
+        click.echo(
+            'Error: Couldn\'t find region "{}" for project "{}".'.format(
+                region, project_id))
+        return
+
     # Creates bucket for logs and models if it doesn't exist
     bucket = get_bucket(service_account_json, bucket_name)
 
@@ -183,18 +197,7 @@ def train(job_id, service_account_json, bucket_name, region, config, dataset,
         path = upload_file(bucket, base_path, config)
         args.extend(['--config', 'gs://{}/{}'.format(bucket_name, path)])
 
-    credentials = get_credentials(service_account_json)
     cloudml = cloud_service(credentials, 'ml')
-    cloudcompute = cloud_service(credentials, 'compute')
-
-    regionrequest = cloudcompute.regions().get(
-        region=region, project=project_id
-    )
-    try:
-        regionrequest.execute()
-    except HttpError as err:
-        tf.logging.error("Couldn't find region.")
-        tf.logging.error(err)
 
     training_inputs = {
         'scaleTier': scale_tier,
