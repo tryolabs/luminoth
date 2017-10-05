@@ -449,8 +449,6 @@ def draw_batch_proposals(pred_dict, display='proposal', top_k=None, draw_all=Tru
     all_anchors = all_anchors[batch_idx]
     targets = targets[batch_idx]
 
-    bboxes = decode(all_anchors, bbox_pred)
-
     if top_k:
         top_scores_idx = np.argsort(scores)[::-1][:top_k]
         scores = scores[top_scores_idx]
@@ -467,6 +465,8 @@ def draw_batch_proposals(pred_dict, display='proposal', top_k=None, draw_all=Tru
         max_overlaps = max_overlaps[foreground_idx]
         all_anchors = all_anchors[foreground_idx]
         targets = targets[foreground_idx]
+
+    bboxes = decode(all_anchors, bbox_pred)
 
     image_pil, draw = get_image_draw(pred_dict)
 
