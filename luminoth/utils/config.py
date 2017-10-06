@@ -21,23 +21,34 @@ def kwargs_to_config(kwargs):
     ))
 
 
+def is_basestring(value):
+    """
+    Checks if value is string in both Python2.7 and Python3+
+    """
+    return isinstance(value, (type(u''), str))
+
+
 def types_compatible(new_config_value, base_config_value):
+    """
+    Checks that config value types are compatible.
+    """
+    # Allow to overwrite None values (explicit or just missing)
     if base_config_value is None:
         return True
-    # Allow all None and False values.
+    # Allow overwrite all None and False values.
     # TODO: reconsider this.
     if new_config_value is None or new_config_value is False:
         return True
-    # For Python2 compatibility. We want to allow the case when both are
-    # basestrings (e.g. unicode and str).
-    if (isinstance(new_config_value, (type(u''), str))
-       and isinstance(base_config_value, (type(u''), str))):
+
+    # Checking strings is different because in Python2 we could get different
+    # types str vs unicode.
+    if is_basestring(new_config_value) and is_basestring(base_config_value):
         return True
 
     return isinstance(new_config_value, type(base_config_value))
 
 
-def merge_into(new_config, base_config):
+def merge_into(new_config, base_config, overwrite=False):
     if type(new_config) is not easydict.EasyDict:
         return
 
@@ -45,19 +56,22 @@ def merge_into(new_config, base_config):
         if value is None:
             continue
 
-        # All keys in new_config must be overwriting values in base_config
-        if key not in base_config:
-            raise KeyError('Key "{}" is not a valid config key.'.format(key))
         # Since we already have the values of base_config we check against them
-        if (not types_compatible(value, base_config[key])):
+        if not types_compatible(value, base_config.get(key)):
             raise ValueError(
                 'Incorrect type "{}" for key "{}". Must be "{}"'.format(
-                    type(value), key, type(base_config[key])))
+                    type(value), key, type(base_config.get(key))))
 
         # Recursively merge dicts
-        if type(value) is easydict.EasyDict:
+        if (isinstance(value, dict) and
+           base_config.get(key) is not None and
+           not overwrite):
+            # Something
             try:
-                merge_into(new_config[key], base_config[key])
+                merge_into(
+                    new_config[key], base_config.get(key, {}),
+                    overwrite=key == 'train'  # Overwrite train config.
+                )
             except (KeyError, ValueError) as e:
                 raise e
         else:

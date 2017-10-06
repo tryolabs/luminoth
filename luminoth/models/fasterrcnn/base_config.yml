@@ -41,16 +41,16 @@ train:
   # Learning rate config.
   learning_rate:
     # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
-    decay_method: piecewise_constant
-    boundaries: [50000, 100000, 150000]
-    values: [0.001, 0.0005, 0.0003, 0.0001]
+    # You can define different decay methods using `decay_method` and defining all the necessary arguments.
+    decay_method:
+    learning_rate: 0.001
 
   # Optimizer config
   optimizer:
     # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
-    type: adam
+    type: momentum
     # any options are passed directly to the optimizer as kwarg.
-    # momentum: 0.9
+    momentum: 0.9
 
   # Number of epochs (complete dataset batches) to run
   num_epochs: 1000
@@ -106,11 +106,12 @@ base_network:
   # Should we download weights if not available
   download: True
   # Which endpoint layer to use as feature map for network
-  endpoint: conv5/conv5_1
+  endpoint:
   # Is trainable, how many layers from the endpoint are we training
-  finetune_num_layers: 3
-  # Regularization
-  weight_decay: 0.0005
+  finetune_num_layers:
+  arg_scope:
+    # Regularization
+    weight_decay: 0.0005
 
 loss:
   # Loss weights for calculating the total loss
