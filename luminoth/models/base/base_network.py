@@ -5,7 +5,7 @@ import functools
 from tensorflow.contrib.slim.nets import (
     vgg, resnet_v2, resnet_v1
 )
-from tensorflow.contrib.slim import arg_scope
+import tensorflow.contrib.slim as slim
 
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
 
@@ -85,7 +85,7 @@ class BaseNetwork(snt.AbstractModule):
 
     def _build(self, inputs, is_training=True):
         inputs = self.preprocess(inputs)
-        with arg_scope(self.arg_scope):
+        with slim.arg_scope(self.arg_scope):
             net, end_points = self.network(is_training=is_training)(inputs)
 
             return {
