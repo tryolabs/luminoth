@@ -7,11 +7,11 @@ python:
   - '3.6'
 install: pip install tox-travis
 script: tox
-notifications:
-  slack:
-    rooms:
-      secure: piy/NEf36gPZqw4nTAhs6dZ7Af2ozOt47RdnTSaed3tkwMfXJ+M3nccuCP4UfwmBP7fRRq2yfhLWCKIZagsFGAxhNZ/mSYgRdXfNUUofOWIJdR4+tQuqhxwgQkTfJjAWlYA+gA+GxrOnSFQ3ACRnfd/dUfthokqq7CWOzQtYYHGBSA1rAxuJU1x2qWbl+1tXa7BUJXCsR8ONz7vWDna4Znk+wixG3enOdd2pdrP2dqp9g0eUztySIT2zdjA2CB4iFIIqQLJ5fz3ab8Vpk4H9+JECB7lE8+SJVS9ZbBu8vuD9yZARBJGCPyD8HcwHTNrvlTu/V9p9W+6OeNCUXamZFuCkMHIwLgDxUntG/IyCptJqtG1n/7dOxikY1kfAIIcwMsmTQDej3xXHny1wyGMztD84w23KhNEPMJP7HsLVHmt26TIiT/yFeIOzGnh2ZPenMwtn7ti8uiweEpAH2G3tmH6bShv8myXEp++RcblSNeowHpyFhRsoevuqpT+dd+C+as2Y1DWBSFqvrfCro7AKloErJHtS3GXUiAf1Fi+Vys/sj+PLQFBh88GR5OY0lDC1cTfA4iy3Vy0IICRIylkQ4W0jfbgKF6B40syA6rM0mlu1v15P9oJvI+P5N9/G8jhUA54Ku3Xxmd6qpzlFvx2ivxmPBfHNc7g7MHJZFlzlzvk=
-    on_success: change
+# notifications:
+#   slack:
+#     rooms:
+#       secure: piy/NEf36gPZqw4nTAhs6dZ7Af2ozOt47RdnTSaed3tkwMfXJ+M3nccuCP4UfwmBP7fRRq2yfhLWCKIZagsFGAxhNZ/mSYgRdXfNUUofOWIJdR4+tQuqhxwgQkTfJjAWlYA+gA+GxrOnSFQ3ACRnfd/dUfthokqq7CWOzQtYYHGBSA1rAxuJU1x2qWbl+1tXa7BUJXCsR8ONz7vWDna4Znk+wixG3enOdd2pdrP2dqp9g0eUztySIT2zdjA2CB4iFIIqQLJ5fz3ab8Vpk4H9+JECB7lE8+SJVS9ZbBu8vuD9yZARBJGCPyD8HcwHTNrvlTu/V9p9W+6OeNCUXamZFuCkMHIwLgDxUntG/IyCptJqtG1n/7dOxikY1kfAIIcwMsmTQDej3xXHny1wyGMztD84w23KhNEPMJP7HsLVHmt26TIiT/yFeIOzGnh2ZPenMwtn7ti8uiweEpAH2G3tmH6bShv8myXEp++RcblSNeowHpyFhRsoevuqpT+dd+C+as2Y1DWBSFqvrfCro7AKloErJHtS3GXUiAf1Fi+Vys/sj+PLQFBh88GR5OY0lDC1cTfA4iy3Vy0IICRIylkQ4W0jfbgKF6B40syA6rM0mlu1v15P9oJvI+P5N9/G8jhUA54Ku3Xxmd6qpzlFvx2ivxmPBfHNc7g7MHJZFlzlzvk=
+#     on_success: change
 
 deploy:
   # Test PyPI in every change to master
