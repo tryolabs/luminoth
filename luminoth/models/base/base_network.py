@@ -29,42 +29,42 @@ VALID_ARCHITECTURES = set([
 class BaseNetwork(snt.AbstractModule):
     def __init__(self, config, name='base_network'):
         super(BaseNetwork, self).__init__(name=name)
-        if config.architecture not in VALID_ARCHITECTURES:
+        if config.get('architecture') not in VALID_ARCHITECTURES:
             raise ValueError('Invalid architecture "{}"'.format(
-                config.architecture
+                config.get('architecture')
             ))
 
-        self._architecture = config.architecture
+        self._architecture = config.get('architecture')
         self._config = config
 
     @property
     def arg_scope(self):
-        kwargs = {}
-        weight_decay = self._config.get('weight_decay')
-        if weight_decay is not None:
-            kwargs['weight_decay'] = weight_decay
+        arg_scope_kwargs = self._config.get('arg_scope', {})
 
         if self.vgg_type:
-            return vgg.vgg_arg_scope(**kwargs)
+            return vgg.vgg_arg_scope(**arg_scope_kwargs)
         elif self.resnet_type:
             # It's the same argscope for v1 or v2.
-            return resnet_v2.resnet_utils.resnet_arg_scope(**kwargs)
+            return resnet_v2.resnet_utils.resnet_arg_scope(**arg_scope_kwargs)
 
     def network(self, is_training=True):
         if self.vgg_type:
             return functools.partial(
-                getattr(vgg, self._architecture), spatial_squeeze=False,
-                is_training=is_training
+                getattr(vgg, self._architecture),
+                is_training=is_training,
+                spatial_squeeze=self._config.get('spatial_squeeze', False)
             )
         elif self.resnet_v1_type:
             return functools.partial(
                 getattr(resnet_v1, self._architecture),
-                is_training=is_training
+                is_training=is_training,
+                num_classes=self._config.get('num_classes')
             )
         elif self.resnet_v2_type:
             return functools.partial(
                 getattr(resnet_v2, self._architecture),
-                is_training=is_training
+                is_training=is_training,
+                num_classes=self._config.get('num_classes')
             )
 
     @property
@@ -94,10 +94,8 @@ class BaseNetwork(snt.AbstractModule):
             }
 
     def preprocess(self, inputs):
-        if self.vgg_type:
+        if self.vgg_type or self.resnet_type:
             inputs = self._substract_channels(inputs)
-        elif self.resnet_type:
-            inputs = self._normalize(inputs)
 
         return inputs
 
@@ -148,10 +146,11 @@ class BaseNetwork(snt.AbstractModule):
         Returns:
             load_op: Load weights operation or no_op.
         """
-        if self._config.weights is None and not self._config.download:
+        if self._config.get('weights') is None and \
+           not self._config.get('download'):
             return tf.no_op(name='not_loading_base_network')
 
-        self._config.weights = get_checkpoint_file(self._architecture)
+        self._config['weights'] = get_checkpoint_file(self._architecture)
 
         module_variables = snt.get_variables_in_module(
             self, tf.GraphKeys.MODEL_VARIABLES
@@ -164,7 +163,7 @@ class BaseNetwork(snt.AbstractModule):
         for var, var_name in variables:
             checkpoint_var_name = var_name[variable_scope_len:]
             var_value = tf.contrib.framework.load_variable(
-                self._config.weights, checkpoint_var_name
+                self._config['weights'], checkpoint_var_name
             )
             load_variables.append(
                 tf.assign(var, var_value)
@@ -173,7 +172,7 @@ class BaseNetwork(snt.AbstractModule):
         tf.logging.info(
             'Constructing op to load {} variables from pretrained '
             'checkpoint {}'.format(
-                len(load_variables), self._config.weights
+                len(load_variables), self._config['weights']
             ))
 
         load_op = tf.group(*load_variables)
