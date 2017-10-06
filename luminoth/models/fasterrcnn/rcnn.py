@@ -376,8 +376,6 @@ class RCNN(snt.AbstractModule):
                 )
 
             return {
-                'rcnn_cls_loss': tf.reduce_mean(
-                    cross_entropy_per_proposal
-                ),
-                'rcnn_reg_loss': tf.reduce_mean(reg_loss_per_proposal),
+                'rcnn_cls_loss': tf.reduce_sum(cross_entropy_per_proposal),
+                'rcnn_reg_loss': tf.reduce_sum(reg_loss_per_proposal),
             }
