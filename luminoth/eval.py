@@ -52,7 +52,7 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
         tf.set_random_seed(config.train.seed)
 
     # Set pretrained as not training
-    config.pretrained.trainable = False
+    config.base_network.trainable = False
 
     model = model_cls(config)
     dataset = TFRecordDataset(config)
