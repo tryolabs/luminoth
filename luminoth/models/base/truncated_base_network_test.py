@@ -20,9 +20,10 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
             self.config.architecture = architecture
             self.config.endpoint = endpoint
             model = TruncatedBaseNetwork(self.config)
-            image = tf.placeholder(tf.float32, [1, None, None, 3])
+            image = tf.placeholder(tf.float32, [1, 320, 320, 3])
             # This should not fail.
-            model(image)
+            out = model(image)
+            self.assertEqual(out.get_shape()[:3], (1, 20, 20))
 
             # Free up memory for travis
             tf.reset_default_graph()
