@@ -1,10 +1,13 @@
 import click
 
 from flask import Flask, jsonify, request, render_template
-from luminoth.utils.predict import get_prediction
+from luminoth.models import get_model
+from luminoth.utils.predict import get_prediction, detect
 from PIL import Image
 
 app = Flask(__name__)
+
+LOADED_MODELS = {}
 
 
 def get_image():
@@ -30,11 +33,24 @@ def predict(model_name):
     if image_array is None:
         return jsonify(error='Missing image.')
 
-    pred = get_prediction(
-        model_name, image_array, app.config['checkpoint_file'],
-        app.config['classes_file']
-    )
+    if model_name in LOADED_MODELS:
+        image_tensor, output, session = LOADED_MODELS[model_name]
+        model_class = get_model(model_name)
+        pred = detect(
+            session, output, image_tensor, model_class,
+            app.config['checkpoint_file'], app.config['classes_file'],
+            image_array
+        )
 
+    else:
+        pred = get_prediction(
+            model_name, image_array, app.config['checkpoint_file'],
+            app.config['classes_file']
+        )
+        LOADED_MODELS[model_name] = (pred['image_tensor'], pred['output'],
+                                     pred['session'])
+
+    del pred['image_tensor'], pred['output'], pred['session']
     return jsonify(pred)
 
 

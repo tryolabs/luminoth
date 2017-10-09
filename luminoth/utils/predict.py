@@ -51,6 +51,12 @@ def get_prediction(model_name, image, checkpoint_file=None, classes_file=None):
             )
             session.run(init_op)
 
+    return detect(session, output, image_tensor, model_class, checkpoint_file,
+                  classes_file, image)
+
+
+def detect(session, output, image_tensor, model_class, checkpoint_file,
+           classes_file, image):
     classification_prediction = output['classification_prediction']
     objects_tf = classification_prediction['objects']
     objects_labels_tf = classification_prediction['labels']
@@ -84,4 +90,7 @@ def get_prediction(model_name, image, checkpoint_file=None, classes_file=None):
         'objects_labels_prob': objects_labels_prob.tolist(),
         'inference_time': end_time - start_time,
         'scale_factor': scale_factor,
+        'image_tensor': image_tensor,
+        'output': output,
+        'session': session
     }

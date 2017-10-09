@@ -1,4 +1,5 @@
 import click
+import tensorflow as tf
 import os
 
 from luminoth.utils.predict import get_prediction
@@ -13,7 +14,7 @@ def detect(image_path, checkpoint_file, classes_file):
     image = Image.open(image_path)
     results = get_prediction(
         'fasterrcnn', image, checkpoint_file, classes_file)
-    print('{} objects detected'.format(len(results['objects'])))
+    tf.logging.info('{} objects detected'.format(len(results['objects'])))
 
     # Draw bounding boxes
     draw = ImageDraw.Draw(image)
@@ -32,5 +33,5 @@ def detect(image_path, checkpoint_file, classes_file):
         save_path = checkpoint_file + '_pred_' + os.path.basename(image_path)
     else:
         save_path = 'pred_' + os.path.basename(image_path)
-    print('Saving image with bounding boxes in {}'.format(save_path))
+    tf.logging.info('Saving image with bounding boxes in {}'.format(save_path))
     image.save(save_path)
