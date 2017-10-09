@@ -18,9 +18,9 @@ from luminoth.utils.training import (
 
 def run(model_type, dataset_type, config_file, override_params, target='',
         cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        get_dataset=None, **kwargs):
+        get_dataset_fn=get_dataset, get_model_fn=get_model, **kwargs):
 
-    model_class = get_model(model_type)
+    model_class = get_model_fn(model_type)
 
     config = get_model_config(
         model_class.base_config, config_file, override_params, **kwargs
@@ -47,7 +47,7 @@ def run(model_type, dataset_type, config_file, override_params, target='',
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
 
-        dataset_class = get_dataset(dataset_type)
+        dataset_class = get_dataset_fn(dataset_type)
         dataset = dataset_class(config)
         train_dataset = dataset()
 
@@ -232,7 +232,7 @@ def train(*args, **kwargs):
 
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
-        return run(*args, get_dataset=get_dataset, **kwargs)
+        return run(*args, **kwargs)
 
     cluster_spec = tf.train.ClusterSpec(cluster)
     server = tf.train.Server(
@@ -250,7 +250,7 @@ def train(*args, **kwargs):
             *args,
             target=server.target, cluster_spec=cluster_spec,
             is_chief=is_chief, job_name=job_name, task_index=task_index,
-            get_dataset=get_dataset, **kwargs
+            **kwargs
         )
 
 

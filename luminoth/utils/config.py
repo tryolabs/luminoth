@@ -143,5 +143,5 @@ def get_model_config(base_config, config_file, override_params, **kwargs):
     if override_params:
         override_config = parse_override(override_params)
         config = merge_into(override_config, config)
-    print(config)
+
     return config
