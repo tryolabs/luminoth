@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 from easydict import EasyDict
-from luminoth.models.fasterrcnn.network import FasterRCNN
+from luminoth.models.fasterrcnn import FasterRCNN
 from luminoth.utils.bbox_transform import clip_boxes
 
 

@@ -1,1 +1,1 @@
-from .network import FasterRCNN  # noqa
+from .fasterrcnn import FasterRCNN  # noqa
