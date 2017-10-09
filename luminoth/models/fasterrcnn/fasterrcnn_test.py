@@ -12,106 +12,152 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         super(FasterRCNNNetworkTest, self).setUp()
         # Setup
         self.config = EasyDict({
-            'network': {
-                'num_classes': 20,
-                'with_rcnn': True
-            },
             'train': {
                 'debug': True,
                 'seed': None,
             },
-            'anchors': {
-                'base_size': 256,
-                'scales': [0.5, 1, 2],
-                'ratios': [0.5, 1, 2],
-                'stride': 16
-            },
-            'loss': {
-                'rpn_cls_loss_weight': 1.0,
-                'rpn_reg_loss_weights': 2.0,
-                'rcnn_cls_loss_weight': 1.0,
-                'rcnn_reg_loss_weights': 2.0,
-            },
-            'base_network': {
-                'architecture': 'vgg_16',
-                'trainable': True,
-                'endpoint': 'conv5/conv5_1',
-                'download': False,
-                'finetune_num_layers': 3,
-                'weight_decay': 0.0005,
-            },
-            'rcnn': {
-                'enabled': True,
-                'layer_sizes': [4096, 4096],
-                'dropout_keep_prop': 1.0,
-                'activation_function': 'relu6',
-                'l2_regularization_scale': 0.0005,
-                'use_mean': False,
-                'initializer': {
-                    'type': 'variance_scaling_initializer',
-                    'factor': 1.0,
-                    'uniform': 'True',
-                    'mode': 'FAN_AVG'
+            'model': {
+                'anchors': {
+                    'base_size': 256,
+                    'scales': [0.5, 1, 2],
+                    'ratios': [0.5, 1, 2],
+                    'stride': 16
                 },
-                'roi': {
-                    'pooling_mode': 'crop',
-                    'pooled_width': 7,
-                    'pooled_height': 7,
-                    'padding': 'VALID'
+                'loss': {
+                    'rpn_cls_loss_weight': 1.0,
+                    'rpn_reg_loss_weights': 2.0,
+                    'rcnn_cls_loss_weight': 1.0,
+                    'rcnn_reg_loss_weights': 2.0,
                 },
-                'proposals': {
-                    'class_max_detections': 100,
-                    'class_nms_threshold': 0.6,
-                    'total_max_detections': 300,
-                    'min_prob_threshold': 0.0,
+                'base_network': {
+                    'architecture': 'vgg_16',
+                    'trainable': True,
+                    'endpoint': 'conv5/conv5_1',
+                    'download': False,
+                    'finetune_num_layers': 3,
+                    'weight_decay': 0.0005,
                 },
-                'target': {
-                    'foreground_fraction': 0.25,
-                    'minibatch_size': 64,
-                    'foreground_threshold': 0.5,
-                    'background_threshold_high': 0.5,
-                    'background_threshold_low': 0.1,
+                'rcnn': {
+                    'enabled': True,
+                    'layer_sizes': [4096, 4096],
+                    'dropout_keep_prop': 1.0,
+                    'activation_function': 'relu6',
+                    'l2_regularization_scale': 0.0005,
+                    'use_mean': False,
+                    'initializer': {
+                        'type': 'variance_scaling_initializer',
+                        'factor': 1.0,
+                        'uniform': 'True',
+                        'mode': 'FAN_AVG'
+                    },
+                    'roi': {
+                        'pooling_mode': 'crop',
+                        'pooled_width': 7,
+                        'pooled_height': 7,
+                        'padding': 'VALID'
+                    },
+                    'proposals': {
+                        'class_max_detections': 100,
+                        'class_nms_threshold': 0.6,
+                        'total_max_detections': 300,
+                        'min_prob_threshold': 0.0,
+                    },
+                    'target': {
+                        'foreground_fraction': 0.25,
+                        'minibatch_size': 64,
+                        'foreground_threshold': 0.5,
+                        'background_threshold_high': 0.5,
+                        'background_threshold_low': 0.1,
+                    }
+                 },
+                'rpn': {
+                    'num_channels': 512,
+                    'kernel_shape': [3, 3],
+                    'rpn_initializer': {
+                        'type': 'variance_scaling_initializer',
+                        'factor': 1.0,
+                        'mode': 'FAN_AVG',
+                        'uniform': True,
+                    },
+                    'anchors': {
+                        'base_size': 256,
+                        'scales': [0.5, 1, 2],
+                        'ratios': [0.5, 1, 2],
+                        'stride': 16
+                    },
+                    'loss': {
+                        'rpn_cls_loss_weight': 1.0,
+                        'rpn_reg_loss_weights': 2.0,
+                        'rcnn_cls_loss_weight': 1.0,
+                        'rcnn_reg_loss_weights': 2.0,
+                    },
+                    'base_network': {
+                        'architecture': 'vgg_16',
+                        'trainable': True,
+                        'endpoint': 'conv5/conv5_1',
+                        'download': False,
+                        'finetune_num_layers': 3,
+                        'weight_decay': 0.0005,
+                    },
+                    'rcnn': {
+                        'enabled': True,
+                        'layer_sizes': [4096, 4096],
+                        'dropout_keep_prop': 1.0,
+                        'activation_function': 'relu6',
+                        'l2_regularization_scale': 0.0005,
+                        'initializer': {
+                            'type': 'variance_scaling_initializer',
+                            'factor': 1.0,
+                            'uniform': 'True',
+                            'mode': 'FAN_AVG'
+                        },
+                        'roi': {
+                            'pooling_mode': 'crop',
+                            'pooled_width': 7,
+                            'pooled_height': 7,
+                            'padding': 'VALID'
+                        },
+                        'proposals': {
+                          'class_max_detections': 100,
+                          'class_nms_threshold': 0.6,
+                          'total_max_detections': 300,
+                        },
+                        'target': {
+                          'foreground_fraction': 0.25,
+                          'minibatch_size': 64,
+                          'foreground_threshold': 0.5,
+                          'background_threshold_high': 0.5,
+                          'background_threshold_low': 0.1,
+                        }
+                     },
+                    'rpn': {
+                       'num_channels': 512,
+                       'kernel_shape': [3, 3],
+                       'initializer': {
+                         'type': 'truncated_normal_initializer',
+                         'mean': 0.0,
+                         'stddev': 0.01
+                       },
+                       'activation_function': 'relu6',
+                       'l2_regularization_scale': 0.0005,
+                       'proposals': {
+                         'pre_nms_top_n': 12000,
+                         'post_nms_top_n': 2000,
+                         'nms_threshold': 0.6,
+                         'min_size': 0
+                       },
+                       'target': {
+                         'allowed_border': 0,
+                         'clobber_positives': False,
+                         'foreground_threshold': 0.7,
+                         'background_threshold_high': 0.3,
+                         'background_threshold_low': 0.,
+                         'foreground_fraction': 0.5,
+                         'minibatch_size': 256,
+                       }
+                    }
                 }
-             },
-            'rpn': {
-                'num_channels': 512,
-                'kernel_shape': [3, 3],
-                'rpn_initializer': {
-                    'type': 'variance_scaling_initializer',
-                    'factor': 1.0,
-                    'mode': 'FAN_AVG',
-                    'uniform': True,
-                },
-                'cls_initializer': {
-                    'type': 'truncated_normal_initializer',
-                    'mean': 0.0,
-                    'stddev': 0.01,
-                },
-                'bbox_initializer': {
-                    'type': 'truncated_normal_initializer',
-                    'mean': 0.0,
-                    'stddev': 0.01,
-                },
-                'activation_function': 'relu6',
-                'l2_regularization_scale': 0.0005,
-                'proposals': {
-                    'pre_nms_top_n': 12000,
-                    'post_nms_top_n': 2000,
-                    'nms_threshold': 0.6,
-                    'min_size': 0,
-                    'clip_after_nms': False,
-                    'filter_outside_anchors': False,
-                },
-                'target': {
-                    'allowed_border': 0,
-                    'clobber_positives': False,
-                    'foreground_threshold': 0.7,
-                    'background_threshold_high': 0.3,
-                    'background_threshold_low': 0.,
-                    'foreground_fraction': 0.5,
-                    'minibatch_size': 256,
-                }
-             }
+            }
         })
         self.image_size = (600, 800)
         self.image = np.random.randint(low=0, high=255, size=(1, 600, 800, 3))
@@ -177,7 +223,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         # Check that every object label is less or equal than 'num_classes'
         self.assertTrue(
             np.less_equal(class_prediction['labels'],
-                          self.config.network.num_classes).all()
+                          self.config.model.network.num_classes).all()
         )
 
         # Check that the sum of class probabilities is 1
@@ -218,10 +264,10 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
 
         feature_map = np.random.randint(low=0, high=255, size=(1, 32, 32, 1))
         config = self.config
-        config.anchors.base_size = 16
-        config.anchors.scales = [0.5, 1, 2]
-        config.anchors.ratios = [0.5, 1, 2]
-        config.anchors.stride = 1  # image is 32 x 32
+        config.model.anchors.base_size = 16
+        config.model.anchors.scales = [0.5, 1, 2]
+        config.model.anchors.ratios = [0.5, 1, 2]
+        config.model.anchors.stride = 1  # image is 32 x 32
 
         anchors = self._gen_anchors(config, feature_map.shape)
 
@@ -257,11 +303,12 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         self.assertEqual(np.min(anchors[:, 3]), 2)
         self.assertEqual(np.max(anchors[:, 3]), 53)
 
+        stride = config.model.anchors.stride
         # Check values are sequential.
-        self._assert_sequential_values(anchors[:, 0], config.anchors.stride)
-        self._assert_sequential_values(anchors[:, 1], config.anchors.stride)
-        self._assert_sequential_values(anchors[:, 2], config.anchors.stride)
-        self._assert_sequential_values(anchors[:, 3], config.anchors.stride)
+        self._assert_sequential_values(anchors[:, 0], stride)
+        self._assert_sequential_values(anchors[:, 1], stride)
+        self._assert_sequential_values(anchors[:, 2], stride)
+        self._assert_sequential_values(anchors[:, 3], stride)
 
     def _assert_sequential_values(self, values, delta=1):
         unique_values = np.unique(values)
