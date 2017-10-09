@@ -48,6 +48,8 @@ def download_checkpoint(network, network_filename, checkpoint_path):
 
 
 def get_checkpoint_file(network, checkpoint_path=DEFAULT_PATH):
+    if checkpoint_path is None:
+        checkpoint_path = DEFAULT_PATH
     checkpoint_path = get_checkpoint_path(path=checkpoint_path)
     files = tf.gfile.ListDirectory(checkpoint_path)
     network_filename = '{}.ckpt'.format(network)

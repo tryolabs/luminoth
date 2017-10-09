@@ -17,17 +17,23 @@ from luminoth.utils.training import (
 )
 
 
-def run(model_type, dataset_type, config_file, override_params, target='',
-        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        get_dataset_fn=get_dataset, get_model_fn=get_model, **kwargs):
+def run(config_files, override_params, target='', cluster_spec=None,
+        is_chief=True, job_name=None, task_index=None):
 
+    custom_config = load_config(
+        config_files, overwrite=True, warn_overwrite=True)
+    # If the config file is empty, our config will be the base_config for the
+    # default model.
+    custom_config_model = custom_config.get('model', {})
+    model_type = custom_config_model.get('type', DEFAULT_MODEL)
+    
     model_class = get_model_fn(model_type)
 
     config = get_model_config(
         model_class.base_config, config_file, override_params, **kwargs
     )
 
-    if config.train.seed is not None:
+    if config.train.get('seed') is not None:
         tf.set_random_seed(config.train.seed)
 
     log_prefix = '[{}-{}] - '.format(job_name, task_index) \
@@ -201,22 +207,9 @@ def run(model_type, dataset_type, config_file, override_params, target='',
 
 
 @click.command(help='Train models')
-@click.option('model_type', '--model', required=True, default='fasterrcnn')  # noqa
-@click.option('dataset_type', '--dataset', required=True, default='tfrecord')  # noqa
-@click.option('config_file', '--config', '-c', help='Config to use.')
+@click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('--seed', type=float, help='Global seed value for random operations.')  # noqa
-@click.option('--checkpoint-file', help='Weight checkpoint to resuming training from.')  # noqa
-@click.option('--ignore-scope', help='Used to ignore variables when loading from checkpoint.')  # noqa
-@click.option('--tf-debug', is_flag=True, help='Create debugging Tensorflow session with tfdb.')  # noqa
-@click.option('--debug', is_flag=True, help='Debug mode (DEBUG log level and intermediate variables are returned)')  # noqa
-@click.option('--run-name', type=str, help='Run name used to log in Tensorboard and isolate checkpoints.')  # noqa
-@click.option('--no-log/--log', default=False, help='Save or don\'t summary logs.')  # noqa
-@click.option('--random-shuffle/--fifo', default=True, help='Ingest data from dataset in random order.')  # noqa
-@click.option('--save-timeline', is_flag=True, help='Save timeline of execution (debug mode must be activated).')  # noqa
-@click.option('--full-trace', is_flag=True, help='Run graph session with FULL_TRACE config (for memory and running time debugging)')  # noqa
-@click.option('--job-dir', type=str, help='Directory where to save logs and checkpoints from training.')  # noqa
-def train(*args, **kwargs):
+def train(config_files, override_params):
     """
     Parse TF_CONFIG to cluster_spec and call run() function
     """
@@ -236,7 +229,7 @@ def train(*args, **kwargs):
 
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
-        return run(*args, **kwargs)
+        return run(config_files, override_params)
 
     cluster_spec = tf.train.ClusterSpec(cluster)
     server = tf.train.Server(
@@ -251,7 +244,7 @@ def train(*args, **kwargs):
     elif job_name in ['master', 'worker']:
         is_chief = job_name == 'master'
         return run(
-            *args,
+            config_files=config_files, override_params=override_params,
             target=server.target, cluster_spec=cluster_spec,
             is_chief=is_chief, job_name=job_name, task_index=task_index,
             **kwargs

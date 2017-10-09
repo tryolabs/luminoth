@@ -3,14 +3,27 @@ import os.path
 import tensorflow as tf
 import yaml
 
+from easydict import EasyDict
 
-def load_config(filename):
-    return easydict.EasyDict(yaml.load(tf.gfile.GFile(filename)))
+
+def load_config(filenames, overwrite=False, warn_overwrite=False):
+    """Load config from a list of files.
+    """
+    if len(filenames) <= 0:
+        tf.logging.error("Tried to load 0 config files.")
+    config = EasyDict({})
+    for filename in filenames:
+        new_config = easydict.EasyDict(yaml.load(tf.gfile.GFile(filename)))
+        config = merge_into(
+            new_config,
+            config, overwrite=overwrite, warn_overwrite=warn_overwrite
+        )
+    return config
 
 
 def get_base_config(path, base_config_filename='base_config.yml'):
     config_path = os.path.join(os.path.dirname(path), base_config_filename)
-    return load_config(config_path)
+    return load_config([config_path])
 
 
 def kwargs_to_config(kwargs):
@@ -48,12 +61,17 @@ def types_compatible(new_config_value, base_config_value):
     return isinstance(new_config_value, type(base_config_value))
 
 
-def merge_into(new_config, base_config, overwrite=False):
+def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
+    """Merge one easy dict into another.
+
+    If `overwrite` is set to true, conflicting keys will get their values from
+    new_config. Else, the value will be taken from base_config.
+    """
     if type(new_config) is not easydict.EasyDict:
         return
 
     for key, value in new_config.items():
-        if value is None:
+        if value is None and base_config.get(key) is not None:
             continue
 
         # Since we already have the values of base_config we check against them
@@ -63,19 +81,17 @@ def merge_into(new_config, base_config, overwrite=False):
                     type(value), key, type(base_config.get(key))))
 
         # Recursively merge dicts
-        if (isinstance(value, dict) and
-           base_config.get(key) is not None and
-           not overwrite):
-            # Something
-            try:
-                merge_into(
-                    new_config[key], base_config.get(key, {}),
-                    overwrite=key == 'train'  # Overwrite train config.
-                )
-            except (KeyError, ValueError) as e:
-                raise e
+        if isinstance(value, dict):
+            base_config[key] = merge_into(
+                new_config[key], base_config.get(key, EasyDict({})),
+                overwrite=overwrite, warn_overwrite=warn_overwrite
+            )
         else:
-            base_config[key] = value
+            if (base_config.get(key) is None
+               or overwrite):
+                base_config[key] = value
+                if warn_overwrite:
+                    tf.logging.warn('Overwrote key "{}"'.format(key))
 
     return base_config
 
@@ -128,20 +144,18 @@ def parse_config_value(value):
     return value
 
 
-def get_model_config(base_config, config_file, override_params, **kwargs):
+def get_model_config(base_config, custom_config, override_params, **kwargs):
     config = easydict.EasyDict(base_config.copy())
 
     # Load train extra options
     config.train = merge_into(kwargs_to_config(kwargs), config.train)
 
-    if config_file:
+    if custom_config:
         # If we have a custom config file overwriting default settings
         # then we merge those values to the base_config.
-        custom_config = load_config(config_file)
         config = merge_into(custom_config, config)
-
     if override_params:
         override_config = parse_override(override_params)
-        config = merge_into(override_config, config)
+        config = merge_into(override_config, config, overwrite=True)
 
     return config

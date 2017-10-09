@@ -5,34 +5,40 @@ import tensorflow as tf
 import time
 
 from luminoth.datasets import TFRecordDataset
-from luminoth.models import get_model
+from luminoth.models import (
+    get_model, DEFAULT_MODEL
+)
 from luminoth.utils.config import (
-    get_model_config
+    get_model_config, load_config
 )
 from luminoth.utils.bbox_overlap import bbox_overlap
 from luminoth.utils.image_vis import image_vis_summaries
 
 
 @click.command(help='Evaluate trained (or training) models')
-@click.option('model_type', '--model', required=True, default='fasterrcnn')
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
-@click.option('config_file', '--config', '-c', help='Config to use.')  # noqa
+@click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
 @click.option('--job-dir', required=True, help='Directory from where to read saved models and write evaluation logs.')  # noqa
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--image-vis', is_flag=True, default=False, help='Display images in TensorBoard.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
-def evaluate(model_type, dataset_split, config_file, job_dir, watch,
+def evaluate(dataset_split, config_files, job_dir, watch,
              from_global_step, override_params, image_vis, files_per_class):
     """
     Evaluate models using dataset.
     """
-    model_cls = get_model(model_type)
-    config = model_cls.base_config
+    custom_config = load_config(config_files)
+    # If the config file is empty, our config will be the base_config for the
+    # default model.
+    custom_config_model = custom_config.get('model', {})
+    model_type = custom_config_model.get('type', DEFAULT_MODEL)
+
+    model_class = get_model(model_type)
 
     config = get_model_config(
-        model_cls.base_config, config_file, override_params
+        model_class.base_config, custom_config, override_params,
     )
 
     config.train.job_dir = job_dir or config.train.job_dir
@@ -57,9 +63,9 @@ def evaluate(model_type, dataset_split, config_file, job_dir, watch,
         tf.set_random_seed(config.train.seed)
 
     # Set pretrained as not training
-    config.base_network.trainable = False
+    config.model.base_network.trainable = False
 
-    model = model_cls(config)
+    model = model_class(config)
     dataset = TFRecordDataset(config)
     train_dataset = dataset()
 
