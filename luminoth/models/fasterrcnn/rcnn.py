@@ -172,7 +172,7 @@ class RCNN(snt.AbstractModule):
         if self._debug:
             prediction_dict['_debug']['flatten_net'] = net
 
-        # After flattening we are lef with a
+        # After flattening we are left with a
         # (num_proposals, pool_height * pool_width * 512) Tensor.
         # The first dimension works as batch size when applied to snt.Linear.
         for i, layer in enumerate(self._layers):

@@ -8,40 +8,42 @@ from luminoth.utils.bbox_transform_tf import encode as encode_tf
 class RPNTarget(snt.AbstractModule):
     """RPNTarget: Get RPN's classification and regression targets.
 
-    RPNTarget is responsable for calculating the correct values for both
-    classification and regression problems. It is also responsable for defining
-    which anchors and target values are going to be used for the RPN minibatch.
+    RPNTarget is responsible for:
+      * calculating the correct values for both classification and regression
+        problems.
+      * defining which anchors and target values are going to be used for the
+        RPN minibatch.
 
-    For calculating the correct values for classification, being classification
-    the question of "does this anchor refer to an object?" returning an
-    objectiveness score, we calculate the intersection over union (IoU) between
-    the anchors boxes and the ground truth boxes and assign values. When the
+    For calculating the correct values for classification (ie. the question of
+    "does this anchor refer to an object?") and returning an objectness score,
+    we calculate the intersection over union (IoU) between the anchors boxes
+    and the ground truth boxes, and use this to categorize anchors. When the
     intersection between anchors and groundtruth is above a threshold, we can
-    mark the anchor as an object or as being foreground.
-    In case of not having any intersection or having a low IoU value, then we
-    say that the anchor refers to background.
+    mark the anchor as an object or as being foreground. In case of not having
+    any intersection or having a low IoU value, then we say that the anchor
+    refers to background.
 
     For calculating the correct values for the regression, the problem of
     transforming the fixed size anchor into a more suitable bounding box (equal
-    to the ground truth box) only applies to some of the anchors, the ones that
-    we consider to be foreground.
+    to the ground truth box) only applies to the anchors that we consider to be
+    foreground.
 
-    RPNTarget is also responsable for selecting which ones of the anchors
-    are going to be used for the minibatch. This is a random process with some
+    RPNTarget is also responsible for selecting which of the anchors are going
+    to be used for the minibatch. This is a random process with some
     restrictions on the ratio between foreground and background samples.
 
-    For selecting the minibatch, labels are not only set to 0 or 1, for the
-    cases of being background and foreground respectively, but also to -1 for
+    For selecting the minibatch, labels are not only set to 0 or 1 (for the
+    cases of being background and foreground respectively), but also to -1 for
     the anchors we just want to ignore and not include in the minibatch.
 
     In summary:
-    - 1 is positive
-        when GT overlap is >= 0.7 (configurable) or for GT max overlap (one
-        anchor)
-    - 0 is negative
-        when GT overlap is < 0.3 (configurable)
-    -1 is don't care
-        useful for subsampling negative labels
+      * 1 is positive
+          when GT overlap is >= 0.7 (configurable) or for GT max overlap (one
+          anchor)
+      * 0 is negative
+          when GT overlap is < 0.3 (configurable)
+      * -1 is don't care
+          useful for subsampling negative labels
 
     Returns:
         labels: label for each anchor
@@ -77,15 +79,15 @@ class RPNTarget(snt.AbstractModule):
 
         Basically what it does is, first generate the targets for all (valid)
         anchors, and then start subsampling the positive (foreground) and the
-        negative ones (background) based on the number of samples we want of
-        each type.
+        negative ones (background) based on the number of samples of each type
+        that we want.
 
         Args:
             all_anchors:
                 A Tensor with all the bounding boxes coords of the anchors.
             gt_boxes:
-                A Tensor with the groundtruth bounding boxes of the image of
-                the batch being processed. It's dimensions should be
+                A Tensor with the ground truth bounding boxes of the image of
+                the batch being processed. Its dimensions should be
                 (num_gt, 5). The last dimension is used for the label.
             im_size:
                 Shape of original image (height, width) in order to define

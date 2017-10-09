@@ -35,7 +35,7 @@ class RPN(snt.AbstractModule):
         self._seed = seed
 
         # According to Faster RCNN paper we need to initialize layers with
-        # "from a zero-mean Gaussian distribution with standard deviation 0.0
+        # "from a zero-mean Gaussian distribution with standard deviation 0.01
         self._initializer = get_initializer(config.initializer, seed=seed)
         self._regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale
@@ -133,7 +133,7 @@ class RPN(snt.AbstractModule):
         # where H, W are height and width of the pretrained feature map.
 
         # Convert `rpn_cls_score` which has two scalars per anchor per location
-        # to be able to apply `spatial_softmax`.
+        # to be able to apply softmax.
         rpn_cls_score = tf.reshape(rpn_cls_score_original, [-1, 2])
         rpn_cls_prob = tf.nn.softmax(rpn_cls_score)
 
