@@ -1,133 +1,184 @@
-<!DOCTYPE html>
+<!--
+    Photon by HTML5 UP
+    html5up.net | @ajlkn
+    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
 <html>
-<head>
-  <title>Luminoth HTTP Server</title>
-  <!-- Google Fonts -->
-  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
-
-  <!-- CSS Reset -->
-  <link rel="stylesheet" href="//cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
-
-  <!-- Milligram CSS minified -->
-  <link rel="stylesheet" href="//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
-  <script type="text/javascript">
-
-    function Shape(x, y, w, h, fill) {
-      this.x = x || 0;
-      this.y = y || 0;
-      this.w = w || 0;
-      this.h = h || 0;
-
-      this.fill = fill || 'rgba(255, 255, 255, 0)';
-    }
-
-    Shape.prototype.draw = function(ctx) {
-      ctx.fillStyle = this.fill;
-      ctx.fillRect(this.x, this.y, this.w, this.h);
-
-      ctx.strokeStyle = '#F00';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(this.x, this.y, this.w, this.h);
-    }
-
-    function drawCanvas(canvas, imageFile, objects, scaleFactor) {
-      ctx = canvas.getContext('2d');
-
-      image = new Image();
-      image.src = URL.createObjectURL(imageFile);
-      image.onload = function () {
-
-        var imageWidth = image.width * scaleFactor;
-        var imageHeight = image.height * scaleFactor
-
-        ctx.canvas.width  = imageWidth;
-        ctx.canvas.height = imageHeight;
-
-        ctx.drawImage(
-          image, 0,0,
-          image.width * scaleFactor,
-          image.height * scaleFactor
-        );
-
-        for (var i = 0; i < objects.length; i++) {
-          ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
-          var x = objects[i][0]
-          var y = objects[i][1];
-          var width = objects[i][2] - objects[i][0];
-          var height = objects[i][3] - objects[i][1];
-          ctx.fillRect(x, y, width, height);
-          ctx.strokeStyle = '#F00';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x, y, width, height);
-        }
+  <head>
+    <title>Luminoth HTTP Server</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+    <link rel="stylesheet" href="/static/main.css" />
+    <style>
+    @import url('https://fonts.googleapis.com/css?family=Open+Sans');
+    </style>
+    <link rel="shortcut icon" href="/static/favicon.ico"/>
+    <style type="text/css">
+      #button-luminoth {
+        margin-top: 2em;
       }
 
-    }
+      label {
+        margin: 1em 0 1em 0;
+      }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      var form = document.getElementById('imageForm');
-      var modelType = document.getElementById('modelField').value;
-      var resultsDiv = document.getElementById('results-row');
-      var jsonDiv = document.getElementById('results');
-      var imageCanvas = document.getElementById('image-canvas');
+      .title {
+        margin: 0.5em 0px 0 1em;
+      }
 
-      form.addEventListener('submit', function(event) {
-        event.preventDefault();
+      #menu {
+        justify-content: normal;
+      }
 
-        var xhr = new XMLHttpRequest();
-        var formdata = new FormData(form);
+      #results {
+        max-height: 600px;
+        margin-top: -2em;
+      }
+    </style>
+    <script type="text/javascript">
 
-        xhr.open('POST', '/api/' + modelType + '/predict', true);
-        xhr.send(formdata);
+      function Shape(x, y, w, h, fill) {
+        this.x = x || 0;
+        this.y = y || 0;
+        this.w = w || 0;
+        this.h = h || 0;
 
-        xhr.onreadystatechange = function(){
-          if(xhr.readyState == 4 && xhr.status == 200) {
-            jsonDiv.innerHTML = xhr.response;
-            response = JSON.parse(xhr.response);
-            var scaleFactor = response.scale_factor;
-            resultsDiv.style.display = '';
+        this.fill = fill || 'rgba(255, 255, 255, 0)';
+      }
 
-            drawCanvas(
-              imageCanvas,
-              formdata.getAll('image')[0],
-              response.objects,
-              scaleFactor
-            );
+      Shape.prototype.draw = function(ctx) {
+        ctx.fillStyle = this.fill;
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+
+        ctx.strokeStyle = '#F00';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x, this.y, this.w, this.h);
+      }
+
+      function drawCanvas(canvas, imageFile, objects, scaleFactor) {
+        ctx = canvas.getContext('2d');
+
+        image = new Image();
+        image.src = URL.createObjectURL(imageFile);
+        image.onload = function () {
+
+          var imageWidth = image.width * scaleFactor;
+          var imageHeight = image.height * scaleFactor
+
+          ctx.canvas.width  = imageWidth;
+          ctx.canvas.height = imageHeight;
+
+          ctx.drawImage(
+            image, 0,0,
+            image.width * scaleFactor,
+            image.height * scaleFactor
+          );
+
+          for (var i = 0; i < objects.length; i++) {
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            var x = objects[i][0]
+            var y = objects[i][1];
+            var width = objects[i][2] - objects[i][0];
+            var height = objects[i][3] - objects[i][1];
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeStyle = '#F00';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, width, height);
           }
         }
+
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var form = document.getElementById('imageForm');
+        var modelType = document.getElementById('modelField').value;
+        var resultsDiv = document.getElementById('results-row');
+        var jsonDiv = document.getElementById('results');
+        var imageCanvas = document.getElementById('image-canvas');
+
+        form.addEventListener('submit', function(event) {
+          event.preventDefault();
+
+          var xhr = new XMLHttpRequest();
+          var formdata = new FormData(form);
+
+          xhr.open('POST', '/api/' + modelType + '/predict', true);
+          xhr.send(formdata);
+
+          xhr.onreadystatechange = function(){
+            if(xhr.readyState == 4 && xhr.status == 200) {
+              jsonDiv.innerHTML = xhr.response;
+              response = JSON.parse(xhr.response);
+              var scaleFactor = response.scale_factor;
+              resultsDiv.style.display = '';
+
+              drawCanvas(
+                imageCanvas,
+                formdata.getAll('image')[0],
+                response.objects,
+                scaleFactor
+              );
+            }
+          }
+        });
       });
-    });
-  </script>
-</head>
-<body>
-  <div class="container">
-    <div class="row">
-      <h1>Luminoth</h1>
-    </div>
-    <div class="row">
-      <form id="imageForm">
-        <fieldset>
-          <label for="imageField">Image</label>
-          <input class="button-primary" name="image" type="file" id="imageField" />
-          <label for="modelField">Model</label>
-          <select id="modelField">
-            <option value="fasterrcnn">Faster RCNN</option>
-          </select>
-          <input class="button-primary" type="submit" value="Submit">
-        </fieldset>
-      </form>
-    </div>
-    <div class="row" id="results-row" style="display: none;">
-      <div class="column column-25">
-        <pre>
-          <code id="results">
-          </code>
-        </pre>
+    </script>
+  </head>
+  <body>
+      <div id="menu">
+        <img src="/static/luminoth-logo.png"/>
+        <h3 class="title">Luminoth HTTP Server</h3>
       </div>
-      <div class="column column-75">
-        <canvas width="640" height="480" id="image-canvas"></canvas>
+
+      <div class="container">
+        <div class="row">
+          <form id="imageForm">
+            <fieldset>
+              <div class="row">
+                <div class="12u">
+                  <label for="imageField">Image</label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="12u">
+                  <input class="button-primary" name="image" type="file" id="imageField" />
+                </div>
+              </div>
+              <div class="row">
+                <div class="12u">
+                  <label for="modelField">Model</label>
+                  <select id="modelField">
+                    <option value="fasterrcnn">Faster RCNN</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row">
+                <div class="12u">
+                  <input class="button-primary special" id="button-luminoth" type="submit" value="Submit">
+                </div>
+              </div>
+            </fieldset>
+          </form>
+        </div>
+        <div class="row" id="results-row" style="display: none;">
+          <div class="4u">
+            <pre>
+              <code id="results">
+              </code>
+            </pre>
+          </div>
+          <div class="7u">
+            <canvas width="640" height="480" id="image-canvas"></canvas>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</body>
+
+
+      <!-- Footer -->
+    <section id="footer">
+      <div id="tryo">Made by</div>
+      <a href="https://tryolabs.com/"><img src="/static/tryolabs-logo.png"/></a>
+    </section>
+  </body>
 </html>
