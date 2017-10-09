@@ -140,9 +140,6 @@ class BaseNetwork(snt.AbstractModule):
         of the module are included in the checkpoint but with a different
         prefix.
 
-        Args:
-            checkpoint_file: Path to checkpoint file.
-
         Returns:
             load_op: Load weights operation or no_op.
         """
@@ -150,7 +147,11 @@ class BaseNetwork(snt.AbstractModule):
            not self._config.get('download'):
             return tf.no_op(name='not_loading_base_network')
 
-        self._config['weights'] = get_checkpoint_file(self._architecture)
+        if self._config.get('weights') is None:
+            # Download the weights (or used cached) if is is not specified in
+            # config file.
+            # Weights are downloaded by default on the ~/.luminoth folder.
+            self._config['weights'] = get_checkpoint_file(self._architecture)
 
         module_variables = snt.get_variables_in_module(
             self, tf.GraphKeys.MODEL_VARIABLES

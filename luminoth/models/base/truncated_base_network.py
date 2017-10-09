@@ -14,10 +14,13 @@ DEFAULT_ENDPOINTS = {
 
 
 class TruncatedBaseNetwork(BaseNetwork):
-    """TruncatedBaseNetwork
     """
-    def __init__(self, config, parent_name=None,
-                 name='truncated_base_network', **kwargs):
+    TruncatedBaseNetwork is a normal classification CNN but instead of
+    returning a classification output it truncates it and returns the output
+    of middle convolutional layer.
+    """
+    def __init__(self, config, parent_name=None, name='truncated_base_network',
+                 **kwargs):
         super(TruncatedBaseNetwork, self).__init__(config, name=name, **kwargs)
         self._endpoint = (
             config.endpoint or DEFAULT_ENDPOINTS[config.architecture]
@@ -33,7 +36,6 @@ class TruncatedBaseNetwork(BaseNetwork):
 
     def _build(self, inputs, is_training=True):
         """
-
         Args:
             inputs: A Tensor of shape `(batch_size, height, width, channels)`.
 
