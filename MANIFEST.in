@@ -1,5 +1,6 @@
 include *.md *.txt tox.ini LICENSE *.yml
 graft luminoth
+recursive-include docs *
 
 global-exclude __pycache__
 global-exclude *.py[co]
