@@ -6,6 +6,8 @@ from PIL import Image
 
 app = Flask(__name__)
 
+LOADED_MODELS = {}
+
 
 def get_image():
     image = request.files.get('image')
@@ -30,11 +32,20 @@ def predict(model_name):
     if image_array is None:
         return jsonify(error='Missing image.')
 
-    pred = get_prediction(
-        model_name, image_array, app.config['checkpoint_file'],
-        app.config['classes_file']
-    )
+    if model_name in LOADED_MODELS:
+        image_tensor, output, session = LOADED_MODELS[model_name]
+        pred = get_prediction(
+            model_name, image_array, app.config['config_file'],
+            session=session, output=output, image_tensor=image_tensor
+        )
 
+    else:
+        pred = get_prediction(
+            model_name, image_array, app.config['checkpoint_file'])
+        LOADED_MODELS[model_name] = (pred['image_tensor'], pred['output'],
+                                     pred['session'])
+
+    del pred['image_tensor'], pred['output'], pred['session']
     return jsonify(pred)
 
 
