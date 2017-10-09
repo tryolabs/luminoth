@@ -104,7 +104,7 @@ lumi dataset transform --type coco --data-dir ~/dataset/coco/ --output-dir ~/dat
 
 ## Training
 
-Check our [TRAINING.md](./TRAINING.md) on how to train locally or in Google Cloud.
+Check our [TRAINING.md](./docs/TRAINING.md) on how to train locally or in Google Cloud.
 
 ## Visualizing results
 
