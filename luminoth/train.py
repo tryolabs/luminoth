@@ -68,13 +68,14 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
 
         trainable_vars = model.get_trainable_vars()
 
-        # Compute, clip and apply gradients
-        grads_and_vars = optimizer.compute_gradients(
-            total_loss, trainable_vars
-        )
+        with tf.name_scope('gradients'):
+            # Compute, clip and apply gradients
+            grads_and_vars = optimizer.compute_gradients(
+                total_loss, trainable_vars
+            )
 
-        # Clip by norm. TODO: Configurable
-        grads_and_vars = clip_gradients_by_norm(grads_and_vars)
+            # Clip by norm. TODO: Configurable
+            grads_and_vars = clip_gradients_by_norm(grads_and_vars)
 
         train_op = optimizer.apply_gradients(
             grads_and_vars, global_step=global_step
