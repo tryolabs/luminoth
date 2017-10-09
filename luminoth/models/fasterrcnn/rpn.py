@@ -11,7 +11,8 @@ from .rpn_target import RPNTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import (
-    get_initializer, layer_summaries, variable_summaries
+    get_initializer, layer_summaries, variable_summaries,
+    get_activation_function
 )
 
 
@@ -42,7 +43,10 @@ class RPN(snt.AbstractModule):
         )
 
         # We could use normal relu without any problems.
-        self._rpn_activation = tf.nn.relu6
+
+        self._rpn_activation = get_activation_function(
+            config.activation_function
+        )
 
         self._config = config
 
