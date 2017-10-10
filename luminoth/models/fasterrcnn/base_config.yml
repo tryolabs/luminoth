@@ -56,6 +56,7 @@ train:
   num_epochs: 1000
 
 dataset:
+  type: tfrecord
   # From which directory to read the dataset
   dir: 'datasets/voc/tf'
   # Which split of tfrecords to look for
@@ -90,131 +91,118 @@ dataset:
           upper: 1.5
         prob: 0.3
 
-network:
-  # Total number of classes to predict
-  num_classes: 20
-  # Use RCNN or just RPN
-  with_rcnn: True
+model:
+  type: fasterrcnn
+  network:
+    # Total number of classes to predict
+    num_classes: 20
+    # Use RCNN or just RPN
+    with_rcnn: True
 
-base_network:
-  # Which type of pretrained network to use
-  architecture: vgg_16
-  # Should we train the pretrained network
-  trainable: True
-  # From which file to load the weights
-  weights:
-  # Should we download weights if not available
-  download: True
-  # Which endpoint layer to use as feature map for network
-  endpoint:
-  # Is trainable, how many layers from the endpoint are we training
-  finetune_num_layers:
-  arg_scope:
-    # Regularization
-    weight_decay: 0.0005
+  base_network:
+    # Which type of pretrained network to use
+    architecture: vgg_16
+    # Should we train the pretrained network
+    trainable: True
+    # From which file to load the weights
+    weights:
+    # Should we download weights if not available
+    download: True
+    # Which endpoint layer to use as feature map for network
+    endpoint:
+    # Is trainable, how many layers from the endpoint are we training
+    finetune_num_layers:
+    arg_scope:
+      # Regularization
+      weight_decay: 0.0005
 
-loss:
-  # Loss weights for calculating the total loss
-  rpn_cls_loss_weight: 1.0
-  rpn_reg_loss_weights: 2.0
-  rcnn_cls_loss_weight: 1.0
-  rcnn_reg_loss_weights: 2.0
+  loss:
+    # Loss weights for calculating the total loss
+    rpn_cls_loss_weight: 1.0
+    rpn_reg_loss_weights: 2.0
+    rcnn_cls_loss_weight: 1.0
+    rcnn_reg_loss_weights: 2.0
 
-anchors:
-  # Base size to use for anchors
-  base_size: 256
-  # Scale used for generating anchor sizes
-  scales: [0.5, 1, 2]
-  # Aspect ratios used for generating anchors
-  ratios: [0.5, 1, 2]
-  # Stride depending on feature map size (of pretrained)
-  stride: 16
+  anchors:
+    # Base size to use for anchors
+    base_size: 256
+    # Scale used for generating anchor sizes
+    scales: [0.5, 1, 2]
+    # Aspect ratios used for generating anchors
+    ratios: [0.5, 1, 2]
+    # Stride depending on feature map size (of pretrained)
+    stride: 16
 
-rpn:
-  num_channels: 512
-  kernel_shape: [3, 3]
-  rpn_initializer:
-    type: variance_scaling_initializer
-    factor: 1.0
-    mode: FAN_AVG
-    uniform: True
-  cls_initializer:
-    type: truncated_normal_initializer
-    mean: 0.0
-    stddev: 0.01
-  bbox_initializer:
-    type: truncated_normal_initializer
-    mean: 0.0
-    stddev: 0.01
-  l2_regularization_scale: 0.0005  # disable using 0
-  activation_function: relu
+  rpn:
+    num_channels: 512
+    kernel_shape: [3, 3]
+    rpn_initializer:
+      type: variance_scaling_initializer
+      factor: 1.0
+      mode: FAN_AVG
+      uniform: True
+    cls_initializer:
+      type: truncated_normal_initializer
+      mean: 0.0
+      stddev: 0.01
+    bbox_initializer:
+      type: truncated_normal_initializer
+      mean: 0.0
+      stddev: 0.01
+    l2_regularization_scale: 0.0005  # disable using 0
+    activation_function: relu
 
-  proposals:
-    # Total proposals to use before running NMS (sorted by score)
-    pre_nms_top_n: 12000
-    # Total proposals to use after NMS (sorted by score)
-    post_nms_top_n: 2000
-    # NMS threshold used when removing "almost duplicates"
-    nms_threshold: 0.6
-    min_size: 0  # disable using 0
-    # Run clipping of proposals after running NMS
-    clip_after_nms: False
-    # Filter proposals from anchors partially outside the image.
-    filter_outside_anchors: False
+    proposals:
+      # Total proposals to use before running NMS (sorted by score)
+      pre_nms_top_n: 12000
+      # Total proposals to use after NMS (sorted by score)
+      post_nms_top_n: 2000
+      # NMS threshold used when removing "almost duplicates"
+      nms_threshold: 0.6
+      min_size: 0  # disable using 0
+      # Run clipping of proposals after running NMS
+      clip_after_nms: False
+      # Filter proposals from anchors partially outside the image.
+      filter_outside_anchors: False
 
-  target:
-    # Margin to crop proposals to close to the border
-    allowed_border: 0
-    # Overwrite positives with negative if threshold is too low
-    clobber_positives: False
-    # How much IoU with GT proposals must have to be marked as positive
-    foreground_threshold: 0.7
-    # High and low thresholds with GT to be considered background
-    background_threshold_high: 0.3
-    background_threshold_low: 0.
-    foreground_fraction: 0.5
-    # Ration between background and foreground in minibatch
-    minibatch_size: 256
-    # Assign to get consistent "random" selection in batch
-    random_seed:  # only to be used for debugging
+    target:
+      # Margin to crop proposals to close to the border
+      allowed_border: 0
+      # Overwrite positives with negative if threshold is too low
+      clobber_positives: False
+      # How much IoU with GT proposals must have to be marked as positive
+      foreground_threshold: 0.7
+      # High and low thresholds with GT to be considered background
+      background_threshold_high: 0.3
+      background_threshold_low: 0.
+      foreground_fraction: 0.5
+      # Ration between background and foreground in minibatch
+      minibatch_size: 256
+      # Assign to get consistent "random" selection in batch
+      random_seed:  # only to be used for debugging
 
-rcnn:
-  enabled: True  # if disabled, then the rest of the config values will not be used.
-  # FC layer sizes
-  layer_sizes: [4096, 4096]
-  # Dropout keep probability (turn off with 1.0 value)
-  dropout_keep_prop: 1.0
-  activation_function: relu
-  use_mean: False
-  initializer:
-    type: variance_scaling_initializer
-    factor: 1.0
-    uniform: True
-    mode: FAN_AVG
-  l2_regularization_scale: 0.0005
+    roi:
+      pooling_mode: crop
+      pooled_width: 7
+      pooled_height: 7
+      padding: VALID
 
-  roi:
-    pooling_mode: crop
-    pooled_width: 7
-    pooled_height: 7
-    padding: VALID
+    proposals:
+      # Maximum number of detections for each class
+      class_max_detections: 100
+      # NMS threshold used to remove "almost duplicate" of the same class
+      class_nms_threshold: 0.6
+      # Maximum total detections for an image (sorted by score)
+      total_max_detections: 300
+      # Minimum prob to be used as proposed object
+      min_prob_threshold: 0.5
 
-  proposals:
-    # Maximum number of detections for each class
-    class_max_detections: 100
-    # NMS threshold used to remove "almost duplicate" of the same class
-    class_nms_threshold: 0.6
-    # Maximum total detections for an image (sorted by score)
-    total_max_detections: 300
-    # Minimum prob to be used as proposed object
-    min_prob_threshold: 0.5
-
-  target:
-    # Ratio between foreground and background samples in minibatch
-    foreground_fraction: 0.25
-    minibatch_size: 64
-    # Threshold with GT to be considered positive
-    foreground_threshold: 0.5
-    # High and low threshold with GT to be considered negative
-    background_threshold_high: 0.5
-    background_threshold_low: 0.1
+    target:
+      # Ratio between foreground and background samples in minibatch
+      foreground_fraction: 0.25
+      minibatch_size: 64
+      # Threshold with GT to be considered positive
+      foreground_threshold: 0.5
+      # High and low threshold with GT to be considered negative
+      background_threshold_high: 0.5
+      background_threshold_low: 0.1
