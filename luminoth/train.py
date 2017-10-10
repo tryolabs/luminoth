@@ -7,7 +7,7 @@ import time
 
 from tensorflow.python import debug as tf_debug
 
-from luminoth.datasets import TFRecordDataset
+from luminoth.datasets.datasets import get_dataset
 from luminoth.models import get_model
 from luminoth.utils.config import get_model_config
 from luminoth.utils.hooks import ImageVisHook
@@ -16,10 +16,11 @@ from luminoth.utils.training import (
 )
 
 
-def run(model_type, config_file, override_params, target='', cluster_spec=None,
-        is_chief=True, job_name=None, task_index=None, **kwargs):
+def run(model_type, dataset_type, config_file, override_params, target='',
+        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
+        get_dataset_fn=get_dataset, get_model_fn=get_model, **kwargs):
 
-    model_class = get_model(model_type)
+    model_class = get_model_fn(model_type)
 
     config = get_model_config(
         model_class.base_config, config_file, override_params, **kwargs
@@ -45,7 +46,9 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
     # See:
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
-        dataset = TFRecordDataset(config)
+
+        dataset_class = get_dataset_fn(dataset_type)
+        dataset = dataset_class(config)
         train_dataset = dataset()
 
         train_image = train_dataset['image']
@@ -159,6 +162,7 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
         save_summaries_steps=config.train.save_summaries_steps,
         save_summaries_secs=config.train.save_summaries_secs,
     ) as sess:
+
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -194,6 +198,7 @@ def run(model_type, config_file, override_params, target='', cluster_spec=None,
 
 @click.command(help='Train models')
 @click.option('model_type', '--model', required=True, default='fasterrcnn')  # noqa
+@click.option('dataset_type', '--dataset', required=True, default='tfrecord')  # noqa
 @click.option('config_file', '--config', '-c', help='Config to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--seed', type=float, help='Global seed value for random operations.')  # noqa
@@ -211,7 +216,6 @@ def train(*args, **kwargs):
     """
     Parse TF_CONFIG to cluster_spec and call run() function
     """
-
     # TF_CONFIG environment variable is available when running using
     # gcloud either locally or on cloud. It has all the information required
     # to create a ClusterSpec which is important for running distributed code.
