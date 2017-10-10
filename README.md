@@ -70,11 +70,11 @@ There is one main command line interface which you can use with the `lumi` comma
 and a list of available options with descriptions will show up.
 
 ## Working with datasets
-See [DATASETS.md](./docs/DATASETS.md).
+See [DATASETS](./docs/DATASETS.md).
 
 ## Training
 
-Check our [TRAINING.md](./docs/TRAINING.md) on how to train locally or in Google Cloud.
+Check our [TRAINING](./docs/TRAINING.md) on how to train locally or in Google Cloud.
 
 ## Visualizing results
 
