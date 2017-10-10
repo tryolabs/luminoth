@@ -1,6 +1,6 @@
 from luminoth.cli import cli  # noqa
 
-__version__ = '0.0.1'
+__version__ = '0.0.2.dev0'
 
 __title__ = 'Luminoth'
 __description__ = 'Computer vision toolkit based on TensorFlow'
