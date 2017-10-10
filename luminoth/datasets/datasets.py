@@ -1,4 +1,4 @@
-from luminoth.datasets import TFRecordDataset
+from luminoth.datasets.tfrecord import TFRecordDataset
 
 DATASETS = {
     'tfrecord': TFRecordDataset,
