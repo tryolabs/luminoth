@@ -1,1 +1,1 @@
-from .models import get_model  # noqa
+from .models import get_model, DEFAULT_MODEL  # noqa

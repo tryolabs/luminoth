@@ -5,6 +5,7 @@ from luminoth.models.fasterrcnn import FasterRCNN
 MODELS = {
     'fasterrcnn': FasterRCNN,
 }
+DEFAULT_MODEL = 'fasterrcnn'
 
 
 def get_model(model_type):

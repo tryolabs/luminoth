@@ -33,11 +33,11 @@ class FasterRCNN(snt.AbstractModule):
 
         # Total number of classes to classify. If not using RCNN then it is not
         # used. TODO: Make it *more* optional.
-        self._num_classes = config.network.num_classes
+        self._num_classes = config.model.network.num_classes
 
         # Generate network with RCNN thus allowing for classification of
         # objects and not just finding them.
-        self._with_rcnn = config.network.with_rcnn
+        self._with_rcnn = config.model.network.with_rcnn
 
         # Turn on debug mode with returns more Tensors which can be used for
         # better visualization and (of course) debugging.
@@ -46,10 +46,10 @@ class FasterRCNN(snt.AbstractModule):
 
         # Anchor config, check out the docs of base_config.yml for a better
         # understanding of how anchors work.
-        self._anchor_base_size = config.anchors.base_size
-        self._anchor_scales = np.array(config.anchors.scales)
-        self._anchor_ratios = np.array(config.anchors.ratios)
-        self._anchor_stride = config.anchors.stride
+        self._anchor_base_size = config.model.anchors.base_size
+        self._anchor_scales = np.array(config.model.anchors.scales)
+        self._anchor_ratios = np.array(config.model.anchors.ratios)
+        self._anchor_stride = config.model.anchors.stride
 
         # Anchor reference for building dynamic anchors for each image in the
         # computation graph.
@@ -61,16 +61,16 @@ class FasterRCNN(snt.AbstractModule):
         self._num_anchors = self._anchor_reference.shape[0]
 
         # Weights used to sum each of the losses of the submodules
-        self._rpn_cls_loss_weight = config.loss.rpn_cls_loss_weight
-        self._rpn_reg_loss_weight = config.loss.rpn_reg_loss_weights
+        self._rpn_cls_loss_weight = config.model.loss.rpn_cls_loss_weight
+        self._rpn_reg_loss_weight = config.model.loss.rpn_reg_loss_weights
 
-        self._rcnn_cls_loss_weight = config.loss.rcnn_cls_loss_weight
-        self._rcnn_reg_loss_weight = config.loss.rcnn_reg_loss_weights
+        self._rcnn_cls_loss_weight = config.model.loss.rcnn_cls_loss_weight
+        self._rcnn_reg_loss_weight = config.model.loss.rcnn_reg_loss_weights
         self._losses_collections = ['fastercnn_losses']
 
         # We want the pretrained model to be outside the FasterRCNN name scope.
         self.base_network = TruncatedBaseNetwork(
-            config.base_network, parent_name=self.module_name
+            config.model.base_network, parent_name=self.module_name
         )
 
     def _build(self, image, gt_boxes=None, is_training=True):
@@ -103,14 +103,14 @@ class FasterRCNN(snt.AbstractModule):
 
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(
-            self._num_anchors, self._config.rpn,
+            self._num_anchors, self._config.model.rpn,
             debug=self._debug, seed=self._seed
         )
         if self._with_rcnn:
             # The RCNN submodule which classifies RPN's proposals and
             # classifies them as background or a specific class.
             self._rcnn = RCNN(
-                self._num_classes, self._config.rcnn,
+                self._num_classes, self._config.model.rcnn,
                 debug=self._debug, seed=self._seed
             )
 
@@ -325,7 +325,7 @@ class FasterRCNN(snt.AbstractModule):
         """Get trainable vars included in the module.
         """
         trainable_vars = snt.get_variables_in_module(self)
-        if self._config.base_network.trainable:
+        if self._config.model.base_network.trainable:
             pretrained_trainable_vars = self.base_network.get_trainable_vars()
             tf.logging.info('Training {} vars from pretrained module.'.format(
                 len(pretrained_trainable_vars)))

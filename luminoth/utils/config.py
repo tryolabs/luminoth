@@ -79,8 +79,7 @@ def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
                 overwrite=overwrite, warn_overwrite=warn_overwrite
             )
         else:
-            if (base_config.get(key) is None
-               or overwrite):
+            if base_config.get(key) is None or overwrite:
                 base_config[key] = value
                 if warn_overwrite:
                     tf.logging.warn('Overwrote key "{}"'.format(key))
@@ -142,7 +141,7 @@ def get_model_config(base_config, custom_config, override_params):
     if custom_config:
         # If we have a custom config file overwriting default settings
         # then we merge those values to the base_config.
-        config = merge_into(custom_config, config)
+        config = merge_into(custom_config, config, overwrite=True)
     if override_params:
         override_config = parse_override(override_params)
         config = merge_into(override_config, config, overwrite=True)

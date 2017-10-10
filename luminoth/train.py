@@ -58,14 +58,10 @@ def run(config_files, override_params, target='', cluster_spec=None,
     # See:
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
-        try:
-            dataset_class = get_dataset_fn(config.dataset.type)
-            dataset = dataset_class(config)
-            train_dataset = dataset()
-        except InvalidDataDirectory as exc:
-            tf.logging.error(
-                'Error while reading dataset, {}'.format(exc.message))
-            return
+        dataset_class = get_dataset_fn(config.dataset.type)
+        dataset = dataset_class(config)
+        train_dataset = dataset()
+
         train_image = train_dataset['image']
         train_filename = train_dataset['filename']
         train_bboxes = train_dataset['bboxes']
