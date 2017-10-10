@@ -42,10 +42,8 @@ class TrainTest(tf.test.TestCase):
         self.config = EasyDict({
             'model_type': 'fasterrcnn',
             'dataset_type': '',
-            'config_file': None,
+            'config_files': [],
             'override_params': ['train.num_epochs=2'],
-            'run_name': 'mock',
-            'save_summaries_secs': None,
             'base_network': {
                 'download': False
             }
@@ -92,9 +90,7 @@ class TrainTest(tf.test.TestCase):
         config = self.config
 
         # This should not fail
-        run(config.model_type, config.dataset_type, config.config_file,
-            config.override_params, run_name=config.run_name,
-            save_summaries_secs=config.save_summaries_secs,
+        run(config.config_files, config.override_params,
             get_dataset_fn=self.get_dataset, get_model_fn=self.get_model)
 
 

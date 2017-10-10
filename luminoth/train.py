@@ -24,7 +24,6 @@ from luminoth.utils.training import (
 def run(config_files, override_params, target='', cluster_spec=None,
         is_chief=True, job_name=None, task_index=None, get_model_fn=get_model,
         get_dataset_fn=get_dataset):
-
     custom_config = load_config(
         config_files, overwrite=True, warn_overwrite=True)
     # If the config file is empty, our config will be the base_config for the
@@ -180,7 +179,7 @@ def run(config_files, override_params, target='', cluster_spec=None,
         try:
             while not coord.should_stop():
                 before = time.time()
-                (_, train_loss, step, filename) = sess.run([
+                _, train_loss, step, filename = sess.run([
                     train_op, total_loss, global_step, train_filename
                 ], options=run_options)
 
