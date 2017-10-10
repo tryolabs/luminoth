@@ -16,7 +16,7 @@ def detect(image_path, config_file, model_name):
     image = Image.open(image_path)
     results = get_prediction(model_name, image, config_file)
     tf.logging.info('{} objects detected'.format(len(results['objects'])))
-    print(results)
+
     # Draw bounding boxes
     draw = ImageDraw.Draw(image)
     scale = results['scale_factor']
@@ -31,9 +31,9 @@ def detect(image_path, config_file, model_name):
 
     # Save the image
     config = easydict.EasyDict(yaml.load(tf.gfile.GFile(config_file)))
-    print(config.train)
     if config.train.job_dir and config.train.run_name:
-        save_path = config.train.run_name + '_pred_' + os.path.basename(image_path)
+        save_path = (
+            config.train.run_name + '_pred_' + os.path.basename(image_path))
     else:
         save_path = 'pred_' + os.path.basename(image_path)
     tf.logging.info('Saving image with bounding boxes in {}'.format(save_path))

@@ -1,13 +1,12 @@
-import easydict
 import json
 import os
 import time
-import yaml
 
 import numpy as np
 import tensorflow as tf
 
 from luminoth.models import get_model
+from luminoth.utils.config import get_model_config
 
 
 def resize_image(image, min_size, max_size):
@@ -29,42 +28,49 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_name, image, config_file, session=None, output=None,
-                   image_tensor=None):
+def get_prediction(model_name, image, config_file, session=None,
+                   prediction_dict=None, image_tensor=None,
+                   return_tf_vars=False):
     """
     Gets the prediction given by the model `model_name` of the image `image`.
-    TODO
-    If `checkpoint_file` is not None, loads it and also loads the name of the
-    classes if a `classes_file` is not None, and returns them.
+    If it exists a checkpoint loads it and also loads the name of the
+    classes from the dataset directory.
     """
     model_class = get_model(model_name)
-    config = easydict.EasyDict(yaml.load(tf.gfile.GFile(config_file)))
-    if session and output and image_tensor:
-        pass
-    else:
+    config = get_model_config(
+        model_class.base_config, config_file, None
+    )
+
+    if session is None or prediction_dict is None or image_tensor is None:
         graph = tf.Graph()
         session = tf.Session(graph=graph)
 
         with graph.as_default():
             image_tensor = tf.placeholder(tf.float32, (1, None, None, 3))
             model = model_class(model_class.base_config)
-            output = model(image_tensor)
+            prediction_dict = model(image_tensor)
+
+            # Restore checkpoint
             if config.train.job_dir and config.train.run_name:
-                checkpoint_dir = os.path.join(
-                    '.',
-                    config.train.job_dir, config.train.run_name,
-                    'model.ckpt-862094')
+                ckpt = tf.train.get_checkpoint_state(os.path.join(
+                    config.train.job_dir, config.train.run_name))
+                if not ckpt or not ckpt.all_model_checkpoint_paths:
+                    raise ValueError('Could not find checkpoint in {}.'.format(
+                        config.train.job_dir
+                    ))
+                ckpt = ckpt.all_model_checkpoint_paths[-1]
+                ckpt_dir = os.path.join('.', ckpt)
                 saver = tf.train.Saver(sharded=True, allow_empty=True)
-                saver.restore(session, checkpoint_dir)
+                saver.restore(session, ckpt_dir)
+            # A prediction without checkpoint is just used for testing
             else:
-                print('else')
                 init_op = tf.group(
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()
                 )
                 session.run(init_op)
 
-    classification_prediction = output['classification_prediction']
+    classification_prediction = prediction_dict['classification_prediction']
     objects_tf = classification_prediction['objects']
     objects_labels_tf = classification_prediction['labels']
     objects_labels_prob_tf = classification_prediction['probs']
@@ -84,21 +90,25 @@ def get_prediction(model_name, image, config_file, session=None, output=None,
     end_time = time.time()
 
     if config.dataset.dir:
-        classes_file = os.path.join(config.dataset.dir, 'classes.json')
         # Gets the names of the classes
+        classes_file = os.path.join(config.dataset.dir, 'classes.json')
         class_labels = json.load(tf.gfile.GFile(classes_file))
         objects_labels = [class_labels[obj] for obj in objects_labels]
 
     else:
         objects_labels = objects_labels.tolist()
 
-    return {
+    res = {
         'objects': objects.tolist(),
         'objects_labels': objects_labels,
         'objects_labels_prob': objects_labels_prob.tolist(),
         'inference_time': end_time - start_time,
         'scale_factor': scale_factor,
-        'image_tensor': image_tensor,
-        'output': output,
-        'session': session
     }
+
+    if return_tf_vars:
+        res['image_tensor'] = image_tensor
+        res['prediction_dict'] = prediction_dict
+        res['session'] = session
+
+    return res
