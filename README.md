@@ -1,33 +1,15 @@
-Luminoth
+![Luminoth](https://user-images.githubusercontent.com/270983/31414425-c12314d2-ae15-11e7-8cc9-42d330b03310.png)
 ========
 
 [![Build Status](https://travis-ci.org/tryolabs/luminoth.svg?branch=master)](https://travis-ci.org/tryolabs/luminoth)
 [![codecov](https://codecov.io/gh/tryolabs/luminoth/branch/master/graph/badge.svg)](https://codecov.io/gh/tryolabs/luminoth)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-> The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
->
-> -- [Dark Visor - Wikitroid](http://metroid.wikia.com/wiki/Dark_Visor)
+Luminoth is an open source toolkit for **computer vision**. Currently, we support object detection and image classification, but we are aiming for much more. It is built in Python, using [TensorFlow](https://www.tensorflow.org/) and [Sonnet](https://github.com/deepmind/sonnet).
 
-# What is Luminoth?
+![Example of Object Detection](https://luminoth.ai/images/screen.png)
 
-Luminoth is a computer vision toolkit made with [Tensorflow](https://www.tensorflow.org/) and [Sonnet](https://deepmind.github.io/sonnet/). Our main objective is to create tools and code to easily train and use deep learning models for computer vision problems.
-
-- Code that is both easy to understand and easy to extend.
-- Out-of-the-box state of the art models.
-- Straightforward implementations with TensorBoard support.
-- Cloud integration for training and deploying.
-
-> **DISCLAIMER**: This is currently a pre-pre-alpha release, we decided to open-source it up for those inquisive minds that don't mind getting their hands dirty with rough edges of code.
-
-## Why Luminoth
-
-We started building Luminoth at [Tryolabs](https://tryolabs.com/) after realizing we always ended up rewriting many of the common Tensorflow boilerplate code and models over and over. Instead of just building a cookie-cutter for Tensorflow we started to think about what other features we could benefit from, and how an ideal toolkit would look like.
-
-## Why Tensorflow (and why Sonnet)?
-
-It is indisputable that TensorFlow is currently the most mature Deep Learning framework, and even though we love (truly love) other frameworks as well, especially [PyTorch](http://pytorch.org), our customers demand stable and production ready Machine Learning solutions.
-
-[Sonnet](https://deepmind.github.io/sonnet/) fits perfectly with our mission to build code that is easy to follow and to extend. It is tricky to build a computation graph that is abstract and low-level at the same time to allows us to build complex models, and luckily Sonnet is a library that provides just that.
+> **DISCLAIMER**: Luminoth is still alpha-quality release, which means the internal and external interfaces (such as command line) are very likely to change as the codebase matures.
 
 # Installation
 Luminoth currently supports Python 2.7 and 3.4–3.6.
@@ -70,7 +52,14 @@ Simply run `lumi --help`.
 
 # Supported models
 
-Currently we are focusing on object detection problems, and have a fully functional version of [Faster RCNN](https://arxiv.org/abs/1506.01497). There are more models in progress (SSD and Mask RCNN to name a couple), and we look forward to opening up those implementations.
+Currently, we support the following models:
+
+* **Object Detection**
+    * [Faster R-CNN](https://arxiv.org/abs/1506.01497)
+
+We are planning on adding support for more models in the near future, such as [SSD](https://arxiv.org/abs/1512.02325), [YOLO](https://arxiv.org/abs/1506.02640) and [Mask R-CNN](https://arxiv.org/abs/1703.06870).
+
+Moreover, we are also working on providing **pre-trained checkpoints** on popular datasets such as [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html).
 
 # Usage
 
@@ -80,31 +69,12 @@ There is one main command line interface which you can use with the `lumi` comma
 
 and a list of available options with descriptions will show up.
 
-## Datasets
-
-Convert datasets to TensorFlow's *`.tfrecords`* for efficient processing using the computation graphs (and for cloud support).
-
-- [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html)
-
-```
-lumi dataset transform --type pascalvoc --data-dir ~/dataset/pascalvoc/ --output-dir ~/dataset/pascalvoc/tf/
-```
-
-- [ImageNet](http://image-net.org/download)
-
-```
-lumi dataset transform --type imagenet --data-dir ~/dataset/imagenet/ --output-dir ~/dataset/imagenet/tf/
-```
-
-- [COCO](http://mscoco.org/dataset/#download)
-
-```
-lumi dataset transform --type coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
-```
+## Working with datasets
+See [DATASETS.md](./docs/DATASETS.md).
 
 ## Training
 
-Check our [TRAINING.md](./TRAINING.md) on how to train locally or in Google Cloud.
+Check our [TRAINING.md](./docs/TRAINING.md) on how to train locally or in Google Cloud.
 
 ## Visualizing results
 
@@ -115,3 +85,13 @@ By default summary and graph logs are saved to `/tmp/luminoth`. You can use Tens
 ```
 tensorboard --logdir /tmp/luminoth
 ```
+
+## Why the name?
+> The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
+>
+> -- [Dark Visor - Wikitroid](http://metroid.wikia.com/wiki/Dark_Visor)
+>
+
+# License
+Copyright © 2017, [Tryolabs](https://tryolabs.com).
+Released under the [BSD Clause-3](LICENSE).
