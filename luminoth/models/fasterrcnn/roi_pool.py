@@ -7,27 +7,24 @@ ROI_POOLING = 'roi_pooling'
 
 
 class ROIPoolingLayer(snt.AbstractModule):
-    """ROIPoolingLayer which applies ROI pooling (or tf.crop_and_resize).
+    """ROIPoolingLayer applies ROI Pooling (or tf.crop_and_resize).
 
     RoI pooling or RoI extraction is used to extract fixed size features from a
-    feature map using variabled sized values for extraction. Since we have
-    plently of proposals of different shapes and sizes, we need a way to use
-    all the information available in the pretrained feature map.
+    variable sized feature map using variabled sized bounding boxes. Since we
+    have proposals of different shapes and sizes, we need a way to transform
+    them into a fixed size Tensor for using FC layers.
 
     There are two basic ways to do this, the original one in the FasterRCNN's
     paper is RoI Pooling, which as the name suggests, it maxpools directly from
-    the region of interest, or proposal, into a fixed sized Tensor.
+    the region of interest, or proposal, into a fixed size Tensor.
 
     The alternative way uses TensorFlow's image utility operation called,
     `crop_and_resize` which first crops an Tensor using a normalized proposal,
-    and then applies extrapolationt to resize it to the desired size,
-    generating a fixed sized Tensor.
+    and then applies extrapolation to resize it to the desired size,
+    generating a fixed size Tensor.
 
     Since there isn't a std support implemenation of RoIPooling, we apply the
     easier but still proven alternatve way.
-
-    TODO: Should not be called ROIPoolingLayer, since it doesn't always apply
-    RoI pooling.
     """
     def __init__(self, config, debug=False, name='roi_pooling'):
         super(ROIPoolingLayer, self).__init__(name=name)

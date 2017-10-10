@@ -12,8 +12,8 @@ class RPNProposal(snt.AbstractModule):
     sorted by relevance.
 
     Besides applying the transformations (or adjustments) from the prediction,
-    it also tries to get rid of duplicate proposals by using non maximum
-    supression (NMS).
+    it tries to get rid of duplicate proposals by using non maximum supression
+    (NMS).
     """
     def __init__(self, num_anchors, config, name='proposal_layer'):
         super(RPNProposal, self).__init__(name=name)
@@ -29,7 +29,7 @@ class RPNProposal(snt.AbstractModule):
         self._post_nms_top_n = config.post_nms_top_n
         # Threshold to use for NMS.
         self._nms_threshold = config.nms_threshold
-        # TODO: Currently we do not filter out proposals by size.
+        # Currently we do not filter out proposals by size.
         self._min_size = config.min_size
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
@@ -102,8 +102,6 @@ class RPNProposal(snt.AbstractModule):
         proposals = clip_boxes(proposals, im_shape)
 
         # Filter proposals with negative area.
-        # TODO: Optional, is not done in paper, maybe we should make it
-        # configurable.
         (x_min, y_min, x_max, y_max) = tf.unstack(proposals, axis=1)
         proposal_filter = tf.greater_equal(
             (x_max - x_min) * (y_max - y_min), 0)

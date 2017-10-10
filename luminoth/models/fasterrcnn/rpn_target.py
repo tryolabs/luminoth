@@ -70,7 +70,7 @@ class RPNTarget(snt.AbstractModule):
         # When choosing random targets use `seed` to replicate behaviour.
         self._seed = seed
 
-    def _build(self, all_anchors, gt_boxes, im_size):
+    def _build(self, all_anchors, gt_boxes, im_shape):
         """
         We compare anchors to GT and using the minibatch size and the different
         config settings (clobber, foreground fraction, etc), we end up with
@@ -85,11 +85,12 @@ class RPNTarget(snt.AbstractModule):
         Args:
             all_anchors:
                 A Tensor with all the bounding boxes coords of the anchors.
+                Its shape should be (num_anchors, 4).
             gt_boxes:
                 A Tensor with the ground truth bounding boxes of the image of
-                the batch being processed. Its dimensions should be
-                (num_gt, 5). The last dimension is used for the label.
-            im_size:
+                the batch being processed. Its shape should be (num_gt, 5).
+                The last dimension is used for the label.
+            im_shape:
                 Shape of original image (height, width) in order to define
                 anchor targers in respect with gt_boxes.
 
@@ -116,8 +117,8 @@ class RPNTarget(snt.AbstractModule):
                 tf.greater_equal(y_min_anchor, -self._allowed_border)
             ),
             tf.logical_and(
-                tf.less(x_max_anchor, im_size[1] + self._allowed_border),
-                tf.less(y_max_anchor, im_size[0] + self._allowed_border)
+                tf.less(x_max_anchor, im_shape[1] + self._allowed_border),
+                tf.less(y_max_anchor, im_shape[0] + self._allowed_border)
             )
         )
 
