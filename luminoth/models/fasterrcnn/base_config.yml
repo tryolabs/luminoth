@@ -181,7 +181,8 @@ rcnn:
   layer_sizes: [4096, 4096]
   # Dropout keep probability (turn off with 1.0 value)
   dropout_keep_prop: 1.0
-  activation_function: relu6
+  activation_function: relu
+  use_mean: False
   initializer:
     type: variance_scaling_initializer
     factor: 1.0
