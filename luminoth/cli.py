@@ -11,9 +11,10 @@ It's base subcommands are:
 
 import click
 
+from luminoth.eval import evaluate
+from luminoth.detect import detect
 from luminoth.tools import cloud, dataset, server
 from luminoth.train import train
-from luminoth.eval import evaluate
 
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -26,6 +27,7 @@ def cli():
 
 cli.add_command(cloud)
 cli.add_command(dataset)
+cli.add_command(detect)
 cli.add_command(evaluate)
 cli.add_command(train)
 cli.add_command(server)
