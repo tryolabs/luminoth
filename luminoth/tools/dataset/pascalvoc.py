@@ -55,6 +55,10 @@ class PascalVOC(DatasetTool):
 
     def load_split(self, split='train'):
         split_path = self.get_split_path(split)
+
+        if not tf.gfile.Exists(split_path):
+            raise ValueError('"{}" not found.'.format(split_path))
+
         with tf.gfile.GFile(split_path) as f:
             for line in f:
                 yield line.strip()

@@ -73,6 +73,9 @@ class ImageNet(DatasetTool):
     def load_split(self, split='train'):
         split_path = self.get_split_path(split)
 
+        if not tf.gfile.Exists(split_path):
+            raise ValueError('"{}" not found'.format(split))
+
         with tf.gfile.GFile(split_path) as f:
             for line in f:
                 # The images in 'extra' directories don't have annotations.

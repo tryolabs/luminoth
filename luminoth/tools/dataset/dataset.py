@@ -186,37 +186,69 @@ class RecordSaver():
             'Generating outputs for splits = {}'.format(", ".join(splits)))
 
         for split in splits:
-            split_size = self.dataset.get_split_size(split)
-            if self.limit_examples:
-                split_size = min(self.limit_examples, split_size)
-
-            tf.logging.info('Converting split = {}'.format(split))
             record_file = self.get_record_file(split)
-            writer = tf.python_io.TFRecordWriter(record_file)
+            try:
+                split_size = self.dataset.get_split_size(split)
+                if self.limit_examples:
+                    split_size = min(self.limit_examples, split_size)
 
-            total_examples = 0
-            with click.progressbar(self.dataset.load_split(split),
-                                   length=split_size) as split_lines:
-                for image_id in split_lines:
-                    if (not self.only_filename or
-                       self.only_filename == image_id):
-                        # Using limit on classes it's possible for an
-                        # image_to_example to return None (because no classes
-                        # match).
-                        example = self.dataset.image_to_example(
-                            self.classes, image_id
+                tf.logging.info('Converting split = {}'.format(split))
+                writer = tf.python_io.TFRecordWriter(record_file)
+
+                total_examples = 0
+                errors = 0
+                with click.progressbar(self.dataset.load_split(split),
+                                       length=split_size) as split_lines:
+                    for image_id in split_lines:
+                        if (not self.only_filename or
+                           self.only_filename == image_id):
+                            # Using limit on classes it's possible for an
+                            # image_to_example to return None (because no
+                            # classes match).
+                            try:
+                                example = self.dataset.image_to_example(
+                                    self.classes, image_id
+                                )
+                                if example:
+                                    total_examples += 1
+                                    writer.write(example.SerializeToString())
+                            except tf.errors.NotFoundError:
+                                errors += 1
+
+                        stop_saving = (
+                            self.limit_examples and
+                            total_examples == self.limit_examples
                         )
-                        if example:
-                            total_examples += 1
-                            writer.write(example.SerializeToString())
+                        if stop_saving:
+                            break
 
-                    stop_saving = (
-                        self.limit_examples and
-                        total_examples == self.limit_examples
+                writer.close()
+
+                if total_examples == 0:
+                    tf.logging.error(
+                        'Data for split "{}" is missing. '
+                        'Removing record file.'.format(
+                            split
+                        ))
+                    tf.gfile.Remove(record_file)
+
+                elif errors > 0:
+                    tf.logging.warning(
+                        'Split "{}" finished with {} missing files ({:.2f}%). '
+                        'Make sure you downloaded all the data '
+                        'correctly.'.format(
+                            split, errors,
+                            100. * errors / (errors + total_examples)
+                        ))
+
+                if total_examples > 0:
+                    tf.logging.info(
+                        'Saved split {} to "{}"'.format(split, record_file)
                     )
-                    if stop_saving:
-                        break
 
-            tf.logging.info(
-                'Saved split {} to "{}"'.format(split, record_file)
-            )
+            except ValueError as e:
+                tf.logging.error(
+                    'Could not create dataset for split {}:'.format(split))
+                tf.logging.error(e)
+                if tf.gfile.Exists(record_file):
+                    tf.gfile.Remove(record_file)
