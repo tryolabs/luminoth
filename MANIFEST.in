@@ -1,4 +1,4 @@
-include *.md *.txt tox.ini LICENSE
+include *.md *.txt tox.ini LICENSE *.yml
 graft luminoth
 
 global-exclude __pycache__
