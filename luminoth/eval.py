@@ -4,7 +4,7 @@ import os
 import tensorflow as tf
 import time
 
-from luminoth.datasets import TFRecordDataset
+from luminoth.datasets import get_dataset
 from luminoth.models import (
     get_model, DEFAULT_MODEL
 )
@@ -66,7 +66,8 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     config.model.base_network.trainable = False
 
     model = model_class(config)
-    dataset = TFRecordDataset(config)
+    dataset_class = get_dataset(config.dataset.type)
+    dataset = dataset_class(config)
     train_dataset = dataset()
 
     train_image = train_dataset['image']
