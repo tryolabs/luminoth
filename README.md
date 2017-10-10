@@ -3,6 +3,7 @@ Luminoth
 
 [![Build Status](https://travis-ci.org/tryolabs/luminoth.svg?branch=master)](https://travis-ci.org/tryolabs/luminoth)
 [![codecov](https://codecov.io/gh/tryolabs/luminoth/branch/master/graph/badge.svg)](https://codecov.io/gh/tryolabs/luminoth)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 > The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
 >
@@ -80,27 +81,8 @@ There is one main command line interface which you can use with the `lumi` comma
 
 and a list of available options with descriptions will show up.
 
-## Datasets
-
-Convert datasets to TensorFlow's *`.tfrecords`* for efficient processing using the computation graphs (and for cloud support).
-
-- [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html)
-
-```
-lumi dataset transform --type pascalvoc --data-dir ~/dataset/pascalvoc/ --output-dir ~/dataset/pascalvoc/tf/
-```
-
-- [ImageNet](http://image-net.org/download)
-
-```
-lumi dataset transform --type imagenet --data-dir ~/dataset/imagenet/ --output-dir ~/dataset/imagenet/tf/
-```
-
-- [COCO](http://mscoco.org/dataset/#download)
-
-```
-lumi dataset transform --type coco --data-dir ~/dataset/coco/ --output-dir ~/dataset/coco/tf/
-```
+## Using existing dataset
+See [DATASETS.md](./docs/DATASETS.md).
 
 ## Training
 
