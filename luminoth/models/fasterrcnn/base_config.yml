@@ -133,13 +133,18 @@ anchors:
 rpn:
   num_channels: 512
   kernel_shape: [3, 3]
-  # Initializer to be used for all RPN conv layers (TODO: Different ones for cls & reg?)
-  initializer:
+  rpn_initializer:
+    type: glorot_uniform_initializer
+  cls_initializer:
+    type: truncated_normal_initializer
+    mean: 0.0
+    stddev: 0.01
+  bbox_initializer:
     type: truncated_normal_initializer
     mean: 0.0
     stddev: 0.01
   l2_regularization_scale: 0.0005  # disable using 0
-  activation_function: relu6
+  activation_function: relu
 
   proposals:
     # Total proposals to use before running NMS (sorted by score)
@@ -149,6 +154,10 @@ rpn:
     # NMS threshold used when removing "almost duplicates"
     nms_threshold: 0.6
     min_size: 0  # disable using 0
+    # Run clipping of proposals after running NMS
+    clip_after_nms: False
+    # Filter proposals from anchors partially outside the image.
+    filter_outside_anchors: False
 
   target:
     # Margin to crop propocals to close to the border

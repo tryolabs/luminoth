@@ -6,7 +6,8 @@ from luminoth.models.fasterrcnn.rcnn_target import RCNNTarget
 from luminoth.models.fasterrcnn.roi_pool import ROIPoolingLayer
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import (
-    get_initializer, layer_summaries, variable_summaries
+    get_initializer, layer_summaries, variable_summaries,
+    get_activation_function
 )
 
 
@@ -38,7 +39,7 @@ class RCNN(snt.AbstractModule):
         # List of the fully connected layer sized used before classifying and
         # adjusting the bounding box.
         self._layer_sizes = config.layer_sizes
-        self._activation = tf.nn.relu
+        self._activation = get_activation_function(config.activation_function)
         self._dropout_keep_prob = config.dropout_keep_prop
         self._use_mean = config.use_mean
 

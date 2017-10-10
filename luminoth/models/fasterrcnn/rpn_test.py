@@ -16,7 +16,15 @@ class RPNTest(tf.test.TestCase):
         self.config = EasyDict({
             'num_channels': 512,
             'kernel_shape': [3, 3],
-            'initializer': {
+            'rpn_initializer': {
+                'type': 'glorot_uniform_initializer',
+            },
+            'cls_initializer': {
+                'type': 'truncated_normal_initializer',
+                'mean': 0.0,
+                'stddev': 0.01,
+            },
+            'bbox_initializer': {
                 'type': 'truncated_normal_initializer',
                 'mean': 0.0,
                 'stddev': 0.01,
@@ -28,6 +36,8 @@ class RPNTest(tf.test.TestCase):
                 'post_nms_top_n': 2000,
                 'nms_threshold': 0.6,
                 'min_size': 0,
+                'clip_after_nms': False,
+                'filter_outside_anchors': False,
             },
             'target': {
                 'allowed_border': 0,

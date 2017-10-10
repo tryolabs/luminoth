@@ -32,6 +32,8 @@ class RPNProposal(snt.AbstractModule):
         self._nms_threshold = config.nms_threshold
         # Currently we do not filter out proposals by size.
         self._min_size = config.min_size
+        self._filter_outside_anchors = config.filter_outside_anchors
+        self._clip_after_nms = config.clip_after_nms
         self._debug = debug
 
     def _build(self, rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape):
@@ -68,14 +70,37 @@ class RPNProposal(snt.AbstractModule):
         # Force flatten the scores (it should be already be flatten).
         scores = tf.reshape(scores, [-1])
 
+        if self._filter_outside_anchors:
+            with tf.name_scope('filter_outside_anchors'):
+                (x_min_anchor, y_min_anchor,
+                 x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
+
+                anchor_filter = tf.logical_and(
+                    tf.logical_and(
+                        tf.greater_equal(x_min_anchor, 0),
+                        tf.greater_equal(y_min_anchor, 0)
+                    ),
+                    tf.logical_and(
+                        tf.less(x_max_anchor, im_shape[1]),
+                        tf.less(y_max_anchor, im_shape[0])
+                    )
+                )
+                anchor_filter = tf.reshape(anchor_filter, [-1])
+                all_anchors = tf.boolean_mask(
+                    all_anchors, anchor_filter, name='filter_anchors')
+                rpn_bbox_pred = tf.boolean_mask(rpn_bbox_pred, anchor_filter)
+                scores = tf.boolean_mask(scores, anchor_filter)
+
         # Decode boxes
         all_proposals = decode(all_anchors, rpn_bbox_pred)
-        # Clip proposals to the image.
-        all_proposals_clipped = clip_boxes(all_proposals, im_shape)
+
+        if not self._clip_after_nms:
+            # Clip proposals to the image.
+            all_proposals = clip_boxes(all_proposals, im_shape)
 
         # Filter proposals with negative or zero area.
         (x_min, y_min, x_max, y_max) = tf.unstack(
-            all_proposals_clipped, axis=1
+            all_proposals, axis=1
         )
         proposal_filter = tf.greater(
             tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
@@ -90,7 +115,7 @@ class RPNProposal(snt.AbstractModule):
             name='filter_invalid_scores'
         )
         proposals = tf.boolean_mask(
-            all_proposals_clipped, proposal_filter,
+            all_proposals, proposal_filter,
             name='filter_invalid_proposals'
         )
         filtered_proposals = tf.shape(scores)[0]
@@ -133,6 +158,11 @@ class RPNProposal(snt.AbstractModule):
 
         # We switch back again to the regular bbox encoding.
         nms_proposals = change_order(nms_proposals)
+
+        if self._clip_after_nms:
+            # Clip proposals to the image after NMS.
+            nms_proposals = clip_boxes(nms_proposals, im_shape)
+
         # Adds batch number for consistency and multi image batch support.
         batch_inds = tf.zeros(
             (tf.shape(nms_proposals)[0], 1), dtype=tf.float32
@@ -151,7 +181,6 @@ class RPNProposal(snt.AbstractModule):
                 'top_k_proposals': top_k_proposals,
                 'top_k_scores': top_k_scores,
                 'all_proposals': all_proposals,
-                'all_proposals_clipped': all_proposals_clipped,
             })
 
         return pred

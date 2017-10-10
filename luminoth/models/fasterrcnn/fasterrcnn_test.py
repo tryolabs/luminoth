@@ -60,44 +60,54 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     'padding': 'VALID'
                 },
                 'proposals': {
-                  'class_max_detections': 100,
-                  'class_nms_threshold': 0.6,
-                  'total_max_detections': 300,
-                  'min_prob_threshold': 0.0,
+                    'class_max_detections': 100,
+                    'class_nms_threshold': 0.6,
+                    'total_max_detections': 300,
+                    'min_prob_threshold': 0.0,
                 },
                 'target': {
-                  'foreground_fraction': 0.25,
-                  'minibatch_size': 64,
-                  'foreground_threshold': 0.5,
-                  'background_threshold_high': 0.5,
-                  'background_threshold_low': 0.1,
+                    'foreground_fraction': 0.25,
+                    'minibatch_size': 64,
+                    'foreground_threshold': 0.5,
+                    'background_threshold_high': 0.5,
+                    'background_threshold_low': 0.1,
                 }
              },
             'rpn': {
-               'num_channels': 512,
-               'kernel_shape': [3, 3],
-               'initializer': {
-                 'type': 'truncated_normal_initializer',
-                 'mean': 0.0,
-                 'stddev': 0.01
-               },
-               'activation_function': 'relu6',
-               'l2_regularization_scale': 0.0005,
-               'proposals': {
-                 'pre_nms_top_n': 12000,
-                 'post_nms_top_n': 2000,
-                 'nms_threshold': 0.6,
-                 'min_size': 0
-               },
-               'target': {
-                 'allowed_border': 0,
-                 'clobber_positives': False,
-                 'foreground_threshold': 0.7,
-                 'background_threshold_high': 0.3,
-                 'background_threshold_low': 0.,
-                 'foreground_fraction': 0.5,
-                 'minibatch_size': 256,
-               }
+                'num_channels': 512,
+                'kernel_shape': [3, 3],
+                'rpn_initializer': {
+                    'type': 'glorot_uniform_initializer',
+                },
+                'cls_initializer': {
+                    'type': 'truncated_normal_initializer',
+                    'mean': 0.0,
+                    'stddev': 0.01,
+                },
+                'bbox_initializer': {
+                    'type': 'truncated_normal_initializer',
+                    'mean': 0.0,
+                    'stddev': 0.01,
+                },
+                'activation_function': 'relu6',
+                'l2_regularization_scale': 0.0005,
+                'proposals': {
+                    'pre_nms_top_n': 12000,
+                    'post_nms_top_n': 2000,
+                    'nms_threshold': 0.6,
+                    'min_size': 0,
+                    'clip_after_nms': False,
+                    'filter_outside_anchors': False,
+                },
+                'target': {
+                    'allowed_border': 0,
+                    'clobber_positives': False,
+                    'foreground_threshold': 0.7,
+                    'background_threshold_high': 0.3,
+                    'background_threshold_low': 0.,
+                    'foreground_fraction': 0.5,
+                    'minibatch_size': 256,
+                }
              }
         })
         self.image_size = (600, 800)

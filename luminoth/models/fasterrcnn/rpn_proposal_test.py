@@ -17,6 +17,8 @@ class RPNProposalTest(tf.test.TestCase):
             'post_nms_top_n': 3,
             'nms_threshold': 1,
             'min_size': 0,
+            'clip_after_nms': False,
+            'filter_outside_anchors': False,
         })
         tf.reset_default_graph()
 
@@ -397,19 +399,19 @@ class RPNProposalTest(tf.test.TestCase):
 
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results['all_proposals_clipped'].shape))
+            tf.float32, shape=(results['nms_proposals'][:, :4].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results['all_proposals_clipped'],
+                proposals: results['nms_proposals'][:, :4],
                 im_size: self.im_size
             })
 
         # Check we get proposals clipped to the image.
         self.assertAllEqual(
-            results['all_proposals_clipped'],
+            results['nms_proposals'][:, :4],
             clipped_proposals
         )
 

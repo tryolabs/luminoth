@@ -24,7 +24,7 @@ class RPN(snt.AbstractModule):
 
         This module works almost independently from the Faster RCNN module.
         It instantiates its own submodules and calculates its own loss,
-        and can be used on its own
+        and can be used on its own.
 
         """
         super(RPN, self).__init__(name=name)
@@ -35,9 +35,17 @@ class RPN(snt.AbstractModule):
         self._debug = debug
         self._seed = seed
 
+        self._rpn_initializer = get_initializer(
+            config.rpn_initializer, seed=seed
+        )
         # According to Faster RCNN paper we need to initialize layers with
         # "from a zero-mean Gaussian distribution with standard deviation 0.01
-        self._initializer = get_initializer(config.initializer, seed=seed)
+        self._cls_initializer = get_initializer(
+            config.cls_initializer, seed=seed
+        )
+        self._bbox_initializer = get_initializer(
+            config.bbox_initializer, seed=seed
+        )
         self._regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale
         )
@@ -55,14 +63,14 @@ class RPN(snt.AbstractModule):
         self._rpn = Conv2D(
             output_channels=self._num_channels,
             kernel_shape=self._kernel_shape,
-            initializers={'w': self._initializer},
+            initializers={'w': self._rpn_initializer},
             regularizers={'w': self._regularizer},
             name='conv'
         )
 
         self._rpn_cls = Conv2D(
             output_channels=self._num_anchors * 2, kernel_shape=[1, 1],
-            initializers={'w': self._initializer},
+            initializers={'w': self._cls_initializer},
             regularizers={'w': self._regularizer},
             padding='VALID', name='cls_conv'
         )
@@ -70,7 +78,7 @@ class RPN(snt.AbstractModule):
         # BBox prediction is 4 values * number of anchors.
         self._rpn_bbox = Conv2D(
             output_channels=self._num_anchors * 4, kernel_shape=[1, 1],
-            initializers={'w': self._initializer},
+            initializers={'w': self._bbox_initializer},
             regularizers={'w': self._regularizer},
             padding='VALID', name='bbox_conv'
         )
@@ -129,7 +137,9 @@ class RPN(snt.AbstractModule):
 
         prediction_dict = {}
 
-        rpn_feature = self._rpn(conv_feature_map)
+        # Get the RPN feature using a simple conv net. Activation function
+        # can be set to empty.
+        rpn_feature = self._rpn_activation(self._rpn(conv_feature_map))
 
         # Then we apply separate conv layers for classification and regression.
         rpn_cls_score_original = self._rpn_cls(rpn_feature)
