@@ -2,7 +2,7 @@
 
 ## Locally
 
-You can use the `lumi train <model-type>` command to easily start training your model (with default config). Before anything else, try running it to see if everything is working.
+You can use the `lumi train --model <model-type>` command to easily start training your model (with default config). Before anything else, try running it to see if everything is working. You'll need a dataset in tfrecord format in the default location (`./datasets/voc/tf`). See [DATASETS.md](./DATASETS.md) for more info.
 
 The `train` cli tool provides many options related to training.
 
