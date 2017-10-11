@@ -78,12 +78,12 @@ Check our [TRAINING](./docs/TRAINING.md) on how to train locally or in Google Cl
 
 ## Visualizing results
 
-We strive to get useful and understandable summary and graph visualizations. We consider them to be essential not only for monitoring (duh!), but for getting a broader understanding of whats going under the hood. The same way it is important for code to be understandable and easy to follow, the computation graph should be as well.
+We strive to get useful and understandable summary and graph visualizations. We consider them to be essential not only for monitoring (duh!), but for getting a broader understanding of what's going under the hood. The same way it is important for code to be understandable and easy to follow, the computation graph should be as well.
 
-By default summary and graph logs are saved to `/tmp/luminoth`. You can use TensorBoard by running:
+By default summary and graph logs are saved to `jobs/` under the current directory. You can use TensorBoard by running:
 
 ```
-tensorboard --logdir /tmp/luminoth
+tensorboard --logdir path/to/jobs
 ```
 
 ## Why the name?
