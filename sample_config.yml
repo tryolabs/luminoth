@@ -6,14 +6,15 @@ dataset:
   # From which directory to read the dataset
   dir: datasets/voc/tf
 
-network:
-  # Total number of classes to predict
-  num_classes: 20
+model:
+  network:
+    # Total number of classes to predict
+    num_classes: 20
 
-base_network:
-  # Which type of pretrained network to use
-  architecture: resnet_v1_101
-  # Should we train the pretrained network
-  trainable: True
-  # Should we download weights if not available
-  download: True
+  base_network:
+    # Which type of pretrained network to use
+    architecture: resnet_v1_101
+    # Should we train the pretrained network
+    trainable: True
+    # Should we download weights if not available
+    download: True
