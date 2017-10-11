@@ -4,21 +4,17 @@
 
 You can use the `lumi train --model <model-type>` command to easily start training your model (with default config). Before anything else, try running it to see if everything is working. You'll need a dataset in tfrecord format in the default location (`./datasets/voc/tf`). See [DATASETS.md](./DATASETS.md) for more info.
 
-The `train` cli tool provides many options related to training.
+The `train` cli tool provides the following options related to training.
 
 Options:
   - `--config`/`-c`: Config file to use.
-  - `--override`/`-o`: Override any configuration setting using dot notation (e.g.: `-o rpn.proposals.nms_threshold=0.8`).
-  - `--run-name`: Run name used for logs and checkpoints.
-  - `--continue-training`: Automatically search for checkpoints and continue training from the last one.
-  - `--model-dir`: Where to save the training checkpoints.
-  - `--checkpoint-file`: From where to read network weights (if available).
-  - `--log-dir`: Where to save the training logs and summaries.
-  - `--save-every`: Save a checkpoint every that many batches or seconds.
-  - `--debug`: Debug log level and richer tensor outputs.
-  - `--tf-debug`: TensorFlow's tfdb debugger.
-  - `--save-timeline`: Save timeline of execution.
-  - `--full-trace`: Run TensorFlow with `FULL_TRACE` config for memory and running time debugging in TensorBoard.
+  - `--override`/`-o`: Override any configuration setting using dot notation
+(e.g.: `-o model.rpn.proposals.nms_threshold=0.8`).
+
+Most of the configuration is done via the `--config` file. See the
+[sample_config.yml](../sample_config.yml) for a simple example, or fasterrcnn's
+[base_config.yml](../luminoth/models/fasterrcnn/base_config.yml) for the full
+range of settings.
 
 
 ## Google Cloud
@@ -57,11 +53,16 @@ Options:
   - `--job-id`: Identifies the training job.
   - `--config`: Configuration used in training.
   - `--bucket`: Google Storage bucket name.
+  - `--region`: [Google Cloud
+region](https://cloud.google.com/compute/docs/regions-zones/) in which to set
+up the cluster.
   - `--dataset`: Path to dataset in the bucket provided.
   - `--scale-tier`: Cluster configuration. Default: BASIC_GPU.
   - `--master-type`: Master node machine type.
   - `--worker-type`: Worker node machine type.
   - `--worker-count`: Number of workers.
+  - `--parameter-server-type`: Parameter server node machine type.
+  - `--parameter-server-count`: Number of parameter servers.
 
 #### `lumi cloud gc jobs`
 List project’s jobs.
