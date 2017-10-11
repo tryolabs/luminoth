@@ -94,4 +94,4 @@ tensorboard --logdir path/to/jobs
 
 # License
 Copyright © 2017, [Tryolabs](https://tryolabs.com).
-Released under the [BSD Clause-3](LICENSE).
+Released under the [BSD 3-Clause](LICENSE).
