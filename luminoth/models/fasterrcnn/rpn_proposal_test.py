@@ -474,6 +474,48 @@ class RPNProposalTest(tf.test.TestCase):
         zeros = np.zeros(results_after['nms_proposals'][:, 1:].shape)
         self.assertAllEqual(top_max, zeros)
 
+    def testFilterOutsideAnchors(self):
+        """
+        Test clipping of proposals before and after NMS
+        """
+        gt_boxes = np.array([
+            [0, 0, 10, 12],
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+            [30, 25, 39, 39],
+            [30, 25, 39, 39],
+        ])
+        all_anchors = np.array([
+            [-20, -10, 12, 6],
+            [2, 10, 20, 20],
+            [0, 0, 50, 16],
+            [2, -10, 20, 50],
+            [25, 30, 27, 33],
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.3, 0.7],
+            [0.1, 0.9],
+            [0.2, 0.8],
+        ])
+        config = EasyDict(self.config)
+        config['filter_outside_anchors'] = False
+        results_without_filter = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
+
+        # Check that all_proposals contain the outside anchors
+        self.assertAllEqual(
+            results_without_filter['all_proposals'].shape,
+            all_anchors.shape)
+
+        config['filter_outside_anchors'] = True
+        results_with_filter = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
+        self.assertAllEqual(
+            results_with_filter['all_proposals'].shape,
+            (2, 4))
+
 
 if __name__ == "__main__":
     tf.test.main()
