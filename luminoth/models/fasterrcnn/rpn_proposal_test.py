@@ -373,47 +373,106 @@ class RPNProposalTest(tf.test.TestCase):
 
     def testClippingOfProposals(self):
         """
-        Test clipping of proposals
+        Test clipping of proposals before and after NMS
+        """
+        """
+        Before NMS
         """
         gt_boxes = np.array([
+            [0, 0, 10, 12],
             [10, 10, 20, 22],
             [10, 10, 20, 22],
-            [10, 10, 20, 22],
-            [10, 10, 20, 22],
+            [30, 25, 39, 39],
         ])
         all_anchors = np.array([
-            [11, 13, 12, 16],
-            [10, 10, 20, 22],
-            [11, 13, 12, 28],
-            [7, 13, 34, 30],
+            [-20, -10, 12, 6],
+            [2, -10, 20, 20],
+            [0, 0, 12, 16],
+            [2, -10, 20, 2],
         ])
         rpn_cls_prob = np.array([
             [0.3, 0.7],
             [0.4, 0.6],
-            [0.9, 0.1],
-            [0.8, 0.2]
+            [0.3, 0.7],
+            [0.1, 0.9],
         ])
 
-        results = self._run_rpn_proposal(
-            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
-
+        rpn_bbox_pred = np.array([  # This is set to zeros so when decode is
+            [0, 0, 0, 0],           # applied in RPNProposal the anchors don't
+            [0, 0, 0, 0],           # change, leaving us with unclipped
+            [0, 0, 0, 0],           # proposals.
+            [0, 0, 0, 0],
+        ])
+        config = EasyDict(self.config)
+        config['clip_after_nms'] = False
+        results_before = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
+            rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results['nms_proposals'][:, :4].shape))
+            tf.float32, shape=(results_before['proposals_raw'].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results['nms_proposals'][:, :4],
+                proposals: results_before['proposals_raw'],
                 im_size: self.im_size
             })
 
-        # Check we get proposals clipped to the image.
+        # Check we clip proposals right after filtering the invalid area ones.
         self.assertAllEqual(
-            results['nms_proposals'][:, :4],
+            results_before['proposals'],
             clipped_proposals
         )
+
+        # Check that the nms proposals are clipped
+        no_negatives = np.maximum(results_before['nms_proposals'][:, 1:], 0)
+        self.assertAllEqual(
+            results_before['nms_proposals'][:, 1:],
+            no_negatives)
+        max_value = np.array(self.im_size)
+        max_value = np.append(max_value, max_value)
+        top_max = np.maximum(
+            results_before['nms_proposals'][:, 1:] + 1 - max_value, 0)
+        zeros = np.zeros(results_before['nms_proposals'][:, 1:].shape)
+        self.assertAllEqual(top_max, zeros)
+
+        """
+        After NMS
+        """
+        config['clip_after_nms'] = True
+        results_after = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
+            rpn_bbox_pred=rpn_bbox_pred)
+        im_size = tf.placeholder(tf.float32, shape=(2,))
+        proposals = tf.placeholder(
+            tf.float32, shape=(results_after['proposals_raw'].shape))
+        clip_bboxes_tf = clip_boxes(proposals, im_size)
+
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
+                proposals: results_after['proposals_raw'],
+                im_size: self.im_size
+            })
+
+        # Check we don't clip proposals in the beginning of the function.
+        self.assertAllEqual(
+            results_after['proposals'],
+            results_after['proposals_raw']
+        )
+        # Check that the nms proposals are clipped
+        no_negatives = np.maximum(results_after['nms_proposals'][:, 1:], 0)
+        self.assertAllEqual(
+            results_after['nms_proposals'][:, 1:],
+            no_negatives)
+        max_value = np.array(self.im_size)
+        max_value = np.append(max_value, max_value)
+        top_max = np.maximum(
+            results_after['nms_proposals'][:, 1:] + 1 - max_value, 0)
+        zeros = np.zeros(results_after['nms_proposals'][:, 1:].shape)
+        self.assertAllEqual(top_max, zeros)
 
 
 if __name__ == "__main__":
