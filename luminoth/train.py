@@ -52,7 +52,8 @@ def run(model_type, dataset_type, config_file, override_params, target='',
             dataset = dataset_class(config)
             train_dataset = dataset()
         except InvalidDataDirectory as exc:
-            tf.logging.error("Error while reading dataset, {}".format(exc.message))
+            tf.logging.error(
+                'Error while reading dataset, {}'.format(exc.message))
             return
         train_image = train_dataset['image']
         train_filename = train_dataset['filename']
