@@ -15,6 +15,7 @@ Luminoth is an open source toolkit for **computer vision**. Currently, we suppor
 Luminoth currently supports Python 2.7 and 3.4–3.6.
 
 If [TensorFlow](https://www.tensorflow.org) and [Sonnet](https://github.com/deepmind/sonnet) are already installed, Luminoth will use those versions.
+> *Note*:  older Tensorflow versions of 1.3.0 will not work.
 
 ## Install with CPU support
 Just run:
