@@ -26,14 +26,6 @@ def get_base_config(path, base_config_filename='base_config.yml'):
     return load_config([config_path])
 
 
-def kwargs_to_config(kwargs):
-    return easydict.EasyDict(dict(
-        (key, val)
-        for key, val in kwargs.items()
-        if val is not None
-    ))
-
-
 def is_basestring(value):
     """
     Checks if value is string in both Python2.7 and Python3+
@@ -144,11 +136,8 @@ def parse_config_value(value):
     return value
 
 
-def get_model_config(base_config, custom_config, override_params, **kwargs):
+def get_model_config(base_config, custom_config, override_params):
     config = easydict.EasyDict(base_config.copy())
-
-    # Load train extra options
-    config.train = merge_into(kwargs_to_config(kwargs), config.train)
 
     if custom_config:
         # If we have a custom config file overwriting default settings
