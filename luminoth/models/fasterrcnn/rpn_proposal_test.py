@@ -408,13 +408,13 @@ class RPNProposalTest(tf.test.TestCase):
             rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results_before['proposals_raw'].shape))
+            tf.float32, shape=(results_before['proposals_unclipped'].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results_before['proposals_raw'],
+                proposals: results_before['proposals_unclipped'],
                 im_size: self.im_size
             })
 
@@ -443,20 +443,20 @@ class RPNProposalTest(tf.test.TestCase):
             rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results_after['proposals_raw'].shape))
+            tf.float32, shape=(results_after['proposals_unclipped'].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results_after['proposals_raw'],
+                proposals: results_after['proposals_unclipped'],
                 im_size: self.im_size
             })
 
         # Check we don't clip proposals in the beginning of the function.
         self.assertAllEqual(
             results_after['proposals'],
-            results_after['proposals_raw']
+            results_after['proposals_unclipped']
         )
         # Check that the nms proposals are clipped
         no_negatives = np.maximum(results_after['nms_proposals'][:, 1:], 0)
