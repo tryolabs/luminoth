@@ -375,9 +375,7 @@ class RPNProposalTest(tf.test.TestCase):
         """
         Test clipping of proposals before and after NMS
         """
-        """
-        Before NMS
-        """
+        # Before NMS
         gt_boxes = np.array([
             [0, 0, 10, 12],
             [10, 10, 20, 22],
@@ -438,9 +436,7 @@ class RPNProposalTest(tf.test.TestCase):
         zeros = np.zeros(results_before['nms_proposals'][:, 1:].shape)
         self.assertAllEqual(top_max, zeros)
 
-        """
-        After NMS
-        """
+        # After NMS
         config['clip_after_nms'] = True
         results_after = self._run_rpn_proposal(
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
