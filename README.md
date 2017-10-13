@@ -7,7 +7,7 @@
 
 Luminoth is an open source toolkit for **computer vision**. Currently, we support object detection and image classification, but we are aiming for much more. It is built in Python, using [TensorFlow](https://www.tensorflow.org/) and [Sonnet](https://github.com/deepmind/sonnet).
 
-![Example of Object Detection](https://luminoth.ai/images/screen.png)
+![Example of Object Detection](https://luminoth.ai/images/screen.png?v=1)
 
 > **DISCLAIMER**: Luminoth is still alpha-quality release, which means the internal and external interfaces (such as command line) are very likely to change as the codebase matures.
 
@@ -15,7 +15,6 @@ Luminoth is an open source toolkit for **computer vision**. Currently, we suppor
 Luminoth currently supports Python 2.7 and 3.4–3.6.
 
 If [TensorFlow](https://www.tensorflow.org) and [Sonnet](https://github.com/deepmind/sonnet) are already installed, Luminoth will use those versions.
-> *Note*:  older Tensorflow versions of 1.3.0 will not work.
 
 ## Install with CPU support
 Just run:
