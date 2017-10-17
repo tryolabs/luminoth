@@ -153,6 +153,23 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             results = sess.run(results)
             return results
 
+    def _get_losses(self, prediction_dict):
+        image = tf.placeholder(
+            tf.float32, shape=self.image.shape)
+        gt_boxes = tf.placeholder(
+            tf.float32, shape=self.gt_boxes.shape)
+        model = FasterRCNN(self.config)
+        results = model(image, gt_boxes)
+        all_losses = model.loss(prediction_dict, return_all=True)
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            sess.run(results, feed_dict={
+                gt_boxes: self.gt_boxes,
+                image: self.image,
+            })
+            all_losses = sess.run(all_losses)
+            return all_losses
+
     def testBasic(self):
         """
         Test basic output of the FasterCnnNetwork
