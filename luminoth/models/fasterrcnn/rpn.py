@@ -220,7 +220,7 @@ class RPN(snt.AbstractModule):
                 * 1: for positive labels
                 * 0: for negative labels
                 * -1: for labels we should ignore.
-                Shape: (num_anchors, 4)
+                Shape: (num_anchors, )
             rpn_bbox_target: Bounding box output delta target for rpn.
                 Shape: (num_anchors, 4)
             rpn_bbox_pred: Bounding box output delta prediction for rpn.
