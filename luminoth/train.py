@@ -9,6 +9,7 @@ from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets.datasets import get_dataset
 from luminoth.models import get_model
+from luminoth.tools.dataset.dataset import InvalidDataDirectory
 from luminoth.utils.config import get_model_config
 from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import (
@@ -46,11 +47,14 @@ def run(model_type, dataset_type, config_file, override_params, target='',
     # See:
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
-
-        dataset_class = get_dataset_fn(dataset_type)
-        dataset = dataset_class(config)
-        train_dataset = dataset()
-
+        try:
+            dataset_class = get_dataset_fn(dataset_type)
+            dataset = dataset_class(config)
+            train_dataset = dataset()
+        except InvalidDataDirectory as exc:
+            tf.logging.error(
+                'Error while reading dataset, {}'.format(exc.message))
+            return
         train_image = train_dataset['image']
         train_filename = train_dataset['filename']
         train_bboxes = train_dataset['bboxes']

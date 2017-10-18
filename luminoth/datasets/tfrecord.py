@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 
+from luminoth.tools.dataset.dataset import InvalidDataDirectory
 from .object_detection_dataset import ObjectDetectionDataset
 
 
@@ -49,12 +50,14 @@ class TFRecordDataset(ObjectDetectionDataset):
         TODO: Join filename, scaling_factor (and possible other fields) into a
         metadata.
         """
-
         # Find split file from which we are going to read.
         split_path = os.path.join(
             self._dataset_dir, '{}.tfrecords'.format(self._split)
         )
-
+        if not tf.gfile.Exists(split_path):
+            raise InvalidDataDirectory(
+                '"{}" does not exist.'.format(split_path)
+            )
         # String input producer allows for a variable number of files to read
         # from. We just know we have a single file.
         filename_queue = tf.train.string_input_producer(
