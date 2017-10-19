@@ -153,12 +153,12 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             results = sess.run(results)
             return results
 
-    def _get_losses(self, prediction_dict):
+    def _get_losses(self, config, prediction_dict):
         image = tf.placeholder(
             tf.float32, shape=self.image.shape)
         gt_boxes = tf.placeholder(
             tf.float32, shape=self.gt_boxes.shape)
-        model = FasterRCNN(self.config)
+        model = FasterRCNN(config)
         results = model(image, gt_boxes)
         all_losses = model.loss(prediction_dict, return_all=True)
         with self.test_session() as sess:
@@ -322,22 +322,9 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         rand_seed = 13
         target_seed = 43
 
-        # Set number of anchors
         num_anchors = 1000
 
-        #
         #   RPN
-        #
-
-        # Random generation of cls_score for rpn
-        rpn_cls_score = tf.random_uniform(
-            [num_anchors, 2],
-            minval=-1,
-            maxval=1,
-            dtype=tf.float32,
-            seed=rand_seed,
-            name=None
-        )
 
         # Random generation of cls_targets for rpn
         # where:
@@ -356,12 +343,25 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         # Creation of cls_scores with:
         #   score 100 in correct class
         #   score 0 in wrong class
-        rpn_cls_perf_score = tf.cast(tf.one_hot(
-            tf.cast(
-                tf.identity(rpn_cls_target),
-                tf.int32),
-            depth=2,
-            on_value=100),
+
+        # Generation of opposite cls_score for rpn
+        rpn_cls_score = tf.cast(
+            tf.one_hot(
+                tf.cast(
+                    tf.mod(tf.identity(rpn_cls_target) + 1, 2),
+                    tf.int32),
+                depth=2,
+                on_value=100),
+            tf.float32
+        )
+        # Generation of correct cls_score for rpn
+        rpn_cls_perf_score = tf.cast(
+            tf.one_hot(
+                tf.cast(
+                    tf.identity(rpn_cls_target),
+                    tf.int32),
+                depth=2,
+                on_value=100),
             tf.float32
         )
 
@@ -403,9 +403,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         prediction_dict_perf['rpn_prediction'][
             'rpn_bbox_pred'] = rpn_bbox_target
 
-        #
         #   RCNN
-        #
 
         # Set the number of classes
         num_classes = self.config['network']['num_classes']
@@ -490,41 +488,15 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         prediction_dict_perf['classification_prediction'][
             'rcnn']['bbox_offsets'] = rcnn_bbox_perf_offsets
 
-        # Calculate both losses
-        loss_perfect = self._get_losses(prediction_dict_perf)
-        loss_random = self._get_losses(prediction_dict_random)
+        loss_perfect = self._get_losses(self.config, prediction_dict_perf)
+        loss_random = self._get_losses(self.config, prediction_dict_random)
 
-        # Losses achieved with the values:
-        #       rand_seed = 13
-        #       target_seed = 43
-        loss_perfect_compare = {
-            'no_reg_loss': 0.0,
-            'rcnn_cls_loss': 0.0,
-            'rcnn_reg_loss': 0.0,
-            'regularization_loss': 5.5716844,
-            'rpn_cls_loss': 0.0,
-            'rpn_reg_loss': 0.0,
-            'total_loss': 5.5716844
-        }
-
-        loss_random_compare = {
-            'no_reg_loss': 1138.8541,
-            'rcnn_cls_loss': 3.4223948,
-            'rcnn_reg_loss': 2.770031,
-            'regularization_loss': 11.141701,
-            'rpn_cls_loss': 474.52008,
-            'rpn_reg_loss': 657.0,
-            'total_loss': 1149.9957
-        }
-
-        # Maximum difference allowed to consider a value correct
-        delta = 0.1
-
-        for loss in loss_perfect:
-            self.assertAlmostEqual(
-                loss_perfect[loss], loss_perfect_compare[loss], delta=delta)
-            self.assertAlmostEqual(
-                loss_random[loss], loss_random_compare[loss], delta=delta)
+        self.assertEqual(
+            loss_perfect['total_loss'],
+            loss_perfect['regularization_loss'])
+        self.assertGreater(
+            loss_random['total_loss'],
+            loss_random['regularization_loss'])
 
     def _assert_sequential_values(self, values, delta=1):
         unique_values = np.unique(values)
