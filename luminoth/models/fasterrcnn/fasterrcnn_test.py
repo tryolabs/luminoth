@@ -117,6 +117,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 }
             }
         })
+
         self.image_size = (600, 800)
         self.image = np.random.randint(low=0, high=255, size=(1, 600, 800, 3))
         self.gt_boxes = np.array([
@@ -153,20 +154,16 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             results = sess.run(results)
             return results
 
-    def _get_losses(self, config, prediction_dict):
+    def _get_losses(self, config, prediction_dict, image_size):
         image = tf.placeholder(
             tf.float32, shape=self.image.shape)
         gt_boxes = tf.placeholder(
             tf.float32, shape=self.gt_boxes.shape)
         model = FasterRCNN(config)
-        results = model(image, gt_boxes)
+        model(image, gt_boxes)
         all_losses = model.loss(prediction_dict, return_all=True)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
-            sess.run(results, feed_dict={
-                gt_boxes: self.gt_boxes,
-                image: self.image,
-            })
             all_losses = sess.run(all_losses)
             return all_losses
 
@@ -321,8 +318,13 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         # Set seeds for stable results
         rand_seed = 13
         target_seed = 43
-
+        image_size = (60, 80)
         num_anchors = 1000
+
+        config = EasyDict(self.config)
+        config['rpn']['l2_regularization_scale'] = 0.0
+        config['rcnn']['l2_regularization_scale'] = 0.0
+        config['base_network']['arg_scope']['weight_decay'] = 0.0
 
         #   RPN
 
@@ -351,7 +353,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     tf.mod(tf.identity(rpn_cls_target) + 1, 2),
                     tf.int32),
                 depth=2,
-                on_value=100),
+                on_value=10),
             tf.float32
         )
         # Generation of correct cls_score for rpn
@@ -429,8 +431,8 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         # Generate random scores for the num_classes + the background class
         rcnn_cls_score = tf.random_uniform(
             [1, num_classes + 1],
-            minval=-1,
-            maxval=1,
+            minval=-100,
+            maxval=100,
             dtype=tf.float32,
             seed=rand_seed,
             name=None
@@ -488,15 +490,28 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         prediction_dict_perf['classification_prediction'][
             'rcnn']['bbox_offsets'] = rcnn_bbox_perf_offsets
 
-        loss_perfect = self._get_losses(self.config, prediction_dict_perf)
-        loss_random = self._get_losses(self.config, prediction_dict_random)
+        loss_perfect = self._get_losses(
+            config, prediction_dict_perf, image_size)
+        loss_random = self._get_losses(
+            config, prediction_dict_random, image_size)
 
-        self.assertEqual(
-            loss_perfect['total_loss'],
-            loss_perfect['regularization_loss'])
-        self.assertGreater(
-            loss_random['total_loss'],
-            loss_random['regularization_loss'])
+        loss_random_compare = {
+            'rcnn_reg_loss': 1,
+            'regularization_loss': 0,
+            'no_reg_loss': 50,
+            'rpn_cls_loss': 50,
+            'rcnn_cls_loss': 50,
+            'total_loss': 100,
+            'rpn_reg_loss': 50
+        }
+
+        for loss in loss_random:
+            self.assertGreaterEqual(
+                loss_random[loss],
+                loss_random_compare[loss])
+            self.assertEqual(
+                loss_perfect[loss],
+                0)
 
     def _assert_sequential_values(self, values, delta=1):
         unique_values = np.unique(values)
