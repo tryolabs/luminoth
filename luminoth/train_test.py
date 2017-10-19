@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from easydict import EasyDict
 from luminoth.train import run
-from luminoth.utils.config import get_base_config
+from luminoth.utils.config import get_base_config, load_config
 
 
 class MockFasterRCNN(snt.AbstractModule):
@@ -89,8 +89,12 @@ class TrainTest(tf.test.TestCase):
     def testTrain(self):
         config = self.config
 
+        custom_config = load_config(config.config_files)
+        # The string we use here is ignored.
+        model_type = 'mockfasterrcnn'
+
         # This should not fail
-        run(config.config_files, config.override_params,
+        run(custom_config, model_type, config.override_params,
             get_dataset_fn=self.get_dataset, get_model_fn=self.get_model)
 
 

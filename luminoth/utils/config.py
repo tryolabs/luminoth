@@ -5,9 +5,7 @@ import yaml
 from easydict import EasyDict
 
 
-def load_config(filenames, overwrite=False, warn_overwrite=False):
-    """Load config from a list of files.
-    """
+def load_config(filenames, warn_overwrite=True):
     if len(filenames) <= 0:
         tf.logging.error("Tried to load 0 config files.")
     config = EasyDict({})
@@ -15,7 +13,7 @@ def load_config(filenames, overwrite=False, warn_overwrite=False):
         new_config = EasyDict(yaml.load(tf.gfile.GFile(filename)))
         config = merge_into(
             new_config,
-            config, overwrite=overwrite, warn_overwrite=warn_overwrite
+            config, overwrite=True, warn_overwrite=warn_overwrite
         )
     return config
 
