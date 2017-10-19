@@ -6,7 +6,7 @@ import time
 
 from luminoth.datasets import get_dataset
 from luminoth.models import (
-    get_model, DEFAULT_MODEL
+    get_model
 )
 from luminoth.utils.config import (
     get_model_config, load_config
@@ -32,8 +32,10 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     custom_config = load_config(config_files)
     # If the config file is empty, our config will be the base_config for the
     # default model.
-    custom_config_model = custom_config.get('model', {})
-    model_type = custom_config_model.get('type', DEFAULT_MODEL)
+    try:
+        model_type = custom_config['model']['type']
+    except KeyError:
+        raise KeyError('model.type should be set on the custom config.')
 
     model_class = get_model(model_type)
 

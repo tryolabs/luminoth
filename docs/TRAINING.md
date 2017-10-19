@@ -2,18 +2,17 @@
 
 ## Locally
 
-You can use the `lumi train --model <model-type>` command to easily start training your model (with default config). Before anything else, try running it to see if everything is working. You'll need a dataset in tfrecord format in the default location (`./datasets/voc/tf`). See [DATASETS.md](./DATASETS.md) for more info.
+You can use the `lumi train -c sample_config.yml` command to easily start training your model (with default config). Before anything else, try running it to see if everything is working. You'll need a dataset in tfrecord format in the default location (`./datasets/voc/tf`). See [DATASETS.md](./DATASETS.md) for more info.
 
 The `train` cli tool provides the following options related to training.
 
 Options:
-  - `--config`/`-c`: Config file to use.
-  - `--override`/`-o`: Override any configuration setting using dot notation
-(e.g.: `-o model.rpn.proposals.nms_threshold=0.8`).
+  - `--config`/`-c`: Config file to use. If the flag is repeated, all config files will be merged in left-to-right order so that every file overwrites the configuration of keys defined previously.
+  - `--override`/`-o`: Override any configuration setting using dot notation (e.g.: `-o model.rpn.proposals.nms_threshold=0.8`).
 
 Most of the configuration is done via the `--config` file. See the
-[sample_config.yml](../sample_config.yml) for a simple example, or fasterrcnn's
-[base_config.yml](../luminoth/models/fasterrcnn/base_config.yml) for the full
+[sample_config.yml](/sample_config.yml) for a simple example, or fasterrcnn's
+[base_config.yml](/luminoth/models/fasterrcnn/base_config.yml) for the full
 range of settings.
 
 

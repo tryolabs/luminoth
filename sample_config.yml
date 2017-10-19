@@ -3,10 +3,12 @@ train:
   job_dir: jobs/
 
 dataset:
+  type: tfrecord
   # From which directory to read the dataset
   dir: datasets/voc/tf
 
 model:
+  type: fasterrcnn
   network:
     # Total number of classes to predict
     num_classes: 20

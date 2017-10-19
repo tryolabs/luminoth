@@ -8,9 +8,8 @@ import time
 from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets import get_dataset
-from luminoth.datasets.datasets import InvalidDataDirectory
 from luminoth.models import (
-    get_model, DEFAULT_MODEL
+    get_model
 )
 from luminoth.utils.config import (
     get_model_config, load_config
@@ -21,16 +20,9 @@ from luminoth.utils.training import (
 )
 
 
-def run(config_files, override_params, target='', cluster_spec=None,
-        is_chief=True, job_name=None, task_index=None, get_model_fn=get_model,
-        get_dataset_fn=get_dataset):
-    custom_config = load_config(
-        config_files, overwrite=True, warn_overwrite=True)
-    # If the config file is empty, our config will be the base_config for the
-    # default model.
-    custom_config_model = custom_config.get('model', {})
-    model_type = custom_config_model.get('type', DEFAULT_MODEL)
-
+def run(custom_config, model_type, override_params, target='',
+        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
+        get_model_fn=get_model, get_dataset_fn=get_dataset):
     model_class = get_model_fn(model_type)
 
     config = get_model_config(
@@ -57,6 +49,10 @@ def run(config_files, override_params, target='', cluster_spec=None,
     # See:
     # https://www.tensorflow.org/api_docs/python/tf/train/replica_device_setter
     with tf.device(tf.train.replica_device_setter(cluster=cluster_spec)):
+        try:
+            config['dataset']['type']
+        except KeyError:
+            raise KeyError('dataset.type should be set on the custom config.')
         dataset_class = get_dataset_fn(config.dataset.type)
         dataset = dataset_class(config)
         train_dataset = dataset()
@@ -227,9 +223,17 @@ def train(config_files, override_params):
     job_name = tf_config.get('task', {}).get('type')
     task_index = tf_config.get('task', {}).get('index')
 
+    # Get the user config and the model type from it.
+    custom_config = load_config(config_files)
+
+    try:
+        model_type = custom_config['model']['type']
+    except KeyError:
+        raise KeyError('model.type should be set on the custom config.')
+
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
-        return run(config_files, override_params)
+        return run(custom_config, model_type, override_params)
 
     cluster_spec = tf.train.ClusterSpec(cluster)
     server = tf.train.Server(
@@ -244,7 +248,7 @@ def train(config_files, override_params):
     elif job_name in ['master', 'worker']:
         is_chief = job_name == 'master'
         return run(
-            config_files=config_files, override_params=override_params,
+            custom_config, model_type, override_params=override_params,
             target=server.target, cluster_spec=cluster_spec,
             is_chief=is_chief, job_name=job_name, task_index=task_index
         )
