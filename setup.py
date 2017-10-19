@@ -34,12 +34,12 @@ CLASSIFIERS = [
 ]
 
 MIN_TENSORFLOW_VERSION = '1.3.0'
-MIN_SONNET_VERSION = '1.10'
 
 INSTALL_REQUIRES = [
     'numpy',
     'Pillow',
     'lxml',
+    'dm-sonnet>=1.12',
     'click>=6.7,<7',
     'PyYAML>=3.12,<4',
     'easydict>=1.7,<2',
@@ -81,19 +81,14 @@ def find_meta(meta):
 
 
 #
-# If TensorFlow or Sonnet are not installed, we might as well do that.
-# Use the CPU versions by default. If the user wants to use the versions
-# with GPU support, they must be installed in advance.
+# If TensorFlow is not installed, install it using the CPU version by default.
+# If the user wants to use the version with GPU support, it must be installed
+# in advance.
 #
 try:
     import tensorflow
 except ImportError:
     INSTALL_REQUIRES += ['tensorflow>={}'.format(MIN_TENSORFLOW_VERSION)]
-
-try:
-    import sonnet
-except ImportError:
-    INSTALL_REQUIRES += ['dm-sonnet>={}'.format(MIN_SONNET_VERSION)]
 
 
 setup(
@@ -117,7 +112,6 @@ setup(
     extras_require={
         'gpu support': [
             'tensorflow-gpu>={}'.format(MIN_TENSORFLOW_VERSION),
-            'dm-sonnet-gpu>={}'.format(MIN_SONNET_VERSION),
         ],
     },
     entry_points="""

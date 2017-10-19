@@ -160,7 +160,7 @@ rpn:
     filter_outside_anchors: False
 
   target:
-    # Margin to crop propocals to close to the border
+    # Margin to crop proposals to close to the border
     allowed_border: 0
     # Overwrite positives with negative if threshold is too low
     clobber_positives: False
