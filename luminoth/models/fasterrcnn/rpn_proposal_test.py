@@ -412,7 +412,6 @@ class RPNProposalTest(tf.test.TestCase):
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
-            sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
                 proposals: results_before['proposals_unclipped'],
                 im_size: self.im_size
@@ -424,17 +423,12 @@ class RPNProposalTest(tf.test.TestCase):
             clipped_proposals
         )
 
-        # Check that the nms proposals are clipped
-        no_negatives = np.maximum(results_before['nms_proposals'][:, 1:], 0)
-        self.assertAllEqual(
-            results_before['nms_proposals'][:, 1:],
-            no_negatives)
-        max_value = np.array(self.im_size)
-        max_value = np.append(max_value, max_value)
-        top_max = np.maximum(
-            results_before['nms_proposals'][:, 1:] + 1 - max_value, 0)
-        zeros = np.zeros(results_before['nms_proposals'][:, 1:].shape)
-        self.assertAllEqual(top_max, zeros)
+        # Checks all NMS proposals have values inside the image boundaries
+        nms_proposals = results_before['nms_proposals'][:, 1:]
+        self.assertTrue((nms_proposals >= 0).all())
+        self.assertTrue(
+            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+        )
 
         # After NMS
         config['clip_after_nms'] = True
@@ -447,7 +441,6 @@ class RPNProposalTest(tf.test.TestCase):
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
-            sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
                 proposals: results_after['proposals_unclipped'],
                 im_size: self.im_size
@@ -458,17 +451,13 @@ class RPNProposalTest(tf.test.TestCase):
             results_after['proposals'],
             results_after['proposals_unclipped']
         )
-        # Check that the nms proposals are clipped
-        no_negatives = np.maximum(results_after['nms_proposals'][:, 1:], 0)
-        self.assertAllEqual(
-            results_after['nms_proposals'][:, 1:],
-            no_negatives)
-        max_value = np.array(self.im_size)
-        max_value = np.append(max_value, max_value)
-        top_max = np.maximum(
-            results_after['nms_proposals'][:, 1:] + 1 - max_value, 0)
-        zeros = np.zeros(results_after['nms_proposals'][:, 1:].shape)
-        self.assertAllEqual(top_max, zeros)
+
+        nms_proposals = results_after['nms_proposals'][:, 1:]
+        # Checks all NMS proposals have values inside the image boundaries
+        self.assertTrue((nms_proposals >= 0).all())
+        self.assertTrue(
+            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+        )
 
     def testFilterOutsideAnchors(self):
         """
@@ -481,12 +470,12 @@ class RPNProposalTest(tf.test.TestCase):
             [30, 25, 39, 39],
             [30, 25, 39, 39],
         ])
-        all_anchors = np.array([
-            [-20, -10, 12, 6],
-            [2, 10, 20, 20],
-            [0, 0, 50, 16],
-            [2, -10, 20, 50],
-            [25, 30, 27, 33],
+        all_anchors = np.array([    # Img_size (40, 40)
+            [-20, -10, 12, 6],      # Should be filtered
+            [2, 10, 20, 20],        # Valid anchor
+            [0, 0, 50, 16],         # Should be filtered
+            [2, -10, 20, 50],       # Should be filtered
+            [25, 30, 27, 33],       # Valid anchor
         ])
         rpn_cls_prob = np.array([
             [0.3, 0.7],
