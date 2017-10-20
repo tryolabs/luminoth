@@ -22,7 +22,7 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('--image-vis', is_flag=True, default=False, help='Display images in TensorBoard.')  # noqa
+@click.option('--image-vis', type=click.Choice([ 'None', 'eval', 'debug']), default='eval', help='Image summaries configuration: \n0-No image summaries\n1-Basic image summaries\n2-All image summaries')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 def evaluate(dataset_split, config_files, job_dir, watch,
              from_global_step, override_params, image_vis, files_per_class):
@@ -45,7 +45,7 @@ def evaluate(dataset_split, config_files, job_dir, watch,
 
     config.train.job_dir = job_dir or config.train.job_dir
     # Only activate debug for image visualizations.
-    config.train.debug = image_vis
+    config.train.debug = image_vis == 'debug'
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)

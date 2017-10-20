@@ -20,58 +20,80 @@ logger = logging.getLogger('luminoth-vis')
 
 summaries_fn = {
     'fasterrcnn': {
-        'rpn': {
-            'draw_anchors': [
-                None, {'anchor_num': 0}
-            ],
-            'draw_anchor_centers': None,
-            'draw_anchor_batch': None,
-            'draw_positive_anchors': None,
-            'draw_top_proposals': [
-                None, {'top_k': False}, {'max_display': 50},
-            ],
-            'draw_top_nms_proposals': [
-                None, {'min_score': 0.9}, {'min_score': 0.75}, {'min_score': 0}
-            ],
-            'draw_batch_proposals': [
-                {'display': 'anchor'}, {'display': 'proposal'},
-                {'display': 'proposal', 'draw_all': False},
-                {'display': 'proposal', 'top_k': 10, 'draw_all': False},
-                {'display': 'proposal', 'top_k': 20, 'draw_all': False},
-                {'display': 'anchor', 'top_k': 20, 'draw_all': False},
-                {'display': 'anchor', 'top_k': 20, 'draw_all': False},
-            ],
-            'draw_rpn_cls_loss': [
-                {'foreground': True, 'topn': 10, 'worst': True},
-                {'foreground': True, 'topn': 10, 'worst': False},
-                {'foreground': False, 'topn': 10, 'worst': True},
-                {'foreground': False, 'topn': 10, 'worst': False},
-                {'foreground': True, 'topn': 20, 'worst': True},
-                {'foreground': True, 'topn': 20, 'worst': False},
-                {'foreground': False, 'topn': 20, 'worst': True},
-                {'foreground': False, 'topn': 20, 'worst': False},
-            ],
-            'draw_rpn_bbox_targets': None,
-            'draw_rpn_bbox_pred': [
-                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
-                {'top_k': 40}, {'top_k': 80}
-            ],
-            'draw_rpn_bbox_pred_with_target': [
-                {'worst': True}, {'worst': False}
-            ],
-            'draw_gt_boxes': None,
-            'draw_correct_rpn_proposals_anchors': None,
-            'draw_rpn_pred_combined_loss': [
-                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
-                {'top_k': 50}
-            ],
+        'train': {
+            'rpn': {
+                'draw_top_nms_proposals': None,
+                'draw_gt_boxes': None,
+            },
+            'rcnn': {
+                'draw_object_prediction': None
+            }
         },
-        'rcnn': {
-            'draw_rcnn_cls_batch': None,
-            'draw_rcnn_input_proposals': None,
-            'draw_rcnn_cls_batch_errors': [{'worst': True}, {'worst': False}],
-            'draw_object_prediction': None
-        }
+        'eval': {
+            'rpn': {
+                'draw_top_nms_proposals': None,
+                'draw_gt_boxes': None,
+            },
+            'rcnn': {
+                'draw_object_prediction': None
+            }
+        },
+        'debug': {
+            'rpn': {
+                'draw_anchors': [
+                    None, {'anchor_num': 0}
+                ],
+                'draw_anchor_centers': None,
+                'draw_anchor_batch': None,
+                'draw_positive_anchors': None,
+                'draw_top_proposals': [
+                    None, {'top_k': False}, {'max_display': 50},
+                ],
+                'draw_top_nms_proposals': [
+                    None, {'min_score': 0.9},
+                    {'min_score': 0.75}, {'min_score': 0}
+                ],
+                'draw_batch_proposals': [
+                    {'display': 'anchor'}, {'display': 'proposal'},
+                    {'display': 'proposal', 'draw_all': False},
+                    {'display': 'proposal', 'top_k': 10, 'draw_all': False},
+                    {'display': 'proposal', 'top_k': 20, 'draw_all': False},
+                    {'display': 'anchor', 'top_k': 10, 'draw_all': False},
+                    {'display': 'anchor', 'top_k': 20, 'draw_all': False},
+                ],
+                'draw_rpn_cls_loss': [
+                    {'foreground': True, 'topn': 10, 'worst': True},
+                    {'foreground': True, 'topn': 10, 'worst': False},
+                    {'foreground': False, 'topn': 10, 'worst': True},
+                    {'foreground': False, 'topn': 10, 'worst': False},
+                    {'foreground': True, 'topn': 20, 'worst': True},
+                    {'foreground': True, 'topn': 20, 'worst': False},
+                    {'foreground': False, 'topn': 20, 'worst': True},
+                    {'foreground': False, 'topn': 20, 'worst': False},
+                ],
+                'draw_rpn_bbox_targets': None,
+                'draw_rpn_bbox_pred': [
+                    {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
+                    {'top_k': 40}, {'top_k': 80}
+                ],
+                'draw_rpn_bbox_pred_with_target': [
+                    {'worst': True}, {'worst': False}
+                ],
+                'draw_gt_boxes': None,
+                'draw_correct_rpn_proposals_anchors': None,
+                'draw_rpn_pred_combined_loss': [
+                    {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 20},
+                    {'top_k': 50}
+                ],
+            },
+            'rcnn': {
+                'draw_rcnn_cls_batch': None,
+                'draw_rcnn_input_proposals': None,
+                'draw_rcnn_cls_batch_errors': [
+                    {'worst': True}, {'worst': False}],
+                'draw_object_prediction': None
+            }
+        },
     }
 }
 
