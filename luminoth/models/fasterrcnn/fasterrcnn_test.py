@@ -17,6 +17,10 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 'seed': None,
             },
             'model': {
+                'network': {
+                    'num_classes': 20,
+                    'with_rcnn': True
+                },
                 'anchors': {
                     'base_size': 256,
                     'scales': [0.5, 1, 2],
@@ -81,13 +85,25 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                         'mode': 'FAN_AVG',
                         'uniform': True,
                     },
+                    'cls_initializer': {
+                        'type': 'truncated_normal_initializer',
+                        'mean': 0.0,
+                        'stddev': 0.01,
+                    },
+                    'bbox_initializer': {
+                        'type': 'truncated_normal_initializer',
+                        'mean': 0.0,
+                        'stddev': 0.01,
+                    },
                     'activation_function': 'relu6',
                     'l2_regularization_scale': 0.0005,
                     'proposals': {
                         'pre_nms_top_n': 12000,
                         'post_nms_top_n': 2000,
                         'nms_threshold': 0.6,
-                        'min_size': 0
+                        'min_size': 0,
+                        'clip_after_nms': False,
+                        'filter_outside_anchors': False,
                     },
                     'target': {
                         'allowed_border': 0,
