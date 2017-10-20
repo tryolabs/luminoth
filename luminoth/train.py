@@ -152,6 +152,8 @@ def run(custom_config, model_type, override_params, target='',
             chief_only_hooks.append(
                 ImageVisHook(
                     prediction_dict,
+                    train_image=train_dataset['image'],
+                    gt_bboxes=train_dataset['bboxes'],
                     with_rcnn=config.model.network.with_rcnn,
                     output_dir=checkpoint_dir,
                     every_n_steps=config.train.display_every_steps,

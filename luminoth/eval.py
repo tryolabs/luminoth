@@ -127,7 +127,8 @@ def evaluate(dataset_split, config_files, job_dir, watch,
         'train_objects': train_objects,
         'losses': losses,
         'prediction_dict': prediction_dict,
-        'filename': train_filename
+        'filename': train_filename,
+        'train_image': train_image
     }
 
     metrics_scope = '{}_metrics'.format(dataset_split)
@@ -252,7 +253,7 @@ def get_checkpoints(config, from_global_step=None):
 
 
 def evaluate_once(writer, saver, ops, num_classes, checkpoint,
-                  metrics_scope='metrics', image_vis=False,
+                  metrics_scope='metrics', image_vis=None,
                   files_per_class=None, files_to_visualize=None):
     """Run the evaluation once.
 
@@ -266,7 +267,8 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
         ops (dict): All the operations needed to successfully run the model.
             Expects the following keys: ``init_op``, ``metric_ops``,
             ``pred_objects``, ``pred_objects_classes``,
-            ``pred_objects_scores``, ``train_objects``, ``losses`.
+            ``pred_objects_scores``, ``train_objects``, ``losses``,
+            ``train_image``.
         checkpoint (dict): Checkpoint-related data.
             Expects the following keys: ``global_step``, ``file``.
     """
@@ -294,6 +296,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     'classes': ops['pred_objects_classes'],
                     'scores': ops['pred_objects_scores'],
                     'gt_bboxes': ops['train_objects'],
+                    'train_image': ops['train_image']
                 }
                 if image_vis:
                     fetches['prediction_dict'] = ops['prediction_dict']
@@ -332,7 +335,9 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     if visualize_file:
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
-                            extra_tag=filename
+                            extra_tag=filename, image_vis=image_vis,
+                            train_image=batch_fetched['train_image'],
+                            gt_bboxes=batch_fetched['gt_bboxes']
                         )
                         for image_summary in image_summaries:
                             writer.add_summary(
