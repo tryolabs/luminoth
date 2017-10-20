@@ -28,15 +28,19 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_name, image, config_file, session=None,
+def get_prediction(model_type, image, config_file, session=None,
                    prediction_dict=None, image_tensor=None,
                    return_tf_vars=False):
     """
-    Gets the prediction given by the model `model_name` of the image `image`.
-    If it exists a checkpoint loads it and also loads the name of the
-    classes from the dataset directory.
+    Gets the prediction given by the model `model_type` of the image `image`.
+    If a checkpoint exists in the job's directory, load it.
+    The names of the classes will be obtained from the dataset directory.
+    Returns a dictionary with the objects, their labels and probabilities,
+    the inference time and the scale factor. Also if the `return_tf_vars` is
+    True, returns the image tensor, the entire prediction of the model and
+    the sesssion.
     """
-    model_class = get_model(model_name)
+    model_class = get_model(model_type)
     config = get_model_config(
         model_class.base_config, config_file, None
     )

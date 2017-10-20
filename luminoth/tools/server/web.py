@@ -1,7 +1,7 @@
 import click
 
 from flask import Flask, jsonify, request, render_template
-from luminoth.utils.predict import get_prediction
+from luminoth.utils.predicting import get_prediction
 from PIL import Image
 
 app = Flask(__name__)
