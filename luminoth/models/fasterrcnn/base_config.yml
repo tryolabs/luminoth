@@ -134,7 +134,10 @@ rpn:
   num_channels: 512
   kernel_shape: [3, 3]
   rpn_initializer:
-    type: glorot_uniform_initializer
+    type: variance_scaling_initializer
+    factor: 1.0
+    mode: FAN_AVG
+    uniform: True
   cls_initializer:
     type: truncated_normal_initializer
     mean: 0.0

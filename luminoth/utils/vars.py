@@ -9,7 +9,6 @@ VALID_INITIALIZERS = {
         tf.contrib.layers.variance_scaling_initializer
     ),
     'random_normal_initializer': tf.random_normal_initializer,
-    'glorot_uniform_initializer': tf.glorot_uniform_initializer,
 }
 
 
