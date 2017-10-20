@@ -2,6 +2,7 @@ import click
 import googleapiclient.discovery as discovery
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import tensorflow as tf
@@ -45,40 +46,42 @@ def build_package(bucket, base_path):
         package_path
     ))
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        output_dir = os.path.join(temp_dir, 'output')
+    temp_dir = tempfile.mkdtemp()
+    output_dir = os.path.join(temp_dir, 'output')
 
-        devnull = open(os.devnull, 'w')
-        subprocess.call(
-            [
-                'python', 'setup.py', 'egg_info', '--egg-base', temp_dir,
-                'build', '--build-base', temp_dir, '--build-temp', temp_dir,
-                'sdist', '--dist-dir', output_dir
-            ],
-            cwd=package_path, stdout=devnull, stderr=devnull
-        )
-        subprocess.call(
-            [
-                'python', 'setup.py', 'build', '--build-base', temp_dir,
-                '--build-temp', temp_dir, 'sdist', '--dist-dir', output_dir
-            ],
-            cwd=package_path, stdout=devnull, stderr=devnull
-        )
-        subprocess.call(
-            ['python', 'setup.py', 'sdist', '--dist-dir', output_dir],
-            cwd=package_path, stdout=devnull, stderr=devnull
-        )
+    devnull = open(os.devnull, 'w')
+    subprocess.call(
+        [
+            'python', 'setup.py', 'egg_info', '--egg-base', temp_dir,
+            'build', '--build-base', temp_dir, '--build-temp', temp_dir,
+            'sdist', '--dist-dir', output_dir
+        ],
+        cwd=package_path, stdout=devnull, stderr=devnull
+    )
+    subprocess.call(
+        [
+            'python', 'setup.py', 'build', '--build-base', temp_dir,
+            '--build-temp', temp_dir, 'sdist', '--dist-dir', output_dir
+        ],
+        cwd=package_path, stdout=devnull, stderr=devnull
+    )
+    subprocess.call(
+        ['python', 'setup.py', 'sdist', '--dist-dir', output_dir],
+        cwd=package_path, stdout=devnull, stderr=devnull
+    )
 
-        tarball_filename = os.listdir(output_dir)[0]
-        tarball_path = os.path.join(
-            output_dir, tarball_filename
-        )
+    tarball_filename = os.listdir(output_dir)[0]
+    tarball_path = os.path.join(
+        output_dir, tarball_filename
+    )
 
-        path = upload_file(
-            bucket, '{}/packages'.format(base_path), tarball_path
-        )
+    path = upload_file(
+        bucket, '{}/packages'.format(base_path), tarball_path
+    )
 
-        return path
+    shutil.rmtree(temp_dir)
+
+    return path
 
 
 def get_account_attribute(service_account_json, attr):
