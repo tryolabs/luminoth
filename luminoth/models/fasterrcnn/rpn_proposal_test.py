@@ -373,47 +373,133 @@ class RPNProposalTest(tf.test.TestCase):
 
     def testClippingOfProposals(self):
         """
-        Test clipping of proposals
+        Test clipping of proposals before and after NMS
         """
+        # Before NMS
         gt_boxes = np.array([
+            [0, 0, 10, 12],
             [10, 10, 20, 22],
             [10, 10, 20, 22],
-            [10, 10, 20, 22],
-            [10, 10, 20, 22],
+            [30, 25, 39, 39],
         ])
         all_anchors = np.array([
-            [11, 13, 12, 16],
-            [10, 10, 20, 22],
-            [11, 13, 12, 28],
-            [7, 13, 34, 30],
+            [-20, -10, 12, 6],
+            [2, -10, 20, 20],
+            [0, 0, 12, 16],
+            [2, -10, 20, 2],
         ])
         rpn_cls_prob = np.array([
             [0.3, 0.7],
             [0.4, 0.6],
-            [0.9, 0.1],
-            [0.8, 0.2]
+            [0.3, 0.7],
+            [0.1, 0.9],
         ])
 
-        results = self._run_rpn_proposal(
-            all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
-
+        rpn_bbox_pred = np.array([  # This is set to zeros so when decode is
+            [0, 0, 0, 0],           # applied in RPNProposal the anchors don't
+            [0, 0, 0, 0],           # change, leaving us with unclipped
+            [0, 0, 0, 0],           # proposals.
+            [0, 0, 0, 0],
+        ])
+        config = EasyDict(self.config)
+        config['clip_after_nms'] = False
+        results_before = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
+            rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
         proposals = tf.placeholder(
-            tf.float32, shape=(results['nms_proposals'][:, :4].shape))
+            tf.float32, shape=(results_before['proposals_unclipped'].shape))
         clip_bboxes_tf = clip_boxes(proposals, im_size)
 
         with self.test_session() as sess:
-            sess.run(tf.global_variables_initializer())
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results['nms_proposals'][:, :4],
+                proposals: results_before['proposals_unclipped'],
                 im_size: self.im_size
             })
 
-        # Check we get proposals clipped to the image.
+        # Check we clip proposals right after filtering the invalid area ones.
         self.assertAllEqual(
-            results['nms_proposals'][:, :4],
+            results_before['proposals'],
             clipped_proposals
         )
+
+        # Checks all NMS proposals have values inside the image boundaries
+        nms_proposals = results_before['nms_proposals'][:, 1:]
+        self.assertTrue((nms_proposals >= 0).all())
+        self.assertTrue(
+            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+        )
+
+        # After NMS
+        config['clip_after_nms'] = True
+        results_after = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
+            rpn_bbox_pred=rpn_bbox_pred)
+        im_size = tf.placeholder(tf.float32, shape=(2,))
+        proposals = tf.placeholder(
+            tf.float32, shape=(results_after['proposals_unclipped'].shape))
+        clip_bboxes_tf = clip_boxes(proposals, im_size)
+
+        with self.test_session() as sess:
+            clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
+                proposals: results_after['proposals_unclipped'],
+                im_size: self.im_size
+            })
+
+        # Check we don't clip proposals in the beginning of the function.
+        self.assertAllEqual(
+            results_after['proposals'],
+            results_after['proposals_unclipped']
+        )
+
+        nms_proposals = results_after['nms_proposals'][:, 1:]
+        # Checks all NMS proposals have values inside the image boundaries
+        self.assertTrue((nms_proposals >= 0).all())
+        self.assertTrue(
+            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+        )
+
+    def testFilterOutsideAnchors(self):
+        """
+        Test clipping of proposals before and after NMS
+        """
+        gt_boxes = np.array([
+            [0, 0, 10, 12],
+            [10, 10, 20, 22],
+            [10, 10, 20, 22],
+            [30, 25, 39, 39],
+            [30, 25, 39, 39],
+        ])
+        all_anchors = np.array([    # Img_size (40, 40)
+            [-20, -10, 12, 6],      # Should be filtered
+            [2, 10, 20, 20],        # Valid anchor
+            [0, 0, 50, 16],         # Should be filtered
+            [2, -10, 20, 50],       # Should be filtered
+            [25, 30, 27, 33],       # Valid anchor
+        ])
+        rpn_cls_prob = np.array([
+            [0.3, 0.7],
+            [0.4, 0.6],
+            [0.3, 0.7],
+            [0.1, 0.9],
+            [0.2, 0.8],
+        ])
+        config = EasyDict(self.config)
+        config['filter_outside_anchors'] = False
+        results_without_filter = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
+
+        # Check that all_proposals contain the outside anchors
+        self.assertAllEqual(
+            results_without_filter['all_proposals'].shape,
+            all_anchors.shape)
+
+        config['filter_outside_anchors'] = True
+        results_with_filter = self._run_rpn_proposal(
+            all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
+        self.assertAllEqual(
+            results_with_filter['all_proposals'].shape,
+            (2, 4))
 
 
 if __name__ == "__main__":

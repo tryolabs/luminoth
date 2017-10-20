@@ -59,10 +59,16 @@ class RPNProposal(snt.AbstractModule):
                 nms_proposals_scores: A Tensor with the probability of being an
                     object for that proposal. Its shape should be
                     (total_nms_proposals, 1)
-                proposals: A Tensor with all the RPN proposals without any
-                    filtering.
-                scores: A Tensor with a score for each of the unfiltered RPN
-                    proposals.
+                scores:  A Tensor with the scores of the proposals contained
+                    in `proposals` and `proposals_unclipped`.
+                proposals: A Tensor with all the valid area RPN proposals, this
+                    tensor is returned in debug mode and is used for
+                    testing, the proposals are clipped if `clip_after_nms` is
+                    set to False.
+                proposals_unclipped: Same as proposals but the proposals in
+                    this tensor are never clipped.
+                all_proposals: A Tensor with all the proposals, including the
+                    ones with zero or negative area.
         """
         # Scores are extracted from the second scalar of the cls probability.
         # cls_probability is a softmax of (background, foreground).
@@ -94,10 +100,6 @@ class RPNProposal(snt.AbstractModule):
         # Decode boxes
         all_proposals = decode(all_anchors, rpn_bbox_pred)
 
-        if not self._clip_after_nms:
-            # Clip proposals to the image.
-            all_proposals = clip_boxes(all_proposals, im_shape)
-
         # Filter proposals with negative or zero area.
         (x_min, y_min, x_max, y_max) = tf.unstack(
             all_proposals, axis=1
@@ -118,6 +120,13 @@ class RPNProposal(snt.AbstractModule):
             all_proposals, proposal_filter,
             name='filter_invalid_proposals'
         )
+        if self._debug:
+            proposals_unclipped = tf.identity(proposals)
+
+        if not self._clip_after_nms:
+            # Clip proposals to the image.
+            proposals = clip_boxes(proposals, im_shape)
+
         filtered_proposals = tf.shape(scores)[0]
 
         tf.summary.scalar(
@@ -178,6 +187,7 @@ class RPNProposal(snt.AbstractModule):
             pred.update({
                 'proposals': proposals,
                 'scores': scores,
+                'proposals_unclipped': proposals_unclipped,
                 'top_k_proposals': top_k_proposals,
                 'top_k_scores': top_k_scores,
                 'all_proposals': all_proposals,
