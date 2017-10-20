@@ -19,7 +19,7 @@ SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
 MACHINE_TYPES = [
     'standard', 'large_model', 'complex_model_s', 'complex_model_m',
     'complex_model_l', 'standard_gpu', 'complex_model_m_gpu',
-    'complex_model_l_gpu'
+    'complex_model_l_gpu', 'standard_p100', 'complex_model_m_p100',
 ]
 
 DEFAULT_SCALE_TIER = 'BASIC_GPU'
