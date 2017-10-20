@@ -95,23 +95,23 @@ class BaseNetwork(snt.AbstractModule):
 
     def preprocess(self, inputs):
         if self.vgg_type or self.resnet_type:
-            inputs = self._substract_channels(inputs)
+            inputs = self._subtract_channels(inputs)
 
         return inputs
 
-    def _substract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
-        """Substract channels from images.
+    def _subtract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
+        """Subtract channels from images.
 
-        It is common for CNNs to substract the mean of all images from each
+        It is common for CNNs to subtract the mean of all images from each
         channel. In the case of RGB images we first calculate the mean from
-        each of the channels (Red, Green, Blue) and substract those values
+        each of the channels (Red, Green, Blue) and subtract those values
         for training and for inference.
 
         Args:
             inputs: A Tensor of images we want to normalize. Its shape is
                 (1, height, width, num_channels).
             means: A Tensor of shape (num_channels,) with the means to be
-                substracted from each channels on the inputs.
+                subtracted from each channels on the inputs.
 
         Returns:
             outputs: A Tensor of images normalized with the means.
