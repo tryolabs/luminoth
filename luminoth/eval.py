@@ -314,8 +314,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = sess.run(ops['losses'])
-
-                if fetches:
+                if image_vis:
                     filename = batch_fetched['filename'][:-4].decode('utf-8')
                     visualize_file = False
                     for gt_class in batch_gt_classes:
