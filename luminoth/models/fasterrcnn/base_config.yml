@@ -40,6 +40,9 @@ train:
   full_trace: False
   # Learning rate config.
   learning_rate:
+    # Because we're using kwargs, we want the learning_rate dict to be replaced
+    # as a whole.
+    _replace: True
     # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
     # You can define different decay methods using `decay_method` and defining all the necessary arguments.
     decay_method:
@@ -47,6 +50,9 @@ train:
 
   # Optimizer config
   optimizer:
+    # Because we're using kwargs, we want the optimizer dict to be replaced
+    # as a whole.
+    _replace: True
     # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
     type: momentum
     # any options are passed directly to the optimizer as kwarg.
@@ -71,8 +77,8 @@ dataset:
         left_right: True
         up_down: False
         prob: 0.5
-    # If you resize to too small images, you may end up with zero anchors that
-    # aren't partially outside the image.
+    # If you resize to too small images, you may end up not having any anchors
+    # that aren't partially outside the image.
     - resize:
         min_size: 600
         max_size: 1024
@@ -137,15 +143,18 @@ model:
     num_channels: 512
     kernel_shape: [3, 3]
     rpn_initializer:
+      _replace: True
       type: variance_scaling_initializer
       factor: 1.0
       mode: FAN_AVG
       uniform: True
     cls_initializer:
+      _replace: True
       type: truncated_normal_initializer
       mean: 0.0
       stddev: 0.01
     bbox_initializer:
+      _replace: True
       type: truncated_normal_initializer
       mean: 0.0
       stddev: 0.01
@@ -188,6 +197,7 @@ model:
     l2_regularization_scale: 0.0005
     use_mean: False
     initializer:
+      _replace: True
       type: variance_scaling_initializer
       factor: 1.0
       uniform: True

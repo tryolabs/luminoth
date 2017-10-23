@@ -4,6 +4,8 @@ import yaml
 
 from easydict import EasyDict
 
+REPLACE_KEY = '_replace'
+
 
 def load_config(filenames, warn_overwrite=True):
     if len(filenames) <= 0:
@@ -50,6 +52,26 @@ def types_compatible(new_config_value, base_config_value):
     return isinstance(new_config_value, type(base_config_value))
 
 
+def should_replace(new_config, base_config, key):
+    """Find out whether we should replace a key when merging.
+    """
+    try:
+        base_replace = base_config[key][REPLACE_KEY]
+    except KeyError:
+        base_replace = None
+    try:
+        new_replace = new_config[key][REPLACE_KEY]
+    except KeyError:
+        new_replace = None
+
+    if new_replace:
+        return True
+    elif new_replace is None and base_replace:
+        return True
+
+    return False
+
+
 def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
     """Merge one easy dict into another.
 
@@ -71,10 +93,15 @@ def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
 
         # Recursively merge dicts
         if isinstance(value, dict):
-            base_config[key] = merge_into(
-                new_config[key], base_config.get(key, EasyDict({})),
-                overwrite=overwrite, warn_overwrite=warn_overwrite
-            )
+            # Sometimes we want to completely replace the original key (i.e.
+            # deleting all keys that aren't in new_config).
+            if (should_replace(new_config, base_config, key)):
+                base_config[key] = value
+            else:
+                base_config[key] = merge_into(
+                    new_config[key], base_config.get(key, EasyDict({})),
+                    overwrite=overwrite, warn_overwrite=warn_overwrite
+                )
         else:
             if base_config.get(key) is None:
                 base_config[key] = value
@@ -134,6 +161,20 @@ def parse_config_value(value):
     return value
 
 
+def cleanup_config(config):
+    """Delete meta-keys from the config file.
+    """
+    cleanup_keys = [REPLACE_KEY]
+    for cleanup_key in cleanup_keys:
+        config.pop(cleanup_key, None)
+
+    for config_key in config:
+        if isinstance(config[config_key], dict):
+            cleanup_config(config[config_key])
+
+    return config
+
+
 def get_model_config(base_config, custom_config, override_params):
     config = EasyDict(base_config.copy())
 
@@ -145,4 +186,5 @@ def get_model_config(base_config, custom_config, override_params):
         override_config = parse_override(override_params)
         config = merge_into(override_config, config, overwrite=True)
 
-    return config
+    # Delete meta-keys before returning.
+    return cleanup_config(config)
