@@ -6,6 +6,7 @@ import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import tensorflow as tf
+import inspect
 
 from .bbox_overlap import bbox_overlap
 from .bbox_transform import decode
@@ -98,8 +99,8 @@ summaries_fn = {
 }
 
 
-def get_image_summaries(summaries_fn, pred_dict, train_image,
-                        gt_bboxes, extra_tag=None):
+def get_image_summaries(summaries_fn, pred_dict, image,
+                        gt_bboxes=None, extra_tag=None):
     summaries = []
 
     for fn_name, arguments in summaries_fn.items():
@@ -114,25 +115,26 @@ def get_image_summaries(summaries_fn, pred_dict, train_image,
                 tag = os.path.join(fn_name, ','.join(
                     '{}={}'.format(k, v) for k, v in argument.items()
                 ))
-
+            if 'gt_bboxes' in inspect.getargspec(globals()[fn_name]).args:
+                argument['gt_bboxes'] = gt_bboxes
             if extra_tag:
                 tag = '{}/{}'.format(tag, extra_tag)
             summary = image_to_summary(
                 globals()[fn_name](
-                    pred_dict, train_image,
-                    gt_bboxes, **argument), tag)
+                    pred_dict, image,
+                    **argument), tag)
             summaries.append(summary)
     return summaries
 
 
 def image_vis_summaries(pred_dict, with_rcnn=True,
                         extra_tag=None, image_vis=None,
-                        train_image=None, gt_bboxes=None):
+                        image=None, gt_bboxes=None):
     summaries = []
     summaries.extend(
         get_image_summaries(
             summaries_fn['fasterrcnn'][image_vis]['rpn'],
-            pred_dict, train_image, gt_bboxes,
+            pred_dict, image, gt_bboxes,
             extra_tag=extra_tag
         )
     )
@@ -140,7 +142,7 @@ def image_vis_summaries(pred_dict, with_rcnn=True,
         summaries.extend(
             get_image_summaries(
                 summaries_fn['fasterrcnn'][image_vis]['rcnn'], pred_dict,
-                train_image, gt_bboxes, extra_tag=extra_tag
+                image, gt_bboxes, extra_tag=extra_tag
             )
         )
 
@@ -223,7 +225,7 @@ def get_image_draw(image):
     return image_pil, draw
 
 
-def draw_positive_anchors(pred_dict, train_image, gt_bboxes):
+def draw_positive_anchors(pred_dict, image, gt_bboxes=None):
     """
     Draws positive anchors used as "correct" in RPN
     """
@@ -238,15 +240,13 @@ def draw_positive_anchors(pred_dict, train_image, gt_bboxes):
     max_overlap = np.squeeze(max_overlap.reshape(anchors.shape[0], 1))
     overlap_iou = max_overlap[positive_indices]
 
-    gt_boxes = gt_bboxes
-
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     logger.debug(
         'We have {} positive_anchors'.format(positive_anchors.shape[0]))
     # logger.debug('Indices, values and bbox: {}'.format(
     #       list(zip(positive_indices, list(overlap_iou), positive_anchors))))
-    logger.debug('GT boxes: {}'.format(gt_boxes))
+    logger.debug('GT boxes: {}'.format(gt_bboxes))
 
     for label, positive_anchor in zip(list(overlap_iou), positive_anchors):
         draw.rectangle(
@@ -259,7 +259,7 @@ def draw_positive_anchors(pred_dict, train_image, gt_bboxes):
             tuple([x, y]), text=str(label), font=font,
             fill=(0, 255, 0, 255))
 
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 60),
             outline=(0, 0, 255, 150))
@@ -267,15 +267,14 @@ def draw_positive_anchors(pred_dict, train_image, gt_bboxes):
     return image_pil
 
 
-def draw_gt_boxes(pred_dict, train_image, gt_bboxes):
+def draw_gt_boxes(pred_dict, image, gt_bboxes):
     """
     Draws GT boxes.
     """
-    gt_boxes = gt_bboxes
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]),
             fill=(0, 0, 255, 60),
@@ -285,7 +284,7 @@ def draw_gt_boxes(pred_dict, train_image, gt_bboxes):
     return image_pil
 
 
-def draw_anchor_centers(pred_dict, train_image, gt_bboxes,):
+def draw_anchor_centers(pred_dict, image):
     anchors = pred_dict['all_anchors']
     x_min = anchors[:, 0]
     y_min = anchors[:, 1]
@@ -295,7 +294,7 @@ def draw_anchor_centers(pred_dict, train_image, gt_bboxes,):
     center_x = x_min + (x_max - x_min) / 2.
     center_y = y_min + (y_max - y_min) / 2.
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for x, y in zip(center_x, center_y):
         draw.rectangle(
@@ -306,7 +305,7 @@ def draw_anchor_centers(pred_dict, train_image, gt_bboxes,):
     return image_pil
 
 
-def draw_anchors(pred_dict, train_image, train_bboxes, anchor_num=None):
+def draw_anchors(pred_dict, image, anchor_num=None):
     """
     Draws positive anchors used as "correct" in RPN
     """
@@ -360,7 +359,7 @@ def draw_anchors(pred_dict, train_image, train_bboxes, anchor_num=None):
     max_x = int(moved_anchors[:, 2].max())
     max_y = int(moved_anchors[:, 3].max())
 
-    image_pil, _ = get_image_draw(train_image)
+    image_pil, _ = get_image_draw(image)
     back = Image.new('RGB', [max_x, max_y], 'white')
     back.paste(image_pil, [int(min_x), int(min_y)])
 
@@ -399,7 +398,7 @@ def draw_anchors(pred_dict, train_image, train_bboxes, anchor_num=None):
     return back
 
 
-def draw_anchor_batch(pred_dict, train_image, gt_bboxes):
+def draw_anchor_batch(pred_dict, image):
     """
     Draw anchors used in the batch for RPN.
     """
@@ -410,7 +409,7 @@ def draw_anchor_batch(pred_dict, train_image, gt_bboxes):
     anchors = anchors[in_batch_idx]
     targets = targets[in_batch_idx]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for anchor, target in zip(anchors, targets):
         if target == 1:
@@ -438,8 +437,7 @@ def draw_bbox(image, bbox):
     return image_pil
 
 
-def draw_top_proposals(pred_dict, train_image, gt_bboxes,
-                       min_score=0.8, max_display=20,
+def draw_top_proposals(pred_dict, image, min_score=0.8, max_display=20,
                        top_k=True, used_in_batch=False):
     tf.logging.debug(
         'Top proposals (blue = matches target in batch,'
@@ -460,7 +458,7 @@ def draw_top_proposals(pred_dict, train_image, gt_bboxes,
     scores = scores[top_scores_idx]
     proposals = proposals[top_scores_idx]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for proposal, score in zip(proposals, scores):
         bbox = list(proposal)
@@ -484,7 +482,7 @@ def draw_top_proposals(pred_dict, train_image, gt_bboxes,
     return image_pil
 
 
-def draw_batch_proposals(pred_dict, train_image, gt_bboxes, display='proposal',
+def draw_batch_proposals(pred_dict, image, gt_bboxes=None, display='proposal',
                          top_k=None, draw_all=True):
     tf.logging.debug(
         'Batch proposals (background or foreground) '
@@ -530,7 +528,7 @@ def draw_batch_proposals(pred_dict, train_image, gt_bboxes, display='proposal',
 
     bboxes = decode(all_anchors, bbox_pred)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for score, proposal, target, max_overlap, anchor in zip(
             scores, bboxes, targets, max_overlaps, all_anchors):
@@ -579,15 +577,14 @@ def draw_batch_proposals(pred_dict, train_image, gt_bboxes, display='proposal',
         score = float(score)
         draw.text(tuple([x, y]), text=font_txt, font=font, fill=font_fill)
 
-    gt_boxes = gt_bboxes
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         box = list(gt_box[:4])
         draw.rectangle(box, fill=(0, 255, 0, 60), outline=(0, 255, 0, 70))
 
     return image_pil
 
 
-def draw_top_nms_proposals(pred_dict, train_image, gt_bboxes, min_score=0.8,
+def draw_top_nms_proposals(pred_dict, image, gt_bboxes=None, min_score=0.8,
                            draw_gt=False):
     logger.debug('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
@@ -602,7 +599,7 @@ def draw_top_nms_proposals(pred_dict, train_image, gt_bboxes, min_score=0.8,
     scores = scores[sorted_idx]
     proposals = proposals[sorted_idx]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     fill_alpha = 70
 
@@ -627,8 +624,7 @@ def draw_top_nms_proposals(pred_dict, train_image, gt_bboxes, min_score=0.8,
         fill_alpha -= 5
 
     if draw_gt:
-        gt_boxes = gt_bboxes
-        for gt_box in gt_boxes:
+        for gt_box in gt_bboxes:
             draw.rectangle(
                 list(gt_box[:4]), fill=(0, 0, 255, 60),
                 outline=(0, 0, 255, 150))
@@ -636,7 +632,7 @@ def draw_top_nms_proposals(pred_dict, train_image, gt_bboxes, min_score=0.8,
     return image_pil
 
 
-def draw_rpn_cls_loss(pred_dict, train_image, gt_bboxes, foreground=True,
+def draw_rpn_cls_loss(pred_dict, image, gt_bboxes=None, foreground=True,
                       topn=10, worst=True):
     """
     For each bounding box labeled object. We wan't to display
@@ -686,7 +682,7 @@ def draw_rpn_cls_loss(pred_dict, train_image, gt_bboxes, foreground=True,
     logger.debug(
         'Mean loss for displayed {}: {}'.format(type_str, loss.mean()))
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for anchor_prob, anchor, anchor_loss in zip(prob, anchors, loss):
         anchor = list(anchor)
@@ -695,15 +691,14 @@ def draw_rpn_cls_loss(pred_dict, train_image, gt_bboxes, foreground=True,
             tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(anchor_loss),
             font=font, fill=(0, 0, 0, 255))
 
-    gt_boxes = gt_bboxes
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
 
     return image_pil
 
 
-def draw_rpn_pred_combined_loss(pred_dict, train_image, gt_bboxes, top_k=10):
+def draw_rpn_pred_combined_loss(pred_dict, image, top_k=10):
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     in_target = target >= 0
     bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred'][in_target]
@@ -724,7 +719,7 @@ def draw_rpn_pred_combined_loss(pred_dict, train_image, gt_bboxes, top_k=10):
 
     bbox_final = decode(all_anchors, bbox_pred)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for bbox, loss in zip(bbox_final, combined_loss):
         bbox = list(bbox)
@@ -736,7 +731,7 @@ def draw_rpn_pred_combined_loss(pred_dict, train_image, gt_bboxes, top_k=10):
     return image_pil
 
 
-def draw_rpn_bbox_pred(pred_dict, train_image, gt_bboxes, top_k=5):
+def draw_rpn_bbox_pred(pred_dict, image, top_k=5):
     """
     For each bounding box labeled object. We wan't to display the
     bbox_reg_error.
@@ -766,7 +761,7 @@ def draw_rpn_bbox_pred(pred_dict, train_image, gt_bboxes, top_k=5):
 
     bbox_final = decode(all_anchors, bbox_pred)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for anchor, bbox, loss in zip(all_anchors, bbox_final, loss_per_anchor):
         anchor = list(anchor)
@@ -793,7 +788,7 @@ def draw_rpn_bbox_pred(pred_dict, train_image, gt_bboxes, top_k=5):
     return image_pil
 
 
-def draw_rpn_bbox_targets(pred_dict, train_image, gt_bboxes):
+def draw_rpn_bbox_targets(pred_dict, image):
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     bbox_target = pred_dict['rpn_prediction']['rpn_bbox_target']
     all_anchors = pred_dict['all_anchors']
@@ -804,7 +799,7 @@ def draw_rpn_bbox_targets(pred_dict, train_image, gt_bboxes):
 
     gt_boxes = decode(all_anchors, bbox_target)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for gt_box in gt_boxes:
         draw.rectangle(
@@ -813,8 +808,7 @@ def draw_rpn_bbox_targets(pred_dict, train_image, gt_bboxes):
     return image_pil
 
 
-def draw_rpn_bbox_pred_with_target(pred_dict, train_image, gt_bboxes,
-                                   worst=True):
+def draw_rpn_bbox_pred_with_target(pred_dict, image, worst=True):
     if worst:
         draw_desc = 'worst'
     else:
@@ -863,7 +857,7 @@ def draw_rpn_bbox_pred_with_target(pred_dict, train_image, gt_bboxes,
     bbox = decode(np.array([anchor]), np.array([bbox_pred]))[0]
     gt_box = decode(np.array([anchor]), np.array([bbox_target]))[0]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     anchor = list(anchor)
     bbox = list(bbox)
@@ -876,7 +870,7 @@ def draw_rpn_bbox_pred_with_target(pred_dict, train_image, gt_bboxes,
     return image_pil
 
 
-def draw_rcnn_cls_batch(pred_dict, train_image, gt_bboxes, foreground=True,
+def draw_rcnn_cls_batch(pred_dict, image, gt_bboxes=None, foreground=True,
                         background=True):
     logger.debug(
         'Show the bboxes used for training classifier. '
@@ -896,7 +890,7 @@ def draw_rcnn_cls_batch(pred_dict, train_image, gt_bboxes, foreground=True,
 
     bboxes = decode(proposals, bbox_offsets_targets)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for bbox, cls_target in zip(bboxes, cls_targets):
         bbox = list(bbox.astype(int))
@@ -911,8 +905,7 @@ def draw_rcnn_cls_batch(pred_dict, train_image, gt_bboxes, foreground=True,
         draw.text(
             tuple(bbox[:2]), text=str(int(cls_target)), font=font, fill=fill)
 
-    gt_boxes = gt_bboxes
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
         draw.text(
@@ -922,7 +915,7 @@ def draw_rcnn_cls_batch(pred_dict, train_image, gt_bboxes, foreground=True,
     return image_pil
 
 
-def draw_rcnn_cls_batch_errors(pred_dict, train_image, gt_bboxes,
+def draw_rcnn_cls_batch_errors(pred_dict, image, gt_bboxes=None,
                                foreground=True, background=True,
                                worst=True, n=10):
     logger.debug(
@@ -959,7 +952,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, train_image, gt_bboxes,
 
     bboxes = decode(proposals, bbox_offsets_targets)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for bbox, cls_target, error in zip(
             bboxes, cls_targets, cross_entropy_per_proposal):
@@ -975,8 +968,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, train_image, gt_bboxes,
         draw.text(
             tuple(bbox[:2]), text='{:.2f}'.format(error), font=font, fill=fill)
 
-    gt_boxes = gt_bboxes
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
         # draw.text(tuple(gt_box[:2]), text=str(gt_box[4]),
@@ -985,7 +977,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, train_image, gt_bboxes,
     return image_pil
 
 
-def draw_rcnn_reg_batch_errors(pred_dict, train_image, gt_bboxes):
+def draw_rcnn_reg_batch_errors(pred_dict, image, gt_bboxes=None):
     logger.debug(
         'Show errors in batch used for training classifier regressor.')
     logger.debug(
@@ -1031,7 +1023,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, train_image, gt_bboxes):
 
     bboxes = decode(proposals, bbox_offsets)
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for proposal, bbox, cls_target, reg_error, cls_error in zip(
             proposals, bboxes, cls_targets,
@@ -1069,21 +1061,19 @@ def draw_rcnn_reg_batch_errors(pred_dict, train_image, gt_bboxes):
             [(proposal[0], proposal[3]), (bbox[0], bbox[3])],
             fill=(0, 0, 0, 170), width=1)
 
-    gt_boxes = gt_bboxes
-    for gt_box in gt_boxes:
+    for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 20), outline=(0, 0, 255, 100))
 
     return image_pil
 
 
-def recalculate_objects(pred_dict, train_image, gt_bboxes):
+def recalculate_objects(pred_dict, image):
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
     proposals_prob = pred_dict['classification_prediction']['rcnn']['cls_prob']
     proposals_target = proposals_prob.argmax(axis=1) - 1
     bbox_offsets = pred_dict[
         'classification_prediction']['rcnn']['bbox_offsets']
-    objects = pred_dict['classification_prediction']['objects']
 
     bbox_offsets = bbox_offsets[proposals_target >= 0]
     proposals = proposals[proposals_target >= 0]
@@ -1100,7 +1090,7 @@ def recalculate_objects(pred_dict, train_image, gt_bboxes):
     return bboxes, proposals_target
 
 
-def draw_object_prediction(pred_dict, train_image, gt_bboxes, topn=50):
+def draw_object_prediction(pred_dict, image, topn=50):
     logger.debug('Display top scored objects with label.')
     objects = pred_dict['classification_prediction']['objects']
     objects_labels = pred_dict['classification_prediction']['labels']
@@ -1110,7 +1100,7 @@ def draw_object_prediction(pred_dict, train_image, gt_bboxes, topn=50):
         logger.debug(
             'No objects detected. Probably all classified as background.')
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for num_object, (object_, label, prob) in enumerate(
             zip(objects, objects_labels, objects_labels_prob)):
@@ -1130,7 +1120,7 @@ def draw_object_prediction(pred_dict, train_image, gt_bboxes, topn=50):
     return image_pil
 
 
-def draw_correct_rpn_proposals_anchors(pred_dict, train_image, gt_bboxes,
+def draw_correct_rpn_proposals_anchors(pred_dict, image, gt_bboxes=None,
                                        top_k=5):
     scores = pred_dict['rpn_prediction']['rpn_cls_prob']
     scores = scores[:, 1]
@@ -1145,7 +1135,7 @@ def draw_correct_rpn_proposals_anchors(pred_dict, train_image, gt_bboxes,
     all_anchors = all_anchors[top_idxs]
     scores = scores[top_idxs]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for bbox, anchor, score in zip(bboxes, all_anchors, scores):
         bbox = list(bbox)
@@ -1161,7 +1151,7 @@ def draw_correct_rpn_proposals_anchors(pred_dict, train_image, gt_bboxes,
     return image_pil
 
 
-def draw_rpn_correct_proposals(pred_dict, train_image, gt_bboxes):
+def draw_rpn_correct_proposals(pred_dict, image, gt_bboxes=None):
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
     gt_boxes = gt_bboxes[:, :4]
 
@@ -1173,7 +1163,7 @@ def draw_rpn_correct_proposals(pred_dict, train_image, gt_bboxes):
 
     proposals = proposals[top_overlap_idx]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for proposal in proposals:
         proposal = list(proposal)
@@ -1181,7 +1171,7 @@ def draw_rpn_correct_proposals(pred_dict, train_image, gt_bboxes):
             proposal, fill=(0, 255, 50, 20), outline=(0, 255, 50, 100))
 
 
-def draw_rcnn_input_proposals(pred_dict, train_image, gt_bboxes):
+def draw_rcnn_input_proposals(pred_dict, image, gt_bboxes=None):
     logger.debug(
         'Display RPN proposals used in training classification. '
         'Top IoU with GT is displayed.')
@@ -1197,7 +1187,7 @@ def draw_rcnn_input_proposals(pred_dict, train_image, gt_bboxes):
     proposals = proposals[top_overlap_idx]
     top_overlap = top_overlap[top_overlap_idx]
 
-    image_pil, draw = get_image_draw(train_image)
+    image_pil, draw = get_image_draw(image)
 
     for proposal, overlap in zip(proposals, top_overlap):
         proposal = list(proposal)
