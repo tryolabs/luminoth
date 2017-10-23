@@ -322,9 +322,9 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         num_anchors = 1000
 
         config = EasyDict(self.config)
-        config['rpn']['l2_regularization_scale'] = 0.0
-        config['rcnn']['l2_regularization_scale'] = 0.0
-        config['base_network']['arg_scope']['weight_decay'] = 0.0
+        config.model.rpn.l2_regularization_scale = 0.0
+        config.model.rcnn.l2_regularization_scale = 0.0
+        config.model.base_network.arg_scope.weight_decay = 0.0
 
         #   RPN
 
@@ -408,7 +408,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         #   RCNN
 
         # Set the number of classes
-        num_classes = self.config['network']['num_classes']
+        num_classes = config.model.network.num_classes
 
         # Randomly generate the bbox_offsets for the correct class = 1
         prediction_dict_random['classification_prediction']['target'] = {
@@ -504,7 +504,6 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             'total_loss': 100,
             'rpn_reg_loss': 50
         }
-
         for loss in loss_random:
             self.assertGreaterEqual(
                 loss_random[loss],
