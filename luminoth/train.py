@@ -23,8 +23,8 @@ from luminoth.utils.training import (
 def run(custom_config, model_type, override_params, target='',
         cluster_spec=None, is_chief=True, job_name=None, task_index=None,
         get_model_fn=get_model, get_dataset_fn=get_dataset):
-    model_class = get_model_fn(model_type)
 
+    model_class = get_model_fn(model_type)
     config = get_model_config(
         model_class.base_config, custom_config, override_params,
     )
@@ -145,20 +145,20 @@ def run(custom_config, model_type, override_params, target='',
         checkpoint_dir = config.train.job_dir
 
     if config.train.display_every_steps or config.train.display_every_secs:
-        if not config.train.debug:
+        if not config.train.debug and image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
         else:
             # ImageVis only runs on the chief.
             chief_only_hooks.append(
                 ImageVisHook(
                     prediction_dict,
-                    train_image=train_dataset['image'],
+                    image=train_dataset['image'],
                     gt_bboxes=train_dataset['bboxes'],
                     with_rcnn=config.model.network.with_rcnn,
                     output_dir=checkpoint_dir,
                     every_n_steps=config.train.display_every_steps,
                     every_n_secs=config.train.display_every_secs,
-                    image_vis='train'
+                    image_vis=image_vis
                 )
             )
 

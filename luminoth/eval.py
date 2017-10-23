@@ -22,7 +22,7 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('--image-vis', type=click.Choice(['eval', 'debug', 'None']), default='eval',help='Image summaries configuration: \neval-Default value\ndebug-Creates exhaustive summaries for debugging\nNone-No image summaries')  # noqa
+@click.option('--image-vis', type=click.Choice(['eval', 'debug', 'train']), help='Image summaries configuration:\neval: Creates consice visualizations for evaluating a model.\ndebug: Creates exhaustive summaries for debugging.\ntrain: Summary used in training by default.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 def evaluate(dataset_split, config_files, job_dir, watch,
              from_global_step, override_params, image_vis, files_per_class):
@@ -44,9 +44,8 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     )
 
     config.train.job_dir = job_dir or config.train.job_dir
-    # Only activate debug for image visualizations.
+    # Only activate debug for if needed for debug visualization mode.
     config.train.debug = image_vis == 'debug'
-
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
@@ -297,7 +296,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     'scores': ops['pred_objects_scores'],
                     'gt_bboxes': ops['train_objects']
                 }
-                if image_vis != 'None':
+                if image_vis:
                     fetches['prediction_dict'] = ops['prediction_dict']
                     fetches['filename'] = ops['filename']
                     fetches['train_image'] = ops['train_image']
@@ -313,7 +312,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = sess.run(ops['losses'])
-                if image_vis != 'None':
+                if image_vis:
                     filename = batch_fetched['filename'][:-4].decode('utf-8')
                     visualize_file = False
                     for gt_class in batch_gt_classes:
@@ -334,7 +333,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
                             extra_tag=filename, image_vis=image_vis,
-                            train_image=batch_fetched['train_image'],
+                            image=batch_fetched['train_image'],
                             gt_bboxes=batch_fetched['gt_bboxes']
                         )
                         for image_summary in image_summaries:

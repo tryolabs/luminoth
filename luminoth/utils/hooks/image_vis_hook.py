@@ -6,7 +6,7 @@ from luminoth.utils.image_vis import image_vis_summaries
 
 class ImageVisHook(tf.train.SessionRunHook):
     def __init__(self, prediction_dict, with_rcnn=True,
-                 train_image=None, gt_bboxes=None, every_n_steps=None,
+                 image=None, gt_bboxes=None, every_n_steps=None,
                  every_n_secs=None, output_dir=None, summary_writer=None,
                  image_vis=None):
         super(ImageVisHook, self).__init__()
@@ -26,7 +26,7 @@ class ImageVisHook(tf.train.SessionRunHook):
         self._output_dir = output_dir
         self._summary_writer = summary_writer
         self._image_vis = image_vis
-        self._train_image = train_image
+        self._image = image
         self._gt_bboxes = gt_bboxes
 
     def begin(self):
@@ -48,7 +48,7 @@ class ImageVisHook(tf.train.SessionRunHook):
         if self._draw_images:
             fetches['prediction_dict'] = self._prediction_dict
             fetches['gt_bboxes'] = self._gt_bboxes
-            fetches['train_image'] = self._train_image
+            fetches['image'] = self._image
 
         return tf.train.SessionRunArgs(fetches)
 
@@ -63,7 +63,7 @@ class ImageVisHook(tf.train.SessionRunHook):
                 summaries = image_vis_summaries(
                     prediction_dict, with_rcnn=self._with_rcnn,
                     image_vis=self._image_vis,
-                    train_image=results.get('train_image'),
+                    image=results.get('image'),
                     gt_bboxes=results.get('gt_bboxes')
                 )
                 for summary in summaries:
