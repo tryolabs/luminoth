@@ -23,7 +23,7 @@ $ lumi dataset transform --type imagenet --data-dir ~/dataset/imagenet/ --output
 ## Limiting the dataset
 During development, it is often useful to verify that the model can actually overfit a small dataset.
 
-You can use the `--limit-examples and `--limit-classes` options for this.
+You can use the `--limit-examples` and `--limit-classes` options for this.
 
 For more information, try `lumi dataset transform --help`.
 
