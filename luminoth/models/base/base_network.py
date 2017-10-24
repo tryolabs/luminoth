@@ -1,13 +1,13 @@
-import sonnet as snt
-import tensorflow as tf
 import functools
+import sonnet as snt
 
-from tensorflow.contrib.slim.nets import (
-    vgg, resnet_v2, resnet_v1
-)
+import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
+from tensorflow.contrib.slim.nets import vgg, resnet_v2, resnet_v1
+
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
+
 
 # Default RGB means used commonly.
 _R_MEAN = 123.68
@@ -27,10 +27,11 @@ VALID_ARCHITECTURES = set([
 
 
 class BaseNetwork(snt.AbstractModule):
+
     def __init__(self, config, name='base_network'):
         super(BaseNetwork, self).__init__(name=name)
         if config.get('architecture') not in VALID_ARCHITECTURES:
-            raise ValueError('Invalid architecture "{}"'.format(
+            raise ValueError('Invalid architecture: "{}"'.format(
                 config.get('architecture')
             ))
 
@@ -43,9 +44,14 @@ class BaseNetwork(snt.AbstractModule):
 
         if self.vgg_type:
             return vgg.vgg_arg_scope(**arg_scope_kwargs)
-        elif self.resnet_type:
-            # It's the same argscope for v1 or v2.
+
+        if self.resnet_type:
+            # It's the same arg_scope for v1 or v2.
             return resnet_v2.resnet_utils.resnet_arg_scope(**arg_scope_kwargs)
+
+        raise ValueError('Invalid architecture: "{}"'.format(
+            self._config.get('architecture')
+        ))
 
     def network(self, is_training=True):
         if self.vgg_type:

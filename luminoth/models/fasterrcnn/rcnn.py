@@ -59,7 +59,7 @@ class RCNN(snt.AbstractModule):
         self._layers = [
             snt.Linear(
                 layer_size,
-                name="fc_{}".format(i),
+                name='fc_{}'.format(i),
                 initializers={'w': self.initializer},
                 regularizers={'w': self.regularizer},
             )
@@ -69,7 +69,7 @@ class RCNN(snt.AbstractModule):
         # since we want to be able to predict if the proposal is background as
         # well.
         self._classifier_layer = snt.Linear(
-            self._num_classes + 1, name="fc_classifier",
+            self._num_classes + 1, name='fc_classifier',
             initializers={'w': self.initializer},
             regularizers={'w': self.regularizer},
         )
@@ -78,7 +78,7 @@ class RCNN(snt.AbstractModule):
         # We choose which to use depending on the output of the classifier
         # layer
         self._bbox_layer = snt.Linear(
-            self._num_classes * 4, name="fc_bbox",
+            self._num_classes * 4, name='fc_bbox',
             initializers={'w': self.initializer},
             regularizers={'w': self.regularizer}
         )
