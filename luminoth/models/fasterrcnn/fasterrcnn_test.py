@@ -117,6 +117,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 }
             }
         })
+
         self.image_size = (600, 800)
         self.image = np.random.randint(low=0, high=255, size=(1, 600, 800, 3))
         self.gt_boxes = np.array([
@@ -152,6 +153,19 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             sess.run(tf.global_variables_initializer())
             results = sess.run(results)
             return results
+
+    def _get_losses(self, config, prediction_dict, image_size):
+        image = tf.placeholder(
+            tf.float32, shape=self.image.shape)
+        gt_boxes = tf.placeholder(
+            tf.float32, shape=self.gt_boxes.shape)
+        model = FasterRCNN(config)
+        model(image, gt_boxes)
+        all_losses = model.loss(prediction_dict, return_all=True)
+        with self.test_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            all_losses = sess.run(all_losses)
+            return all_losses
 
     def testBasic(self):
         """
@@ -267,6 +281,236 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         self._assert_sequential_values(anchors[:, 1], stride)
         self._assert_sequential_values(anchors[:, 2], stride)
         self._assert_sequential_values(anchors[:, 3], stride)
+
+    def testLoss(self):
+        """
+        Tests the loss of the FasterRCNN
+        """
+
+        # Create prediction_dict's structure
+        prediction_dict_random = {
+            'rpn_prediction': {},
+            'classification_prediction': {
+                'rcnn': {
+                    'cls_score': None,
+                    'bbox_offsets': None
+                },
+                'target': {},
+                '_debug': {
+                    'losses': {}
+                }
+            }
+        }
+        prediction_dict_perf = {
+            'rpn_prediction': {},
+            'classification_prediction': {
+                'rcnn': {
+                    'cls_score': None,
+                    'bbox_offsets': None
+                },
+                'target': {},
+                '_debug': {
+                    'losses': {}
+                }
+            }
+        }
+
+        # Set seeds for stable results
+        rand_seed = 13
+        target_seed = 43
+        image_size = (60, 80)
+        num_anchors = 1000
+
+        config = EasyDict(self.config)
+        config.model.rpn.l2_regularization_scale = 0.0
+        config.model.rcnn.l2_regularization_scale = 0.0
+        config.model.base_network.arg_scope.weight_decay = 0.0
+
+        #   RPN
+
+        # Random generation of cls_targets for rpn
+        # where:
+        #       {-1}:   Ignore
+        #       { 0}:   Background
+        #       { 1}:   Object
+        rpn_cls_target = tf.floor(tf.random_uniform(
+            [num_anchors],
+            minval=-1,
+            maxval=2,
+            dtype=tf.float32,
+            seed=target_seed,
+            name=None
+        ))
+
+        # Creation of cls_scores with:
+        #   score 100 in correct class
+        #   score 0 in wrong class
+
+        # Generation of opposite cls_score for rpn
+        rpn_cls_score = tf.cast(
+            tf.one_hot(
+                tf.cast(
+                    tf.mod(tf.identity(rpn_cls_target) + 1, 2),
+                    tf.int32),
+                depth=2,
+                on_value=10),
+            tf.float32
+        )
+        # Generation of correct cls_score for rpn
+        rpn_cls_perf_score = tf.cast(
+            tf.one_hot(
+                tf.cast(
+                    tf.identity(rpn_cls_target),
+                    tf.int32),
+                depth=2,
+                on_value=100),
+            tf.float32
+        )
+
+        # Random generation of target bbox deltas
+        rpn_bbox_target = tf.floor(tf.random_uniform(
+            [num_anchors, 4],
+            minval=-1,
+            maxval=1,
+            dtype=tf.float32,
+            seed=target_seed,
+            name=None
+        ))
+
+        # Random generation of predicted bbox deltas
+        rpn_bbox_predictions = tf.floor(tf.random_uniform(
+            [num_anchors, 4],
+            minval=-1,
+            maxval=1,
+            dtype=tf.float32,
+            seed=rand_seed,
+            name=None
+        ))
+
+        prediction_dict_random['rpn_prediction'][
+            'rpn_cls_score'] = rpn_cls_score
+        prediction_dict_random['rpn_prediction'][
+            'rpn_cls_target'] = rpn_cls_target
+        prediction_dict_random['rpn_prediction'][
+            'rpn_bbox_target'] = rpn_bbox_target
+        prediction_dict_random['rpn_prediction'][
+            'rpn_bbox_pred'] = rpn_bbox_predictions
+
+        prediction_dict_perf['rpn_prediction'][
+            'rpn_cls_score'] = rpn_cls_perf_score
+        prediction_dict_perf['rpn_prediction'][
+            'rpn_cls_target'] = rpn_cls_target
+        prediction_dict_perf['rpn_prediction'][
+            'rpn_bbox_target'] = rpn_bbox_target
+        prediction_dict_perf['rpn_prediction'][
+            'rpn_bbox_pred'] = rpn_bbox_target
+
+        #   RCNN
+
+        # Set the number of classes
+        num_classes = config.model.network.num_classes
+
+        # Randomly generate the bbox_offsets for the correct class = 1
+        prediction_dict_random['classification_prediction']['target'] = {
+            'bbox_offsets': tf.random_uniform(
+                [1, 4],
+                minval=-1,
+                maxval=1,
+                dtype=tf.float32,
+                seed=target_seed,
+                name=None
+            ),
+            'cls': [1]
+        }
+
+        # Set the same bbox_offsets and cls for the perfect prediction
+        prediction_dict_perf[
+            'classification_prediction']['target'] = prediction_dict_random[
+                'classification_prediction']['target'].copy()
+
+        # Generate random scores for the num_classes + the background class
+        rcnn_cls_score = tf.random_uniform(
+            [1, num_classes + 1],
+            minval=-100,
+            maxval=100,
+            dtype=tf.float32,
+            seed=rand_seed,
+            name=None
+        )
+
+        # Generate a perfect prediction with the correct class score = 100
+        # and the rest set to 0
+        rcnn_cls_perf_score = tf.cast(
+            tf.one_hot(
+                [1], depth=num_classes + 1,
+                on_value=100
+            ),
+            tf.float32
+        )
+
+        # Generate the random delta prediction for each class
+        rcnn_bbox_offsets = tf.random_uniform(
+            [1, num_classes * 4],
+            minval=-1,
+            maxval=1,
+            dtype=tf.float32,
+            seed=rand_seed,
+            name=None
+        )
+
+        # Copy the random prediction and set the correct class prediction
+        # as the target one
+        target_bbox_offsets = prediction_dict_random[
+            'classification_prediction']['target']['bbox_offsets']
+        initial_val = 1 * 4  # cls value * 4
+        rcnn_bbox_perf_offsets = tf.Variable(tf.reshape(
+            tf.random_uniform(
+                [1, num_classes * 4],
+                minval=-1,
+                maxval=1,
+                dtype=tf.float32,
+                seed=target_seed,
+                name=None
+            ), [-1]))
+        rcnn_bbox_perf_offsets = tf.reshape(
+            tf.scatter_update(
+                rcnn_bbox_perf_offsets,
+                tf.range(initial_val, initial_val + 4),
+                tf.reshape(target_bbox_offsets, [-1])
+            ),
+            [1, -1])
+
+        prediction_dict_random['classification_prediction'][
+            'rcnn']['cls_score'] = rcnn_cls_score
+        prediction_dict_random['classification_prediction'][
+            'rcnn']['bbox_offsets'] = rcnn_bbox_offsets
+
+        prediction_dict_perf['classification_prediction'][
+            'rcnn']['cls_score'] = rcnn_cls_perf_score
+        prediction_dict_perf['classification_prediction'][
+            'rcnn']['bbox_offsets'] = rcnn_bbox_perf_offsets
+
+        loss_perfect = self._get_losses(
+            config, prediction_dict_perf, image_size)
+        loss_random = self._get_losses(
+            config, prediction_dict_random, image_size)
+
+        loss_random_compare = {
+            'rcnn_reg_loss': 1,
+            'regularization_loss': 0,
+            'no_reg_loss': 50,
+            'rpn_cls_loss': 50,
+            'rcnn_cls_loss': 50,
+            'total_loss': 100,
+            'rpn_reg_loss': 50
+        }
+        for loss in loss_random:
+            self.assertGreaterEqual(
+                loss_random[loss],
+                loss_random_compare[loss])
+            self.assertEqual(
+                loss_perfect[loss],
+                0)
 
     def _assert_sequential_values(self, values, delta=1):
         unique_values = np.unique(values)

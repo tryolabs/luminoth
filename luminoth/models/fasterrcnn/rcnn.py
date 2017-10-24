@@ -241,15 +241,16 @@ class RCNN(snt.AbstractModule):
                     cls_prob: shape (num_proposals, num_classes + 1)
                         Application of softmax on cls_score.
 
-                    cls_target: shape (num_proposals,)
-                        Has the correct label for each of the proposals.
-                        0 => background
-                        1..n => 1-indexed classes
-                target:
                     bbox_offsets: shape (num_proposals, num_classes * 4)
                         Has the offset for each proposal for each class.
                         We have to compare only the proposals labeled with the
                         offsets for that label.
+
+                target:
+                    cls_target: shape (num_proposals,)
+                        Has the correct label for each of the proposals.
+                        0 => background
+                        1..n => 1-indexed classes
 
                     bbox_offsets_target: shape (num_proposals, 4)
                         Has the true offset of each proposal for the true
