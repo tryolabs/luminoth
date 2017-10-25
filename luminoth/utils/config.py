@@ -141,7 +141,7 @@ def parse_config_value(value):
     Try to parse the config value to boolean, integer, float or string.
     We assume all values are strings.
     """
-    if value == '':
+    if value.lower() == 'none':
         return None
     elif value.lower() == 'true':
         return True

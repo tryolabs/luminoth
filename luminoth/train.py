@@ -135,6 +135,7 @@ def run(custom_config, model_type, override_params, target='',
         tf.logging.warning(
             '`job_dir` is not defined. Checkpoints and logs will not be saved.'
         )
+        checkpoint_dir = None
     elif config.train.run_name:
         # Use run_name when available
         checkpoint_dir = os.path.join(
@@ -157,6 +158,7 @@ def run(custom_config, model_type, override_params, target='',
                 )
             )
 
+    step = -1
     with tf.train.MonitoredTrainingSession(
         master=target,
         is_chief=is_chief,
@@ -200,6 +202,8 @@ def run(custom_config, model_type, override_params, target='',
 
         # Wait for all threads to stop.
         coord.join(threads)
+
+        return step
 
 
 @click.command(help='Train models')
