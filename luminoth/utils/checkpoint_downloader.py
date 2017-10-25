@@ -1,9 +1,10 @@
-import tensorflow as tf
 import click
-import requests
+import json
 import os
-import tempfile
+import requests
 import tarfile
+import tensorflow as tf
+
 
 TENSORFLOW_OFFICIAL_ENDPOINT = 'http://download.tensorflow.org/models/'
 
@@ -19,32 +20,67 @@ BASE_NETWORK_FILENAMES = {
     'vgg_19': 'vgg_19_2016_08_28.tar.gz',
 }
 
-DEFAULT_PATH = '~/.luminoth/'
+
+def get_default_path():
+    if 'TF_CONFIG' in os.environ:
+        tf_config = json.loads(os.environ['TF_CONFIG'])
+        job_dir = tf_config.get('job', {}).get('job_dir')
+        if job_dir:
+            # Instead of using the job_dir we create a folder inside.
+            job_dir = os.path.join(job_dir, 'pretrained_checkpoints/')
+            return job_dir
+
+    return '~/.luminoth/'
+
+
+DEFAULT_PATH = get_default_path()
 
 
 def get_checkpoint_path(path=DEFAULT_PATH):
-    tf.logging.debug('Creating folder "{}" to save checkpoints.'.format(path))
-    full_path = os.path.abspath(os.path.expanduser(path))
-    tf.gfile.MakeDirs(full_path)
-    return full_path
+    tf.logging.info('Creating folder "{}" to save checkpoints.'.format(path))
+    # Expand user if path is relative to user home.
+    path = os.path.expanduser(path)
+
+    if not path.startswith('gs://'):
+        # We don't need to create Google cloud storage "folders"
+        path = os.path.abspath(path)
+
+    tf.gfile.MakeDirs(path)
+
+    return path
 
 
-def download_checkpoint(network, network_filename, checkpoint_path):
-    url = TENSORFLOW_OFFICIAL_ENDPOINT + BASE_NETWORK_FILENAMES[network]
+def download_checkpoint(network, network_filename, checkpoint_path,
+                        checkpoint_filename):
+    tarball_filename = BASE_NETWORK_FILENAMES[network]
+    url = TENSORFLOW_OFFICIAL_ENDPOINT + tarball_filename
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('Content-Length'))
-    tmp_file = tempfile.NamedTemporaryFile(delete=False)
+    tarball_path = os.path.join(checkpoint_path, tarball_filename)
+    tmp_tarball = tf.gfile.Open(tarball_path, 'wb')
     tf.logging.info('Downloading {} checkpoint.'.format(network_filename))
     with click.progressbar(length=total_size) as bar:
         for data in response.iter_content(chunk_size=4096):
-            tmp_file.write(data)
+            tmp_tarball.write(data)
             bar.update(len(data))
-    tmp_file.flush()
+    tmp_tarball.flush()
 
     tf.logging.info('Saving checkpoint to {}'.format(checkpoint_path))
-    tar_obj = tarfile.open(tmp_file.name)
-    tar_obj.extract(network_filename, checkpoint_path)
-    tmp_file.close()
+    # Open saved tarball as readable binary
+    tmp_tarball = tf.gfile.Open(tarball_path, 'rb')
+    # Open tarfile object
+    tar_obj = tarfile.open(fileobj=tmp_tarball)
+    # Create buffer with extracted network checkpoint
+    checkpoint_fp = tar_obj.extractfile(network_filename)
+    # Define where to save.
+    checkpoint_file = tf.gfile.Open(checkpoint_filename, 'wb')
+    # Write extracted checkpoint to file
+    checkpoint_file.write(checkpoint_fp.read())
+    checkpoint_file.flush()
+    checkpoint_file.close()
+    tmp_tarball.close()
+    # Remove temp tarball
+    tf.gfile.Remove(tarball_path)
 
 
 def get_checkpoint_file(network, checkpoint_path=DEFAULT_PATH):
@@ -53,8 +89,10 @@ def get_checkpoint_file(network, checkpoint_path=DEFAULT_PATH):
     checkpoint_path = get_checkpoint_path(path=checkpoint_path)
     files = tf.gfile.ListDirectory(checkpoint_path)
     network_filename = '{}.ckpt'.format(network)
-    network_file = os.path.join(checkpoint_path, network_filename)
+    checkpoint_file = os.path.join(checkpoint_path, network_filename)
     if network_filename not in files:
-        download_checkpoint(network, network_filename, checkpoint_path)
+        download_checkpoint(
+            network, network_filename, checkpoint_path, checkpoint_file
+        )
 
-    return network_file
+    return checkpoint_file
