@@ -28,6 +28,8 @@ def run(custom_config, model_type, override_params, target='',
         model_class.base_config, custom_config, override_params,
     )
 
+    image_vis = config.train.get('image_vis')
+
     if config.train.get('seed') is not None:
         tf.set_random_seed(config.train.seed)
 
@@ -143,7 +145,7 @@ def run(custom_config, model_type, override_params, target='',
     else:
         checkpoint_dir = config.train.job_dir
     if (config.train.display_every_steps or config.train.display_every_secs and
-            'image_vis' in config.train.keys()):
+            image_vis is not None):
         if not config.train.debug and config.train.image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
         else:
