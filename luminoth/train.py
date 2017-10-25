@@ -204,8 +204,9 @@ def run(custom_config, model_type, override_params, target='',
 
 @click.command(help='Train models')
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
+@click.option('--job-dir', help='Job directory.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-def train(config_files, override_params):
+def train(config_files, job_dir, override_params):
     """
     Parse TF_CONFIG to cluster_spec and call run() function
     """
@@ -229,7 +230,11 @@ def train(config_files, override_params):
     try:
         model_type = custom_config['model']['type']
     except KeyError:
+        # Without mode type defined we can't use the default config settings.
         raise KeyError('model.type should be set on the custom config.')
+
+    if job_dir:
+        override_params += ('train.job_dir={}'.format(job_dir), )
 
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:

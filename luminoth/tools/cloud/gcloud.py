@@ -29,8 +29,6 @@ DEFAULT_WORKER_COUNT = 2
 DEFAULT_PS_TYPE = 'large_model'
 DEFAULT_PS_COUNT = 0
 
-VGG_WEIGHTS = 'gs://luminoth-pretrained/vgg_16.ckpt'
-
 
 @click.group(help='Train models in Google Cloud ML')
 def gc():
@@ -133,7 +131,7 @@ def cloud_service(credentials, service, version='v1'):
 @click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
 @click.option('--dataset', required=True, help='Bucket where the dataset is located.')  # noqa
-@click.option('config_files', '--config', '-c', multiple=True, required=True, help='Path to config to use in training.')  # noqa
+@click.option('config_files', '--config', '-c', required=True, multiple=True, help='Path to config to use in training.')  # noqa
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--worker-type', default=DEFAULT_WORKER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
@@ -188,11 +186,9 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         dataset = 'gs://{}'.format(dataset)
 
     args.extend([
-        '--job-dir', 'gs://{}/{}'.format(bucket_name, base_path),
-        '--override', 'dataset.dir={}'.format(dataset),
-        '--override', 'pretrained.weights={}'.format(VGG_WEIGHTS),
+        '-o', 'dataset.dir={}'.format(dataset),
         # TODO: Turning off data_augmentation because of TF 1.2 limitations
-        '--override', 'dataset.data_augmentation=false'
+        '-o', 'dataset.data_augmentation=false'
     ])
 
     for config in config_files:
@@ -210,7 +206,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         'pythonModule': 'luminoth.train',
         'args': args,
         'region': region,
-        'jobDir': 'gs://{}/{}/train/'.format(bucket_name, base_path),
+        'jobDir': 'gs://{}/{}/'.format(bucket_name, base_path),
         'runtimeVersion': '1.2'
     }
 
