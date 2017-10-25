@@ -1,4 +1,5 @@
 import sonnet as snt
+import tempfile
 import tensorflow as tf
 
 from easydict import EasyDict
@@ -39,15 +40,17 @@ class TrainTest(tf.test.TestCase):
     Basic test to train module
     """
     def setUp(self):
+        self.total_epochs = 2
         self.config = EasyDict({
             'model_type': 'fasterrcnn',
             'dataset_type': '',
             'config_files': [],
-            'override_params': ['train.num_epochs=2'],
+            'override_params': [],
             'base_network': {
                 'download': False
             }
         })
+        tf.reset_default_graph()
 
     def get_dataset(self, dataset_type):
         """
@@ -87,15 +90,48 @@ class TrainTest(tf.test.TestCase):
         return MockFasterRCNN
 
     def testTrain(self):
-        config = self.config
-
-        custom_config = load_config(config.config_files)
+        custom_config = load_config(self.config.config_files)
         # The string we use here is ignored.
         model_type = 'mockfasterrcnn'
 
+        self.config.override_params = [
+            'train.num_epochs={}'.format(self.total_epochs),
+            'train.job_dir=',
+        ]
+
         # This should not fail
-        run(custom_config, model_type, config.override_params,
+        run(custom_config, model_type, self.config.override_params,
             get_dataset_fn=self.get_dataset, get_model_fn=self.get_model)
+
+    def testTrainSave(self):
+        custom_config = load_config(self.config.config_files)
+        model_type = 'mockfasterrcnn'
+
+        # Save checkpoints to a temp directory.
+        tmp_job_dir = tempfile.mkdtemp()
+        self.config.override_params = [
+            'train.num_epochs={}'.format(self.total_epochs),
+            'train.job_dir={}'.format(tmp_job_dir),
+            'train.run_name=test_runname',
+        ]
+
+        step = run(
+            custom_config, model_type, self.config.override_params,
+            get_dataset_fn=self.get_dataset, get_model_fn=self.get_model
+        )
+        self.assertEqual(step, 2)
+
+        # We have to reset the graph to avoid having duplicate names.
+        tf.reset_default_graph()
+        step = run(
+            custom_config, model_type, self.config.override_params,
+            get_dataset_fn=self.get_dataset, get_model_fn=self.get_model
+        )
+
+        # This is because of a MonitoredTrainingSession "bug".
+        # When ending training it saves a checkpoint as the next step.
+        # That causes that we are one step ahead when loading it.
+        self.assertEqual(step, 5)
 
 
 if __name__ == '__main__':
