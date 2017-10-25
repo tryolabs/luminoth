@@ -1,0 +1,168 @@
+# KEY:
+# AMIP: as mentioned in the paper
+
+model:
+  type: retina
+  anchors:
+    # Base size to use for anchors (in pyramid-level points)
+    base_size: 8
+    # Aspect ratios used for generating anchors (AMIP)
+    ratios: [0.5, 1., 2.]
+    # Scales of the anchors (AMIP)
+    scales: [0.666, 1., 1.333]
+    # How many pixels outside the level we will allow the anchor to be.
+    offset: 0
+
+  network:
+    num_classes: 20
+  fpn:
+    num_channels: 256  # AMIP
+    architecture: resnet_v2_101
+    train_base: True
+    endpoints:
+      - 'block4/unit_3/bottleneck_v2/conv3'
+      - 'block3/unit_23/bottleneck_v2/conv1'
+      - 'block2/unit_4/bottleneck_v2/conv1'
+
+  loss:
+    gamma: 2.0
+
+  # Config for BBox delta prediction subnets.
+  box_subnet:
+    # TODO: not implemented
+    share_weights: True
+    # Config for the hidden layers of the net.
+    hidden:
+      depth: 4
+      channels: 256
+      kernel_shape: [3, 3]
+      activation: relu
+    # Config for the final layer of the net.
+    final:
+      kernel_shape: [3, 3]
+      activation: sigmoid
+
+  # Config for classification subnet(s).
+  class_subnet:
+    # TODO: not implemented
+    share_weights: True
+    # Config for the hidden layers of the net.
+    hidden:
+      # Number of layers.
+      depth: 4
+      # Number of output channels.
+      channels: 256
+      kernel_shape: [3, 3]
+      activation: relu
+    # Config for the final layer of the net.
+    final:
+      # Pi as described in the paper. Used to initialize the bias of the
+      # final layer.
+      pi: 0.1  # In the paper, they use 0.01
+      kernel_shape: [3, 3]
+      activation: sigmoid
+
+  target:
+    # Threshold with GT to be considered positive
+    foreground_threshold: 0.5
+    # High and low threshold with GT to be considered negative
+    background_threshold_high: 0.5  # AMIP (Retina)
+    background_threshold_low: 0.1
+
+  proposal:
+    # Maximum number of detections for each class
+    class_max_detections: 100
+    # NMS threshold used to remove "almost duplicate" of the same class
+    class_nms_threshold: 0.6
+    # Maximum total detections for an image (sorted by score)
+    total_max_detections: 300
+    # Minimum prob to be used as proposed object
+    # TODO: figure this out
+    # With this value set to 0.5 we're having problems because at the initial
+    # state all labels get around 0.048 prob.
+    min_prob_threshold: 0.0
+
+dataset:
+  type: tfrecord
+  split: 'train'
+  image_preprocessing:
+    min_size: 600
+    max_size: 1024
+  # Data augmentation techniques
+  data_augmentation:
+    - flip:
+        left_right: True
+        up_down: False
+        prob: 0.5
+    # If you resize to too small images, you may end up not having any anchors
+    # that aren't partially outside the image.
+    - resize:
+        min_size: 600
+        max_size: 1024
+        prob: 0.2
+    - patch:
+        min_height: 600
+        min_width: 600
+        prob: 0.2
+    - distortion:
+        brightness:
+          max_delta: 0.2
+        hue:
+          max_delta: 0.2
+        saturation:
+          lower: 0.5
+          upper: 1.5
+        prob: 0.3
+
+train:
+  debug: False
+  tf_debug: False
+  job_dir: jobs
+  seed:
+  num_epochs: 1000
+  # TODO: make other batch_size-s work.
+  batch_size: 1
+
+  run_name:
+  # Disables logging and saving checkpoints
+  no_log: False
+  # Displays debugging images with results every N steps. Debug mode must be
+  # enabled
+  display_every_steps:
+  # Display debugging images every N seconds.
+  display_every_secs: 300
+  # Shuffle the dataset. It should only be disabled when trying to reproduce
+  # some problem on some sample
+  random_shuffle: True
+  # Save Tensorboard timeline
+  save_timeline: False
+  # The frequency, in seconds, that a checkpoint is saved.
+  save_checkpoint_secs: 600
+  # The frequency, in number of global steps, that the summaries are written to disk
+  save_summaries_steps:
+  # The frequency, in secs, that the summaries are written to disk.
+  # If both save_summaries_steps and save_summaries_secs are set to empty, then the
+  # default summary saver isn't used
+  save_summaries_secs: 30
+  # Run TensorFlow using full_trace mode for memory and running time logging
+  # Debug mode must be enabled.
+  full_trace: False
+  # Learning rate config.
+  learning_rate:
+    # Because we're using kwargs, we want the learning_rate dict to be replaced
+    # as a whole.
+    _replace: True
+    # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
+    # You can define different decay methods using `decay_method` and defining all the necessary arguments.
+    decay_method:
+    learning_rate: 0.001
+
+  # Optimizer config
+  optimizer:
+    # Because we're using kwargs, we want the optimizer dict to be replaced
+    # as a whole.
+    _replace: True
+    # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
+    type: momentum
+    # any options are passed directly to the optimizer as kwarg.
+    momentum: 0.9

@@ -17,7 +17,18 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
     """
     # We normalize bounding boxes points.
     bboxes_float = tf.to_float(bboxes)
-    x_min, y_min, x_max, y_max, label = tf.unstack(bboxes_float, axis=1)
+    boxes_shape = bboxes_float.shape
+    if boxes_shape[1] == 5:
+        x_min, y_min, x_max, y_max, label = tf.unstack(bboxes_float, axis=1)
+        label = tf.to_int32(label)  # Cast back to int.
+    elif boxes_shape[1] == 4:
+        x_min, y_min, x_max, y_max = tf.unstack(bboxes_float, axis=1)
+    else:
+        raise ValueError(
+            'bboxes argument of adjust_bboxes should have '
+            'size 4 or 5 in the last dimension. '
+            'Has size {}.'.format(boxes_shape[1])
+        )
 
     x_min = x_min / old_width
     y_min = y_min / old_height
@@ -29,8 +40,9 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
     y_min = tf.to_int32(y_min * new_height)
     x_max = tf.to_int32(x_max * new_width)
     y_max = tf.to_int32(y_max * new_height)
-    label = tf.to_int32(label)  # Cast back to int.
 
+    if boxes_shape[1] == 4:
+        return tf.stack([x_min, y_min, x_max, y_max], axis=1)
     # Concat points and label to return a [num_bboxes, 5] tensor.
     return tf.stack([x_min, y_min, x_max, y_max, label], axis=1)
 

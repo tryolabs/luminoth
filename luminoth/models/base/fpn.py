@@ -64,7 +64,13 @@ class FPN(BaseNetwork):
             try:
                 end_points.append(end_points_dict[key])
             except KeyError:
-                tf.logging.warn('Illegal endpoint name "{}"'.format(key))
+                tf.logging.warning('Illegal endpoint name "{}"'.format(key))
         if len(end_points) < 1:
             raise ValueError('No legal endpoint names for FPN.')
         return end_points
+
+    def get_trainable_vars(self, train_base):
+        trainable_vars = snt.get_variables_in_module(self)
+        if train_base:
+            trainable_vars += super(FPN, self).get_trainable_vars()
+        return trainable_vars
