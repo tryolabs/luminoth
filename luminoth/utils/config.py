@@ -143,7 +143,7 @@ def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
             elif overwrite:
                 base_config[key] = value
                 if warn_overwrite:
-                    tf.logging.warn('Overwrote key "{}"'.format(key))
+                    tf.logging.warning('Overwrote key "{}"'.format(key))
 
     return base_config
 

@@ -267,7 +267,7 @@ class RPNTargetTest(tf.test.TestCase):
             all_anchors, gt_boxes, config
         )
 
-        # 4 foreground
+        # 4 foregrounds
         self.assertEqual(labels[labels == 1].shape[0], 4)
         # 4 background
         self.assertEqual(labels[labels == 0].shape[0], 4)

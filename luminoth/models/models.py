@@ -1,11 +1,13 @@
 from luminoth.models.fasterrcnn import FasterRCNN
 from luminoth.models.ssd import SSD
+from luminoth.models.retina import Retina
 
 
 # TODO: More models :)
 MODELS = {
     'fasterrcnn': FasterRCNN,
-    'ssd': SSD
+    'ssd': SSD,
+    'retina': Retina,
 }
 
 

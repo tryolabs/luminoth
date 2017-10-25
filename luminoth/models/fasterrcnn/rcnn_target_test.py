@@ -36,11 +36,11 @@ class RCNNTargetTest(tf.test.TestCase):
         """Runs an instance of RCNNTarget
 
         Args:
-            model: an RCNNTarget model.
-            gt_boxes: a Tensor holding the ground truth boxes, with shape
+            model: RCNNTarget model.
+            gt_boxes: Tensor holding the ground truth boxes, with shape
                 (num_gt, 5). The last value is the class label.
-            proposed_boxes: a Tensor holding the proposed boxes. Its shape is
-                (num_proposals, 4). The first value is the batch number.
+            proposed_boxes: Tensor holding the proposed boxes. Its shape is
+                (num_proposals, 4).
 
         Returns:
             The tuple returned by RCNNTarget._build().
