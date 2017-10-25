@@ -240,10 +240,15 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 
 
 @gc.command(help='List project jobs')
-@click.option('--project-id', required=True)
 @click.option('--service-account-json', required=True)
 @click.option('--running', is_flag=True, help='List only jobs that are running.')  # noqa
-def jobs(project_id, service_account_json, running):
+def jobs(service_account_json, running):
+    project_id = get_project_id(service_account_json)
+    if project_id is None:
+        raise ValueError(
+            'Missing "project_id" in service_account_json "{}"'.format(
+                service_account_json))
+
     credentials = get_credentials(service_account_json)
     cloudml = cloud_service(credentials, 'ml')
     request = cloudml.projects().jobs().list(
@@ -275,10 +280,15 @@ def jobs(project_id, service_account_json, running):
 
 @gc.command(help='Show logs from a running job')
 @click.argument('job_id')
-@click.option('--project-id', required=True)
 @click.option('--service-account-json', required=True)
 @click.option('--polling-interval', default=60, help='Polling interval in seconds.')  # noqa
-def logs(job_id, project_id, service_account_json, polling_interval):
+def logs(job_id, service_account_json, polling_interval):
+    project_id = get_project_id(service_account_json)
+    if project_id is None:
+        raise ValueError(
+            'Missing "project_id" in service_account_json "{}"'.format(
+                service_account_json))
+
     credentials = get_credentials(service_account_json)
     cloudlog = cloud_service(credentials, 'logging', 'v2')
 
