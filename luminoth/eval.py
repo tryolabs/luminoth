@@ -55,7 +55,10 @@ def evaluate(dataset_split, config_files, job_dir, watch,
         tf.set_random_seed(config.train.seed)
 
     # Set pretrained as not training
-    config.model.base_network.trainable = False
+    try:
+        config.model.base_network.trainable = False
+    except (KeyError, AttributeError) as e:
+        pass
 
     model_class = get_model(config.model.type)
     model = model_class(config)
@@ -72,6 +75,10 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     prediction_dict = model(
         train_image, train_objects
     )
+    try:
+        config.model.network.with_rcnn
+    except (KeyError, AttributeError) as e:
+        config.model.network.with_rcnn = True
 
     if config.model.network.with_rcnn:
         pred = prediction_dict['classification_prediction']

@@ -1,9 +1,11 @@
 from luminoth.models.fasterrcnn import FasterRCNN
+from luminoth.models.retina import Retina
 
 
 # TODO: More models :)
 MODELS = {
     'fasterrcnn': FasterRCNN,
+    'retina': Retina,
 }
 
 
