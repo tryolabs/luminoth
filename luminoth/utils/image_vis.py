@@ -6,7 +6,6 @@ import PIL.Image as Image
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import tensorflow as tf
-import inspect
 
 from .bbox_overlap import bbox_overlap
 from .bbox_transform import decode
@@ -102,6 +101,8 @@ summaries_fn = {
 def get_image_summaries(summaries_fn, pred_dict, image,
                         gt_bboxes=None, extra_tag=None):
     summaries = []
+    if gt_bboxes is not None:
+        pred_dict['gt_bboxes'] = gt_bboxes
 
     for fn_name, arguments in summaries_fn.items():
         if not arguments:
@@ -115,34 +116,40 @@ def get_image_summaries(summaries_fn, pred_dict, image,
                 tag = os.path.join(fn_name, ','.join(
                     '{}={}'.format(k, v) for k, v in argument.items()
                 ))
-            if 'gt_bboxes' in inspect.getargspec(globals()[fn_name]).args:
-                argument['gt_bboxes'] = gt_bboxes
             if extra_tag:
                 tag = '{}/{}'.format(tag, extra_tag)
-            summary = image_to_summary(
-                globals()[fn_name](
-                    pred_dict, image,
-                    **argument), tag)
-            summaries.append(summary)
+            try:
+                summary = image_to_summary(
+                    globals()[fn_name](
+                        pred_dict, image,
+                        **argument), tag)
+                summaries.append(summary)
+            except KeyError as err:
+                tf.logging.warning(
+                    'Function {} failed with KeyError. Key value: {}'.format(
+                        fn_name, err.message))
     return summaries
 
 
-def image_vis_summaries(pred_dict, with_rcnn=True,
-                        extra_tag=None, image_vis=None,
-                        image=None, gt_bboxes=None):
+def image_vis_summaries(pred_dict, with_rcnn=True, extra_tag=None,
+                        image_visualization_mode=None, image=None,
+                        gt_bboxes=None):
     summaries = []
     summaries.extend(
         get_image_summaries(
-            summaries_fn['fasterrcnn'][image_vis]['rpn'],
+            summaries_fn[
+                'fasterrcnn'][image_visualization_mode]['rpn'],
             pred_dict, image, gt_bboxes,
             extra_tag=extra_tag
         )
     )
-    if with_rcnn and summaries_fn['fasterrcnn'][image_vis].get('rcnn'):
+    if with_rcnn and summaries_fn[
+            'fasterrcnn'][image_visualization_mode].get('rcnn'):
         summaries.extend(
             get_image_summaries(
-                summaries_fn['fasterrcnn'][image_vis]['rcnn'], pred_dict,
-                image, gt_bboxes, extra_tag=extra_tag
+                summaries_fn[
+                    'fasterrcnn'][image_visualization_mode]['rcnn'],
+                pred_dict, image, gt_bboxes, extra_tag=extra_tag
             )
         )
 
@@ -225,7 +232,7 @@ def get_image_draw(image):
     return image_pil, draw
 
 
-def draw_positive_anchors(pred_dict, image, gt_bboxes=None):
+def draw_positive_anchors(pred_dict, image):
     """
     Draws positive anchors used as "correct" in RPN
     """
@@ -235,7 +242,7 @@ def draw_positive_anchors(pred_dict, image, gt_bboxes=None):
     positive_indices = np.nonzero(correct_labels > 0)[0]
     positive_anchors = anchors[positive_indices]
     correct_labels = correct_labels[positive_indices]
-
+    gt_bboxes = pred_dict['gt_bboxes']
     max_overlap = pred_dict['rpn_prediction']['rpn_max_overlap']
     max_overlap = np.squeeze(max_overlap.reshape(anchors.shape[0], 1))
     overlap_iou = max_overlap[positive_indices]
@@ -267,13 +274,13 @@ def draw_positive_anchors(pred_dict, image, gt_bboxes=None):
     return image_pil
 
 
-def draw_gt_boxes(pred_dict, image, gt_bboxes):
+def draw_gt_boxes(pred_dict, image):
     """
     Draws GT boxes.
     """
 
     image_pil, draw = get_image_draw(image)
-
+    gt_bboxes = pred_dict['gt_bboxes']
     for gt_box in gt_bboxes:
         draw.rectangle(
             list(gt_box[:4]),
@@ -482,8 +489,8 @@ def draw_top_proposals(pred_dict, image, min_score=0.8, max_display=20,
     return image_pil
 
 
-def draw_batch_proposals(pred_dict, image, gt_bboxes=None, display='proposal',
-                         top_k=None, draw_all=True):
+def draw_batch_proposals(pred_dict, image, display='proposal', top_k=None,
+                         draw_all=True):
     tf.logging.debug(
         'Batch proposals (background or foreground) '
         '(score is classification, blue = foreground, '
@@ -501,6 +508,7 @@ def draw_batch_proposals(pred_dict, image, gt_bboxes=None, display='proposal',
     targets = pred_dict['rpn_prediction']['rpn_cls_target']
     max_overlaps = pred_dict['rpn_prediction']['rpn_max_overlap']
     all_anchors = pred_dict['all_anchors']
+    gt_bboxes = pred_dict['gt_bboxes']
 
     batch_idx = targets >= 0
     scores = scores[batch_idx]
@@ -584,8 +592,7 @@ def draw_batch_proposals(pred_dict, image, gt_bboxes=None, display='proposal',
     return image_pil
 
 
-def draw_top_nms_proposals(pred_dict, image, gt_bboxes=None, min_score=0.8,
-                           draw_gt=False):
+def draw_top_nms_proposals(pred_dict, image, min_score=0.8, draw_gt=False):
     logger.debug('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
@@ -624,6 +631,7 @@ def draw_top_nms_proposals(pred_dict, image, gt_bboxes=None, min_score=0.8,
         fill_alpha -= 5
 
     if draw_gt:
+        gt_bboxes = pred_dict['gt_bboxes']
         for gt_box in gt_bboxes:
             draw.rectangle(
                 list(gt_box[:4]), fill=(0, 0, 255, 60),
@@ -632,8 +640,8 @@ def draw_top_nms_proposals(pred_dict, image, gt_bboxes=None, min_score=0.8,
     return image_pil
 
 
-def draw_rpn_cls_loss(pred_dict, image, gt_bboxes=None, foreground=True,
-                      topn=10, worst=True):
+def draw_rpn_cls_loss(pred_dict, image, foreground=True, topn=10,
+                      worst=True):
     """
     For each bounding box labeled object. We wan't to display
     the softmax score.
@@ -651,6 +659,7 @@ def draw_rpn_cls_loss(pred_dict, image, gt_bboxes=None, foreground=True,
     prob = prob.reshape([-1, 2])[:, 1]
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     anchors = pred_dict['all_anchors']
+    gt_bboxes = pred_dict['gt_bboxes']
 
     non_ignored_indices = target >= 0
     target = target[non_ignored_indices]
@@ -870,8 +879,7 @@ def draw_rpn_bbox_pred_with_target(pred_dict, image, worst=True):
     return image_pil
 
 
-def draw_rcnn_cls_batch(pred_dict, image, gt_bboxes=None, foreground=True,
-                        background=True):
+def draw_rcnn_cls_batch(pred_dict, image, foreground=True, background=True):
     logger.debug(
         'Show the bboxes used for training classifier. '
         '(GT labels are -1 from cls targets)')
@@ -881,6 +889,7 @@ def draw_rcnn_cls_batch(pred_dict, image, gt_bboxes=None, foreground=True,
     cls_targets = pred_dict['classification_prediction']['target']['cls']
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
+    gt_bboxes = pred_dict['gt_bboxes']
 
     batch_idx = np.where(cls_targets != -1)[0]
 
@@ -915,9 +924,8 @@ def draw_rcnn_cls_batch(pred_dict, image, gt_bboxes=None, foreground=True,
     return image_pil
 
 
-def draw_rcnn_cls_batch_errors(pred_dict, image, gt_bboxes=None,
-                               foreground=True, background=True,
-                               worst=True, n=10):
+def draw_rcnn_cls_batch_errors(pred_dict, image, foreground=True,
+                               background=True, worst=True, n=10):
     logger.debug(
         'Show the {} classification errors in batch '
         'used for training classifier.'.format('worst' if worst else 'best'))
@@ -927,7 +935,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, image, gt_bboxes=None,
     cls_targets = pred_dict['classification_prediction']['target']['cls']
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
-
+    gt_bboxes = pred_dict['gt_bboxes']
     batch_idx = np.where(cls_targets != -1)[0]
 
     proposals = proposals[batch_idx]
@@ -977,7 +985,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, image, gt_bboxes=None,
     return image_pil
 
 
-def draw_rcnn_reg_batch_errors(pred_dict, image, gt_bboxes=None):
+def draw_rcnn_reg_batch_errors(pred_dict, image):
     logger.debug(
         'Show errors in batch used for training classifier regressor.')
     logger.debug(
@@ -989,6 +997,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, image, gt_bboxes=None):
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
     bbox_offsets = pred_dict['classification_prediction']['bbox_offsets']
+    gt_bboxes = pred_dict['gt_bboxes']
 
     batch_idx = np.where(cls_targets >= 0)[0]
 
@@ -1120,13 +1129,12 @@ def draw_object_prediction(pred_dict, image, topn=50):
     return image_pil
 
 
-def draw_correct_rpn_proposals_anchors(pred_dict, image, gt_bboxes=None,
-                                       top_k=5):
+def draw_correct_rpn_proposals_anchors(pred_dict, image, top_k=5):
     scores = pred_dict['rpn_prediction']['rpn_cls_prob']
     scores = scores[:, 1]
     bbox_pred = pred_dict['rpn_prediction']['rpn_bbox_pred']
     all_anchors = pred_dict['all_anchors']
-
+    gt_bboxes = pred_dict['gt_bboxes']
     bboxes = decode(all_anchors, bbox_pred)
 
     gt_overlap = bbox_overlap(bboxes, gt_bboxes[:, :4])
@@ -1151,8 +1159,9 @@ def draw_correct_rpn_proposals_anchors(pred_dict, image, gt_bboxes=None,
     return image_pil
 
 
-def draw_rpn_correct_proposals(pred_dict, image, gt_bboxes=None):
+def draw_rpn_correct_proposals(pred_dict, image):
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    gt_bboxes = pred_dict['gt_bboxes']
     gt_boxes = gt_bboxes[:, :4]
 
     overlaps = bbox_overlap(proposals, gt_boxes)
@@ -1171,11 +1180,12 @@ def draw_rpn_correct_proposals(pred_dict, image, gt_bboxes=None):
             proposal, fill=(0, 255, 50, 20), outline=(0, 255, 50, 100))
 
 
-def draw_rcnn_input_proposals(pred_dict, image, gt_bboxes=None):
+def draw_rcnn_input_proposals(pred_dict, image):
     logger.debug(
         'Display RPN proposals used in training classification. '
         'Top IoU with GT is displayed.')
     proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    gt_bboxes = pred_dict['gt_bboxes']
     gt_boxes = gt_bboxes[:, :4]
 
     overlaps = bbox_overlap(proposals, gt_boxes)

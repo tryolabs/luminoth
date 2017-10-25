@@ -146,7 +146,7 @@ def run(custom_config, model_type, override_params, target='',
         checkpoint_dir = config.train.job_dir
     if (config.train.display_every_steps or config.train.display_every_secs and
             image_vis is not None):
-        if not config.train.debug and config.train.image_vis == 'debug':
+        if not config.train.debug and image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
         else:
             # ImageVis only runs on the chief.
@@ -159,7 +159,7 @@ def run(custom_config, model_type, override_params, target='',
                     output_dir=checkpoint_dir,
                     every_n_steps=config.train.display_every_steps,
                     every_n_secs=config.train.display_every_secs,
-                    image_vis=config.train.image_vis
+                    image_visualization_mode=image_vis
                 )
             )
 

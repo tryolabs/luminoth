@@ -5,10 +5,10 @@ from luminoth.utils.image_vis import image_vis_summaries
 
 
 class ImageVisHook(tf.train.SessionRunHook):
-    def __init__(self, prediction_dict, with_rcnn=True,
-                 image=None, gt_bboxes=None, every_n_steps=None,
-                 every_n_secs=None, output_dir=None, summary_writer=None,
-                 image_vis=None):
+    def __init__(self, prediction_dict, image, with_rcnn=True,
+                 gt_bboxes=None, every_n_steps=None, every_n_secs=None,
+                 output_dir=None, summary_writer=None,
+                 image_visualization_mode=None):
         super(ImageVisHook, self).__init__()
         if (every_n_secs is None) == (every_n_steps is None):
             raise ValueError(
@@ -25,7 +25,7 @@ class ImageVisHook(tf.train.SessionRunHook):
         self._with_rcnn = with_rcnn
         self._output_dir = output_dir
         self._summary_writer = summary_writer
-        self._image_vis = image_vis
+        self._image_visualization_mode = image_visualization_mode
         self._image = image
         self._gt_bboxes = gt_bboxes
 
@@ -47,8 +47,9 @@ class ImageVisHook(tf.train.SessionRunHook):
 
         if self._draw_images:
             fetches['prediction_dict'] = self._prediction_dict
-            fetches['gt_bboxes'] = self._gt_bboxes
             fetches['image'] = self._image
+            if self._gt_bboxes is not None:
+                fetches['gt_bboxes'] = self._gt_bboxes
 
         return tf.train.SessionRunArgs(fetches)
 
@@ -62,7 +63,7 @@ class ImageVisHook(tf.train.SessionRunHook):
             if prediction_dict is not None:
                 summaries = image_vis_summaries(
                     prediction_dict, with_rcnn=self._with_rcnn,
-                    image_vis=self._image_vis,
+                    image_visualization_mode=self._image_visualization_mode,
                     image=results.get('image'),
                     gt_bboxes=results.get('gt_bboxes')
                 )

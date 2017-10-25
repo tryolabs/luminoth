@@ -24,7 +24,7 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 def evaluate(dataset_split, config_files, job_dir, watch,
-             from_global_step, override_params, image_vis, files_per_class):
+             from_global_step, override_params, files_per_class):
     """
     Evaluate models using dataset.
     """
@@ -46,7 +46,7 @@ def evaluate(dataset_split, config_files, job_dir, watch,
 
     # Only activate debug for if needed for debug visualization mode.
     if not config.train.debug:
-        config.train.debug = image_vis == 'debug'
+        config.train.debug = config.eval.image_vis == 'debug'
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -154,7 +154,6 @@ def evaluate(dataset_split, config_files, job_dir, watch,
                 'Missing checkpoint; Checking again in a minute')
             time.sleep(60)
             continue
-
         for checkpoint in checkpoints:
             # Always returned in order, so it's safe to assign directly.
             tf.logging.info(
@@ -165,8 +164,9 @@ def evaluate(dataset_split, config_files, job_dir, watch,
             try:
                 start = time.time()
                 evaluate_once(
-                    writer, saver, ops, config.network.num_classes, checkpoint,
-                    metrics_scope=metrics_scope, image_vis=image_vis,
+                    writer, saver, ops, config.model.network.num_classes,
+                    checkpoint, metrics_scope=metrics_scope,
+                    image_vis=config.eval.image_vis,
                     files_per_class=files_per_class,
                     files_to_visualize=files_to_visualize
                 )
@@ -334,7 +334,8 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     if visualize_file:
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
-                            extra_tag=filename, image_vis=image_vis,
+                            extra_tag=filename,
+                            image_visualization_mode=image_vis,
                             image=batch_fetched['train_image'],
                             gt_bboxes=batch_fetched['gt_bboxes']
                         )
