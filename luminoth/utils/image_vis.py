@@ -127,7 +127,7 @@ def get_image_summaries(summaries_fn, pred_dict, image,
             except KeyError as err:
                 tf.logging.warning(
                     'Function {} failed with KeyError. Key value: {}'.format(
-                        fn_name, err.message))
+                        fn_name, err))
     return summaries
 
 
@@ -251,8 +251,6 @@ def draw_positive_anchors(pred_dict, image):
 
     logger.debug(
         'We have {} positive_anchors'.format(positive_anchors.shape[0]))
-    # logger.debug('Indices, values and bbox: {}'.format(
-    #       list(zip(positive_indices, list(overlap_iou), positive_anchors))))
     logger.debug('GT boxes: {}'.format(gt_bboxes))
 
     for label, positive_anchor in zip(list(overlap_iou), positive_anchors):

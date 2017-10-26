@@ -154,6 +154,7 @@ def evaluate(dataset_split, config_files, job_dir, watch,
                 'Missing checkpoint; Checking again in a minute')
             time.sleep(60)
             continue
+
         for checkpoint in checkpoints:
             # Always returned in order, so it's safe to assign directly.
             tf.logging.info(
@@ -314,6 +315,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = sess.run(ops['losses'])
+
                 if image_vis is not None:
                     filename = batch_fetched['filename'][:-4].decode('utf-8')
                     visualize_file = False

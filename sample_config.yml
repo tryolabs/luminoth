@@ -2,10 +2,6 @@ train:
   # Directory in which model checkpoints & summaries (for Tensorboard) will be saved
   job_dir: jobs/
   debug: True
-  image_vis: train
-
-eval:
-  image_vis: eval
 
 dataset:
   type: tfrecord
@@ -20,6 +16,7 @@ model:
 
   base_network:
     # Which type of pretrained network to use
+    architecture: resnet_v1_101
     # Should we train the pretrained network
     trainable: True
     # Should we download weights if not available
