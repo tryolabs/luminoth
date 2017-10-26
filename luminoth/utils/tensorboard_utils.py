@@ -15,7 +15,7 @@ from tensorboard.plugins.scalar import scalars_plugin
 from tensorboard.plugins.text import text_plugin
 
 
-def setUp(logdir):
+def set_up(logdir):
     plugins = [
         core_plugin.CorePlugin,
         scalars_plugin.ScalarsPlugin,
@@ -29,14 +29,14 @@ def setUp(logdir):
         profile_plugin.ProfilePlugin,
     ]
     werkzeug_logger = logging.getLogger('werkzeug')
-    werkzeug_logger.setLevel(50)
+    werkzeug_logger.setLevel(tf.logging.ERROR)
     tf.flags.FLAGS.logdir = logdir
-    tf.logging.set_verbosity(50)
+    tf.logging.set_verbosity(tf.logging.ERROR)
     app = tb.create_tb_app(plugins)
     tb.run_simple_server(app)
 
 
-def initTensorboard(logdir):
-    thread = threading.Thread(target=setUp, args=(logdir,))
+def tensorboard_start(logdir):
+    thread = threading.Thread(target=set_up, args=(logdir,))
     thread.daemon = True
     thread.start()

@@ -18,12 +18,13 @@ from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import (
     get_optimizer, clip_gradients_by_norm
 )
-from luminoth.utils.tensorboard_init import initTensorboard
+from luminoth.utils.tensorboard_utils import tensorboard_start
 
 
 def run(custom_config, model_type, override_params, target='',
         cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        get_model_fn=get_model, get_dataset_fn=get_dataset):
+        get_model_fn=get_model, get_dataset_fn=get_dataset,
+        with_tensorboard=False):
     model_class = get_model_fn(model_type)
 
     config = get_model_config(
@@ -102,7 +103,8 @@ def run(custom_config, model_type, override_params, target='',
     if is_chief:
         # Load pretrained weights needs to be called before defining the train
         # op. After it, variables for the optimizer are created.
-        initTensorboard(config.train.job_dir)
+        if with_tensorboard:
+            tensorboard_start(config.train.job_dir)
         with tf.control_dependencies([tf.global_variables_initializer()]):
             with tf.control_dependencies([model.load_pretrained_weights()]):
                 init_op = tf.no_op(name='global_init_load_pretrained')
@@ -213,7 +215,8 @@ def run(custom_config, model_type, override_params, target='',
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
 @click.option('--job-dir', help='Job directory.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-def train(config_files, job_dir, override_params):
+@click.option('--with-tensorboard', is_flag=True, default=False, help='Start Tensorflow automatically.')  # noqa
+def train(config_files, job_dir, override_params, with_tensorboard):
     """
     Parse TF_CONFIG to cluster_spec and call run() function
     """
@@ -262,7 +265,8 @@ def train(config_files, job_dir, override_params):
         return run(
             custom_config, model_type, override_params=override_params,
             target=server.target, cluster_spec=cluster_spec,
-            is_chief=is_chief, job_name=job_name, task_index=task_index
+            is_chief=is_chief, job_name=job_name, task_index=task_index,
+            with_tensorboard=with_tensorboard
         )
 
 
