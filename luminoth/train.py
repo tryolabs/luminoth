@@ -18,6 +18,7 @@ from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import (
     get_optimizer, clip_gradients_by_norm
 )
+from luminoth.utils.tensorboard_init import initTensorboard
 
 
 def run(custom_config, model_type, override_params, target='',
@@ -101,6 +102,7 @@ def run(custom_config, model_type, override_params, target='',
     if is_chief:
         # Load pretrained weights needs to be called before defining the train
         # op. After it, variables for the optimizer are created.
+        initTensorboard(config.train.job_dir)
         with tf.control_dependencies([tf.global_variables_initializer()]):
             with tf.control_dependencies([model.load_pretrained_weights()]):
                 init_op = tf.no_op(name='global_init_load_pretrained')

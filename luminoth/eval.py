@@ -163,8 +163,9 @@ def evaluate(dataset_split, config_files, job_dir, watch,
             try:
                 start = time.time()
                 evaluate_once(
-                    writer, saver, ops, config.network.num_classes, checkpoint,
-                    metrics_scope=metrics_scope, image_vis=image_vis,
+                    writer, saver, ops, config.model.network.num_classes,
+                    checkpoint, metrics_scope=metrics_scope,
+                    image_vis=image_vis,
                     files_per_class=files_per_class,
                     files_to_visualize=files_to_visualize
                 )
