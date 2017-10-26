@@ -144,8 +144,9 @@ def run(custom_config, model_type, override_params, target='',
         )
     else:
         checkpoint_dir = config.train.job_dir
+
     if (config.train.display_every_steps or config.train.display_every_secs and
-            image_vis is not None):
+            image_vis is not None and checkpoint_dir is not None):
         if not config.train.debug and image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
         else:

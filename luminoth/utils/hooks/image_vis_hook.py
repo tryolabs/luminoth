@@ -67,8 +67,9 @@ class ImageVisHook(tf.train.SessionRunHook):
                     image=results.get('image'),
                     gt_bboxes=results.get('gt_bboxes')
                 )
-                for summary in summaries:
-                    self._summary_writer.add_summary(summary, global_step)
+                if self._summary_writer is not None:
+                    for summary in summaries:
+                        self._summary_writer.add_summary(summary, global_step)
 
         self._next_step = global_step + 1
 
