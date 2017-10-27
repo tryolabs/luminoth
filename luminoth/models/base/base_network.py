@@ -27,6 +27,13 @@ VALID_ARCHITECTURES = set([
 
 
 class BaseNetwork(snt.AbstractModule):
+    """
+    Convolutional Neural Network used for image classification, whose
+    architecture can be any of the `VALID_ARCHITECTURES`.
+
+    This class wraps the `tf.slim` implementations of these models, with some
+    helpful additions.
+    """
 
     def __init__(self, config, name='base_network'):
         super(BaseNetwork, self).__init__(name=name)
@@ -88,6 +95,16 @@ class BaseNetwork(snt.AbstractModule):
     @property
     def resnet_v2_type(self):
         return self._architecture.startswith('resnet_v2')
+
+    @property
+    def default_image_size(self):
+        # Usually 224, but depends on the architecture.
+        if self.vgg_type:
+            return vgg.vgg_16.default_image_size
+        if self.resnet_v1_type:
+            return resnet_v1.resnet_v1.default_image_size
+        if self.resnet_v2_type:
+            return resnet_v2.resnet_v2.default_image_size
 
     def _build(self, inputs, is_training=True):
         inputs = self.preprocess(inputs)
@@ -188,30 +205,33 @@ class BaseNetwork(snt.AbstractModule):
         return load_op
 
     def get_trainable_vars(self):
-        """Get trainable vars for the network.
+        """
+        Returns a list of the variables that are trainable.
 
-        Not all variables are trainable, it depends on the endpoint being used.
-        For example, when using a Pretrained network for object detection we
-        don't want to define variables below the selected endpoint to be
+        If a value for `fine_tune_from` is specified in the config, only the
+        variables starting from the first that contains this string in its name
+        will be trainable. For example, specifying `vgg_16/fc6` for a VGG16
+        will set only the variables in the fully connected layers to be
         trainable.
-
-        It is also possible to partially train part of the CNN, for that case
-        we use config's `finetune_num_layers` variable to define how many
-        layers from the chosen endpoint we want to train.
+        If `fine_tune_from` is None, then all the variables will be trainable.
 
         Returns:
-            trainable_variables: A list of variables.
+            trainable_variables: a list of `tf.Variable`.
         """
         all_variables = snt.get_variables_in_module(self)
-        var_names = [v.name for v in all_variables]
-        last_idx = [
-            i for i, name in enumerate(var_names) if self._endpoint in name
-        ][0]
 
-        finetune_num_layers = self._config.get('finetune_num_layers')
-        if not finetune_num_layers:
+        fine_tune_from = self._config.get('fine_tune_from')
+        if fine_tune_from is None:
             return all_variables
-        else:
-            return all_variables[
-                last_idx - finetune_num_layers * 2:last_idx
-            ]
+
+        # Get the index of the first trainable variable
+        var_iter = enumerate(v.name for v in all_variables)
+        try:
+            index = next(i for i, name in var_iter if fine_tune_from in name)
+        except StopIteration:
+            raise ValueError(
+                '"{}" is an invalid value of fine_tune_from for this '
+                'architecture.'.format(fine_tune_from)
+            )
+
+        return all_variables[index:]
