@@ -47,3 +47,35 @@ class TruncatedBaseNetwork(BaseNetwork):
             inputs, is_training=is_training
         )
         return dict(pred['end_points'])[self._scope_endpoint]
+
+    def get_trainable_vars(self):
+        """
+        Returns a list of the variables that are trainable.
+
+        Returns:
+            trainable_variables: a list of `tf.Variable`.
+        """
+        all_trainable = super(TruncatedBaseNetwork, self).get_trainable_vars()
+
+        # Get the index of the last endpoint scope variable.
+        # For example, if the endpoint for ResNet-50 is set as
+        # "block4/unit_3/bottleneck_v1/conv2", then it will get 155,
+        # because the variables (with their indexes) are:
+        #   153 block4/unit_3/bottleneck_v1/conv2/weights:0
+        #   154 block4/unit_3/bottleneck_v1/conv2/BatchNorm/beta:0
+        #   155 block4/unit_3/bottleneck_v1/conv2/BatchNorm/gamma:0
+        var_iter = enumerate(v.name for v in all_trainable)
+        scope_var_index_iter = (
+            i for i, name in var_iter if self._endpoint in name
+        )
+        index = None
+        for index in scope_var_index_iter:
+            pass
+
+        if index is None:
+            raise ValueError(
+                '"{}" is an invalid value of endpoint for this '
+                'architecture.'.format(self._endpoint)
+            )
+
+        return all_trainable[:index + 1]
