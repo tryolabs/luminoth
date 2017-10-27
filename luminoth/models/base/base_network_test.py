@@ -16,6 +16,13 @@ class BaseNetworkTest(tf.test.TestCase):
         })
         tf.reset_default_graph()
 
+    def testDefaultImageSize(self):
+        m = BaseNetwork(easydict.EasyDict({'architecture': 'vgg_16'}))
+        self.assertEquals(m.default_image_size, 224)
+
+        m = BaseNetwork(easydict.EasyDict({'architecture': 'resnet_v1_50'}))
+        self.assertEquals(m.default_image_size, 224)
+
     def testSubtractChannels(self):
         m = BaseNetwork(self.config)
         inputs = tf.placeholder(tf.float32, [1, 2, 2, 3])

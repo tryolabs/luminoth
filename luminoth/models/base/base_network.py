@@ -96,6 +96,16 @@ class BaseNetwork(snt.AbstractModule):
     def resnet_v2_type(self):
         return self._architecture.startswith('resnet_v2')
 
+    @property
+    def default_image_size(self):
+        # Usually 224, but depends on the architecture.
+        if self.vgg_type:
+            return vgg.vgg_16.default_image_size
+        if self.resnet_v1_type:
+            return resnet_v1.resnet_v1.default_image_size
+        if self.resnet_v2_type:
+            return resnet_v2.resnet_v2.default_image_size
+
     def _build(self, inputs, is_training=True):
         inputs = self.preprocess(inputs)
         with slim.arg_scope(self.arg_scope):
