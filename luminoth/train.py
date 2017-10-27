@@ -4,6 +4,7 @@ import click
 import json
 import tensorflow as tf
 import time
+import warnings
 
 from tensorflow.python import debug as tf_debug
 
@@ -78,10 +79,16 @@ def run(custom_config, model_type, override_params, target='',
         trainable_vars = model.get_trainable_vars()
 
         with tf.name_scope('gradients'):
+            # Ignore warning: "Converting sparse IndexedSlices to a dense
+            # Tensor of unknown shape. This may consume a large amount of
+            # memory." % num_elements)
+            warnings.simplefilter('ignore')
+
             # Compute, clip and apply gradients
             grads_and_vars = optimizer.compute_gradients(
                 total_loss, trainable_vars
             )
+            warnings.simplefilter('default')
 
             # Clip by norm. TODO: Configurable
             grads_and_vars = clip_gradients_by_norm(grads_and_vars)
