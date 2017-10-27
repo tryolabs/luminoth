@@ -92,7 +92,7 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
             easydict.EasyDict({
                 'architecture': 'resnet_v1_50',
                 'endpoint': 'block4/unit_2/bottleneck_v1/conv2',
-                'finetune_from': 'block4/unit_2/bottleneck_v1/conv1',
+                'fine_tune_from': 'block4/unit_2/bottleneck_v1/conv1',
             })
         )
         model(inputs)

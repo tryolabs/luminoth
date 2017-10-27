@@ -63,7 +63,7 @@ class BaseNetworkTest(tf.test.TestCase):
 
         model = BaseNetwork(
             easydict.EasyDict(
-                {'architecture': 'vgg_16', 'finetune_from': 'conv5/conv5_3'}
+                {'architecture': 'vgg_16', 'fine_tune_from': 'conv5/conv5_3'}
             )
         )
         model(inputs)

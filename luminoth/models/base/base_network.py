@@ -198,30 +198,30 @@ class BaseNetwork(snt.AbstractModule):
         """
         Returns a list of the variables that are trainable.
 
-        If a value for `finetune_from` is specified in the config, only the
+        If a value for `fine_tune_from` is specified in the config, only the
         variables starting from the first that contains this string in its name
         will be trainable. For example, specifying `vgg_16/fc6` for a VGG16
         will set only the variables in the fully connected layers to be
         trainable.
-        If `finetune_from` is None, then all the variables will be trainable.
+        If `fine_tune_from` is None, then all the variables will be trainable.
 
         Returns:
             trainable_variables: a list of `tf.Variable`.
         """
         all_variables = snt.get_variables_in_module(self)
 
-        finetune_from = self._config.get('finetune_from')
-        if finetune_from is None:
+        fine_tune_from = self._config.get('fine_tune_from')
+        if fine_tune_from is None:
             return all_variables
 
         # Get the index of the first trainable variable
         var_iter = enumerate(v.name for v in all_variables)
         try:
-            index = next(i for i, name in var_iter if finetune_from in name)
+            index = next(i for i, name in var_iter if fine_tune_from in name)
         except StopIteration:
             raise ValueError(
-                '"{}" is an invalid value of finetune_from for this '
-                'architecture.'.format(finetune_from)
+                '"{}" is an invalid value of fine_tune_from for this '
+                'architecture.'.format(fine_tune_from)
             )
 
         return all_variables[index:]

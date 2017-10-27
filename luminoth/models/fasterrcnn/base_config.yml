@@ -119,7 +119,7 @@ model:
     # Starting point after which all the variables in the base network
     # will be trainable. If not specified, then all the variables in the
     # network will be trainable.
-    finetune_from:
+    fine_tune_from:
     arg_scope:
       # Regularization
       weight_decay: 0.0005
