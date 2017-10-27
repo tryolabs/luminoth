@@ -12,31 +12,34 @@ from luminoth.utils.vars import (
 
 
 class RCNN(snt.AbstractModule):
-    """RCNN: Region-based Convolutional Neural Network
+    """RCNN: Region-based Convolutional Neural Network.
 
-    Given a number of proposals (bounding boxes on an image) and a feature map
-    of that image, RCNN adjust the bounding box and classifies the region as
-    either background or a specific class.
+    Given region proposals (bounding boxes on an image) and a feature map of
+    that image, RCNN adjusts the bounding boxes and classifies each region as
+    either background or a specific object class.
 
-    These are the steps for classifying the images:
-        - Region of Interest Pooling. It extracts features from the feature map
-        based on the proposals into a fixed size (applying extrapolation).
-        - Uses two fully connected layers to generate a smaller Tensor for each
-        region
-        - Finally, a fully conected layer for classifying the class (adding
-        background as a possible class), and a regression for adjusting the
-        bounding box, one 4-d regression for each one of the possible classes.
-        - Using the class probability and the corresponding bounding box
-        regression it, in case of not classifying the region as background it
-        generates the final object bounding box with class and class
-        probability assigned to it.
+    Steps:
+        1. Region of Interest Pooling. Extract features from the feature map
+           (based on the proposals) and convert into fixed size tensors
+           (applying extrapolation).
+        2. Two fully connected layers generate a smaller tensor for each
+           region.
+        3. A fully conected layer outputs the probability distribution over the
+           classes (plus a background class), and another fully connected layer
+           outputs the bounding box regressions (one 4-d regression for each of
+           the possible classes).
+
+    Using the class probability, filter regions classified as background. For
+    the remaining regions, use the class probability together with the
+    corresponding bounding box regression offsets to generate the final object
+    bounding boxes, with classes and probabilities assigned.
     """
 
     def __init__(self, num_classes, config, debug=False, seed=None,
                  name='rcnn'):
         super(RCNN, self).__init__(name=name)
         self._num_classes = num_classes
-        # List of the fully connected layer sized used before classifying and
+        # List of the fully connected layer sizes used before classifying and
         # adjusting the bounding box.
         self._layer_sizes = config.layer_sizes
         self._activation = get_activation_function(config.activation_function)
@@ -54,12 +57,12 @@ class RCNN(snt.AbstractModule):
         self._seed = seed
 
     def _instantiate_layers(self):
-        # We define layers as an array since they are simple fully conected
+        # We define layers as an array since they are simple fully connected
         # ones and it should be easy to tune it from the network config.
         self._layers = [
             snt.Linear(
                 layer_size,
-                name="fc_{}".format(i),
+                name='fc_{}'.format(i),
                 initializers={'w': self.initializer},
                 regularizers={'w': self.regularizer},
             )
@@ -69,7 +72,7 @@ class RCNN(snt.AbstractModule):
         # since we want to be able to predict if the proposal is background as
         # well.
         self._classifier_layer = snt.Linear(
-            self._num_classes + 1, name="fc_classifier",
+            self._num_classes + 1, name='fc_classifier',
             initializers={'w': self.initializer},
             regularizers={'w': self.regularizer},
         )
@@ -78,7 +81,7 @@ class RCNN(snt.AbstractModule):
         # We choose which to use depending on the output of the classifier
         # layer
         self._bbox_layer = snt.Linear(
-            self._num_classes * 4, name="fc_bbox",
+            self._num_classes * 4, name='fc_bbox',
             initializers={'w': self.initializer},
             regularizers={'w': self.regularizer}
         )
@@ -100,25 +103,26 @@ class RCNN(snt.AbstractModule):
     def _build(self, conv_feature_map, proposals, im_shape,
                gt_boxes=None, is_training=False):
         """
-        Classifies proposals based on the pooled feature map.
+        Classifies & refines proposals based on the pooled feature map.
 
         Args:
-            conv_feature_map: The feature map of the image extracted
+            conv_feature_map: The feature map of the image, extracted
                 using the pretrained network.
-                Shape (num_proposals, pool_height, pool_width, 512).
-            proposals: A Tensor with the bounding boxes proposed by de RPN. Its
-                shape is (total_num_proposals, 4) using the encoding
-                (x1, y1, x2, y2).
+                Shape: (num_proposals, pool_height, pool_width, 512).
+            proposals: A Tensor with the bounding boxes proposed by the RPN.
+                Shape: (total_num_proposals, 4).
+                Encoding: (x1, y1, x2, y2).
             im_shape: A Tensor with the shape of the image in the form of
-                (image_height, image_width)
+                (image_height, image_width).
             gt_boxes (optional): A Tensor with the ground truth boxes of the
-                image. Its shape is (total_num_gt, 5), using the encoding
-                (x1, y1, x2, y2, label).
+                image.
+                Shape: (total_num_gt, 5).
+                Encoding: (x1, y1, x2, y2, label).
             is_training (optional): A boolean to determine if we are just using
-                the module for training or for complete object inference.
+                the module for training or just inference.
 
         Returns:
-            prediction_dict a dict with the object predictions.
+            prediction_dict: a dict with the object predictions.
                 It should have the keys:
                 objects:
                 labels:
@@ -180,8 +184,8 @@ class RCNN(snt.AbstractModule):
         if self._debug:
             prediction_dict['_debug']['flatten_net'] = net
 
-        # After flattening we are left with a
-        # (num_proposals, pool_height * pool_width * 512) Tensor.
+        # After flattening we are left with a Tensor of shape
+        # (num_proposals, pool_height * pool_width * 512).
         # The first dimension works as batch size when applied to snt.Linear.
         for i, layer in enumerate(self._layers):
             # Through FC layer.

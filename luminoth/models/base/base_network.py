@@ -1,13 +1,13 @@
-import sonnet as snt
-import tensorflow as tf
 import functools
 
-from tensorflow.contrib.slim.nets import (
-    vgg, resnet_v2, resnet_v1
-)
+import sonnet as snt
+import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
+from tensorflow.contrib.slim.nets import vgg, resnet_v2, resnet_v1
+
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
+
 
 # Default RGB means used commonly.
 _R_MEAN = 123.68
@@ -27,10 +27,11 @@ VALID_ARCHITECTURES = set([
 
 
 class BaseNetwork(snt.AbstractModule):
+
     def __init__(self, config, name='base_network'):
         super(BaseNetwork, self).__init__(name=name)
         if config.get('architecture') not in VALID_ARCHITECTURES:
-            raise ValueError('Invalid architecture "{}"'.format(
+            raise ValueError('Invalid architecture: "{}"'.format(
                 config.get('architecture')
             ))
 
@@ -43,9 +44,14 @@ class BaseNetwork(snt.AbstractModule):
 
         if self.vgg_type:
             return vgg.vgg_arg_scope(**arg_scope_kwargs)
-        elif self.resnet_type:
-            # It's the same argscope for v1 or v2.
+
+        if self.resnet_type:
+            # It's the same arg_scope for v1 or v2.
             return resnet_v2.resnet_utils.resnet_arg_scope(**arg_scope_kwargs)
+
+        raise ValueError('Invalid architecture: "{}"'.format(
+            self._config.get('architecture')
+        ))
 
     def network(self, is_training=True):
         if self.vgg_type:
@@ -95,23 +101,23 @@ class BaseNetwork(snt.AbstractModule):
 
     def preprocess(self, inputs):
         if self.vgg_type or self.resnet_type:
-            inputs = self._substract_channels(inputs)
+            inputs = self._subtract_channels(inputs)
 
         return inputs
 
-    def _substract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
-        """Substract channels from images.
+    def _subtract_channels(self, inputs, means=[_R_MEAN, _G_MEAN, _B_MEAN]):
+        """Subtract channels from images.
 
-        It is common for CNNs to substract the mean of all images from each
+        It is common for CNNs to subtract the mean of all images from each
         channel. In the case of RGB images we first calculate the mean from
-        each of the channels (Red, Green, Blue) and substract those values
+        each of the channels (Red, Green, Blue) and subtract those values
         for training and for inference.
 
         Args:
             inputs: A Tensor of images we want to normalize. Its shape is
                 (1, height, width, num_channels).
             means: A Tensor of shape (num_channels,) with the means to be
-                substracted from each channels on the inputs.
+                subtracted from each channels on the inputs.
 
         Returns:
             outputs: A Tensor of images normalized with the means.
@@ -135,7 +141,7 @@ class BaseNetwork(snt.AbstractModule):
 
     def load_weights(self):
         """
-        Creates operations to load weigths from checkpoint for each of the
+        Creates operations to load weights from checkpoint for each of the
         variables defined in the module. It is assumed that all variables
         of the module are included in the checkpoint but with a different
         prefix.
@@ -148,9 +154,10 @@ class BaseNetwork(snt.AbstractModule):
             return tf.no_op(name='not_loading_base_network')
 
         if self._config.get('weights') is None:
-            # Download the weights (or used cached) if is is not specified in
+            # Download the weights (or used cached) if not specified in the
             # config file.
-            # Weights are downloaded by default on the ~/.luminoth folder.
+            # Weights are downloaded by default to the ~/.luminoth folder if
+            # running locally, or to the job bucket if running in Google Cloud.
             self._config['weights'] = get_checkpoint_file(self._architecture)
 
         module_variables = snt.get_variables_in_module(

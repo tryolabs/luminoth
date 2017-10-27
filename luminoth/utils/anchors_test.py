@@ -30,8 +30,8 @@ class AnchorsTest(tf.test.TestCase):
         self.assertAllEqual(
             anchor_reference[0],
             [
-                -(base_size - 1)/2.0, -(base_size - 1)/2.0,
-                (base_size - 1)/2.0, (base_size - 1)/2.0
+                -(base_size - 1) / 2.0, -(base_size - 1) / 2.0,
+                (base_size - 1) / 2.0, (base_size - 1) / 2.0
             ]
         )
 

@@ -71,7 +71,7 @@ class RCNNProposal(snt.AbstractModule):
             proposals = proposals[:, 1:]
 
         # First we want get the most probable label for each proposal
-        # We still have the background on idx 0 so we substract 1 to the idxs.
+        # We still have the background on idx 0 so we subtract 1 to the idxs.
         proposal_label = tf.argmax(cls_prob, axis=1) - 1
         # Get the probability for the selected label for each proposal.
         proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
