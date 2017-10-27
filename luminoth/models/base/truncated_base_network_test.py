@@ -106,6 +106,23 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         #   146 block4/unit_2/bottleneck_v1/conv2/BatchNorm/gamma:0
         self.assertEquals(len(trainable_vars), 6)
 
+        #
+        # Check that we raise proper exception if fine_tune_from is after
+        # the chosen endpoint (there is nothing to fine-tune!)
+        #
+        model = TruncatedBaseNetwork(
+            easydict.EasyDict(
+                {
+                    'architecture': 'resnet_v1_50',
+                    'endpoint': 'block4/unit_2/bottleneck_v1/conv1',
+                    'fine_tune_from': 'block4/unit_2/bottleneck_v1/conv2',
+                }
+            )
+        )
+        model(inputs)
+        with self.assertRaises(ValueError):
+            model.get_trainable_vars()
+
 
 if __name__ == '__main__':
     tf.test.main()

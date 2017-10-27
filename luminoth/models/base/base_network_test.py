@@ -85,6 +85,18 @@ class BaseNetworkTest(tf.test.TestCase):
         #   fc8/biases:0
         self.assertEquals(len(model.get_trainable_vars()), 8)
 
+        #
+        # Check invalid fine_tune_from raises proper exception
+        #
+        model = BaseNetwork(
+            easydict.EasyDict(
+                {'architecture': 'vgg_16', 'fine_tune_from': 'conv5/conv99'}
+            )
+        )
+        model(inputs)
+        with self.assertRaises(ValueError):
+            model.get_trainable_vars()
+
 
 if __name__ == '__main__':
     tf.test.main()
