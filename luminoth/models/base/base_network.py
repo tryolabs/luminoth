@@ -1,6 +1,6 @@
 import functools
-import sonnet as snt
 
+import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
@@ -141,7 +141,7 @@ class BaseNetwork(snt.AbstractModule):
 
     def load_weights(self):
         """
-        Creates operations to load weigths from checkpoint for each of the
+        Creates operations to load weights from checkpoint for each of the
         variables defined in the module. It is assumed that all variables
         of the module are included in the checkpoint but with a different
         prefix.
@@ -154,9 +154,10 @@ class BaseNetwork(snt.AbstractModule):
             return tf.no_op(name='not_loading_base_network')
 
         if self._config.get('weights') is None:
-            # Download the weights (or used cached) if is is not specified in
+            # Download the weights (or used cached) if not specified in the
             # config file.
-            # Weights are downloaded by default on the ~/.luminoth folder.
+            # Weights are downloaded by default to the ~/.luminoth folder if
+            # running locally, or to the job bucket if running in Google Cloud.
             self._config['weights'] = get_checkpoint_file(self._architecture)
 
         module_variables = snt.get_variables_in_module(

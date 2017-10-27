@@ -18,8 +18,8 @@ class ObjectDetectionDataset(snt.AbstractModule):
     This module implements some of the basic functionalities every object
     detector dataset usually needs.
 
-    Object detection datasets, are datasets that have ground-truth information
-    consisting of bounding boxes.
+    Object detection datasets are datasets that have ground-truth information
+    consisting of rectangular bounding boxes.
 
     Attributes:
         dataset_dir (str): Base directory of the dataset.

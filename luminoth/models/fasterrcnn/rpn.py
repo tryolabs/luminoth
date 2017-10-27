@@ -108,9 +108,9 @@ class RPN(snt.AbstractModule):
 
         Returns:
             prediction_dict: A dict with the following keys:
-                proposals: A Tensor with an unknown number of proposals for
+                proposals: A Tensor with a variable number of proposals for
                     objects on the image.
-                scores: A Tensor with a objectivness probability for each
+                scores: A Tensor with a "objectness" probability for each
                     proposal. The score should be the output of the softmax for
                     object.
 
