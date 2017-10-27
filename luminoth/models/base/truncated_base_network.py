@@ -51,7 +51,13 @@ class TruncatedBaseNetwork(BaseNetwork):
         pred = super(TruncatedBaseNetwork, self)._build(
             inputs, is_training=is_training
         )
-        return dict(pred['end_points'])[self._scope_endpoint]
+        try:
+            return dict(pred['end_points'])[self._scope_endpoint]
+        except KeyError:
+            raise ValueError(
+                '"{}" is an invalid value of endpoint for this '
+                'architecture.'.format(self._endpoint)
+            )
 
     def get_trainable_vars(self):
         """
