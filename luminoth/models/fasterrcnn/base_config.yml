@@ -116,8 +116,10 @@ model:
     download: True
     # Which endpoint layer to use as feature map for network
     endpoint:
-    # Is trainable, how many layers from the endpoint are we training
-    finetune_num_layers:
+    # Starting point after which all the variables in the base network
+    # will be trainable. If not specified, then all the variables in the
+    # network will be trainable.
+    finetune_from:
     arg_scope:
       # Regularization
       weight_decay: 0.0005

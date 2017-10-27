@@ -188,30 +188,33 @@ class BaseNetwork(snt.AbstractModule):
         return load_op
 
     def get_trainable_vars(self):
-        """Get trainable vars for the network.
+        """
+        Returns a list of the variables that are trainable.
 
-        Not all variables are trainable, it depends on the endpoint being used.
-        For example, when using a Pretrained network for object detection we
-        don't want to define variables below the selected endpoint to be
+        If a value for `finetune_from` is specified in the config, only the
+        variables starting from the first that contains this string in its name
+        will be trainable. For example, specifying `vgg_16/fc6` for a VGG16
+        will set only the variables in the fully connected layers to be
         trainable.
-
-        It is also possible to partially train part of the CNN, for that case
-        we use config's `finetune_num_layers` variable to define how many
-        layers from the chosen endpoint we want to train.
+        If `finetune_from` is None, then all the variables will be trainable.
 
         Returns:
-            trainable_variables: A list of variables.
+            trainable_variables: a list of `tf.Variable`.
         """
         all_variables = snt.get_variables_in_module(self)
-        var_names = [v.name for v in all_variables]
-        last_idx = [
-            i for i, name in enumerate(var_names) if self._endpoint in name
-        ][0]
 
-        finetune_num_layers = self._config.get('finetune_num_layers')
-        if not finetune_num_layers:
+        finetune_from = self._config.get('finetune_from')
+        if finetune_from is None:
             return all_variables
-        else:
-            return all_variables[
-                last_idx - finetune_num_layers * 2:last_idx
-            ]
+
+        # Get the index of the first trainable variable
+        var_iter = enumerate(v.name for v in all_variables)
+        try:
+            index = next(i for i, name in var_iter if finetune_from in name)
+        except StopIteration:
+            raise ValueError(
+                '"{}" is an invalid value of finetune_from for this '
+                'architecture.'.format(finetune_from)
+            )
+
+        return all_variables[index:]

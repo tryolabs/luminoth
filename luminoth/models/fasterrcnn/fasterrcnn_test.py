@@ -38,7 +38,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     'trainable': True,
                     'endpoint': 'conv5/conv5_1',
                     'download': False,
-                    'finetune_num_layers': 3,
+                    'finetune_from': 'conv4/conv4_2',
                     'arg_scope': {
                         'weight_decay': 0.0005,
                     }
