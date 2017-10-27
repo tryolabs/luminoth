@@ -20,12 +20,17 @@ class RPN(snt.AbstractModule):
 
     def __init__(self, num_anchors, config, debug=False, seed=None,
                  name='rpn'):
-        """RPN - Region Proposal Network
+        """RPN - Region Proposal Network.
 
-        This module works almost independently from the Faster RCNN module.
-        It instantiates its own submodules and calculates its own loss,
-        and can be used on its own.
+        Given an image (as feature map) and a fixed set of anchors, the RPN
+        will learn weights to adjust those anchors so they better look like the
+        ground truth objects, as well as scoring them by "objectness" (ie. how
+        likely they are to be an object vs background).
 
+        The final result will be a set of rectangular boxes ("proposals"),
+        each associated with an objectness score.
+
+        Note: this module can be used independently of Faster R-CNN.
         """
         super(RPN, self).__init__(name=name)
         self._num_anchors = num_anchors
@@ -51,7 +56,6 @@ class RPN(snt.AbstractModule):
         )
 
         # We could use normal relu without any problems.
-
         self._rpn_activation = get_activation_function(
             config.activation_function
         )
