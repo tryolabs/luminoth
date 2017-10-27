@@ -27,6 +27,13 @@ VALID_ARCHITECTURES = set([
 
 
 class BaseNetwork(snt.AbstractModule):
+    """
+    Convolutional Neural Network used for image classification, whose
+    architecture can be any of the `VALID_ARCHITECTURES`.
+
+    This class wraps the `tf.slim` implementations of these models, with some
+    helpful additions.
+    """
 
     def __init__(self, config, name='base_network'):
         super(BaseNetwork, self).__init__(name=name)

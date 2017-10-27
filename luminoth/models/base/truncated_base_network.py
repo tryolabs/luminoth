@@ -15,10 +15,13 @@ DEFAULT_ENDPOINTS = {
 
 class TruncatedBaseNetwork(BaseNetwork):
     """
-    TruncatedBaseNetwork is a normal classification CNN but instead of
-    returning a classification output it truncates it and returns the output
-    of middle convolutional layer.
+    Feature extractor for images using a regular CNN.
+
+    By using the notion of an "endpoint", we truncate a classification CNN at
+    a certain layer output, and return this partial feature map to be used as
+    a good image representation for other ML tasks.
     """
+
     def __init__(self, config, parent_name=None, name='truncated_base_network',
                  **kwargs):
         super(TruncatedBaseNetwork, self).__init__(config, name=name, **kwargs)
@@ -41,7 +44,9 @@ class TruncatedBaseNetwork(BaseNetwork):
 
         Returns:
             feature_map: A Tensor of shape
-                `(batch_size, feature_map_height feature_map_width, depth)`.
+                `(batch_size, feature_map_height, feature_map_width, depth)`.
+                The resulting dimensions depend on the CNN architecture and
+                endpoints used.
         """
         pred = super(TruncatedBaseNetwork, self)._build(
             inputs, is_training=is_training
