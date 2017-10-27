@@ -45,8 +45,8 @@ class TruncatedBaseNetwork(BaseNetwork):
         Returns:
             feature_map: A Tensor of shape
                 `(batch_size, feature_map_height, feature_map_width, depth)`.
-                The resulting dimensions depend on the CNN architecture and
-                endpoints used.
+                The resulting dimensions depend on the CNN architecture, the
+                endpoint used, and the dimensions of the input images.
         """
         pred = super(TruncatedBaseNetwork, self)._build(
             inputs, is_training=is_training
