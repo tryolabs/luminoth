@@ -1,13 +1,14 @@
-import os
-
 import click
 import json
+import os
+import sys
 import tensorflow as tf
 import time
 
 from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets import get_dataset
+from luminoth.tools.dataset import InvalidDataDirectory
 from luminoth.models import (
     get_model
 )
@@ -53,9 +54,16 @@ def run(custom_config, model_type, override_params, target='',
             config['dataset']['type']
         except KeyError:
             raise KeyError('dataset.type should be set on the custom config.')
-        dataset_class = get_dataset_fn(config.dataset.type)
-        dataset = dataset_class(config)
-        train_dataset = dataset()
+
+        try:
+            dataset_class = get_dataset_fn(config.dataset.type)
+            dataset = dataset_class(config)
+            train_dataset = dataset()
+        except InvalidDataDirectory as exc:
+            tf.logging.error(
+                "Error while reading dataset, {}".format(exc)
+            )
+            sys.exit(1)
 
         train_image = train_dataset['image']
         train_filename = train_dataset['filename']

@@ -1,8 +1,8 @@
 import os
 import tensorflow as tf
 
-from luminoth.tools.dataset.dataset import InvalidDataDirectory
 from .object_detection_dataset import ObjectDetectionDataset
+from luminoth.tools.dataset import InvalidDataDirectory
 
 
 class TFRecordDataset(ObjectDetectionDataset):
