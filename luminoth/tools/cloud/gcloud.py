@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import tensorflow as tf
 import time
@@ -13,6 +14,9 @@ from datetime import datetime
 from google.cloud import storage
 from googleapiclient.errors import HttpError
 from oauth2client import service_account
+
+from luminoth.models import get_model
+from luminoth.utils.config import get_model_config, load_config, dump_config
 
 
 SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
@@ -28,6 +32,9 @@ DEFAULT_WORKER_TYPE = 'standard_gpu'
 DEFAULT_WORKER_COUNT = 2
 DEFAULT_PS_TYPE = 'large_model'
 DEFAULT_PS_COUNT = 0
+
+DEFAULT_CONFIG_FILENAME = 'config.yml'
+DEFAULT_PACKAGES_PATH = 'packages'
 
 
 @click.group(help='Train models in Google Cloud ML')
@@ -74,7 +81,7 @@ def build_package(bucket, base_path):
     )
 
     path = upload_file(
-        bucket, '{}/packages'.format(base_path), tarball_path
+        bucket, '{}/{}'.format(base_path, DEFAULT_PACKAGES_PATH), tarball_path
     )
 
     shutil.rmtree(temp_dir)
@@ -105,6 +112,12 @@ def get_bucket(service_account_json, bucket_name):
     return bucket
 
 
+def upload_data(bucket, file_path, data):
+    blob = bucket.blob(file_path)
+    blob.upload_from_string(data)
+    return blob
+
+
 def upload_file(bucket, base_path, file_path):
     filename = os.path.basename(file_path)
     path = '{}/{}'.format(base_path, filename)
@@ -125,6 +138,21 @@ def cloud_service(credentials, service, version='v1'):
     return discovery.build(service, version, credentials=credentials)
 
 
+def validate_region(region, project_id, credentials):
+    cloudcompute = cloud_service(credentials, 'compute')
+
+    regionrequest = cloudcompute.regions().get(
+        region=region, project=project_id
+    )
+    try:
+        regionrequest.execute()
+    except HttpError:
+        click.echo(
+            'Error: Couldn\'t find region "{}" for project "{}".'.format(
+                region, project_id))
+        sys.exit(1)
+
+
 @gc.command(help='Start a training job')
 @click.option('--job-id', help='JobId for saving models and logs.')
 @click.option('--service-account-json', required=True)
@@ -142,8 +170,6 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
           dataset, scale_tier, master_type, worker_type, worker_count,
           parameter_server_type, parameter_server_count):
 
-    args = []
-
     project_id = get_project_id(service_account_json)
     if project_id is None:
         raise ValueError(
@@ -157,18 +183,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
             'Bucket name not specified. Using "{}".'.format(bucket_name))
 
     credentials = get_credentials(service_account_json)
-    cloudcompute = cloud_service(credentials, 'compute')
-
-    regionrequest = cloudcompute.regions().get(
-        region=region, project=project_id
-    )
-    try:
-        regionrequest.execute()
-    except HttpError as err:
-        click.echo(
-            'Error: Couldn\'t find region "{}" for project "{}".'.format(
-                region, project_id))
-        return
+    validate_region(region, project_id, credentials)
 
     # Creates bucket for logs and models if it doesn't exist
     bucket = get_bucket(service_account_json, bucket_name)
@@ -185,16 +200,31 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     if not dataset.startswith('gs://'):
         dataset = 'gs://{}'.format(dataset)
 
+    args = []
+
     args.extend([
         '-o', 'dataset.dir={}'.format(dataset),
-        # TODO: Turning off data_augmentation because of TF 1.2 limitations
         '-o', 'dataset.data_augmentation=false'
     ])
 
-    for config in config_files:
-        # Upload config file to be used by the training job.
-        path = upload_file(bucket, base_path, config)
-        args.extend(['--config', 'gs://{}/{}'.format(bucket_name, path)])
+    override_params = [
+        'dataset.dir={}'.format(dataset),
+        # TODO: Turning off data_augmentation because of TF 1.2 limitations
+        'dataset.data_augmentation=false'
+    ]
+
+    custom_config = load_config(config_files)
+    model_class = get_model(custom_config.model.type)
+    config = get_model_config(
+        model_class.base_config, custom_config, override_params,
+    )
+    # We should validate config before submitting job
+
+    # Update final config file to job bucket
+    config_path = os.path.join(base_path, DEFAULT_CONFIG_FILENAME)
+    upload_data(bucket, config_path, dump_config(config))
+
+    args = ['--config', 'gs://{}/{}'.format(bucket_name, config_path)]
 
     cloudml = cloud_service(credentials, 'ml')
 
@@ -235,6 +265,80 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     except Exception as err:
         click.echo(
             'There was an error creating the training job. '
+            'Check the details: \n{}'.format(err._get_reason())
+        )
+
+
+@gc.command(help='Start a evaluation job')
+@click.option('--job-id', required=True, help='JobId for saving models and logs.')  # noqa
+@click.option('--service-account-json', required=True)
+@click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
+@click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
+@click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
+@click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
+def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
+             scale_tier):
+    project_id = get_project_id(service_account_json)
+    if project_id is None:
+        raise ValueError(
+            'Missing "project_id" in service_account_json "{}"'.format(
+                service_account_json))
+
+    if bucket_name is None:
+        client_id = get_client_id(service_account_json)
+        bucket_name = 'luminoth-{}'.format(client_id)
+        click.echo(
+            'Bucket name not specified. Using "{}".'.format(bucket_name))
+
+    credentials = get_credentials(service_account_json)
+    validate_region(region, project_id, credentials)
+
+    job_folder = 'lumi_{}'.format(job_id)
+    job_dir = 'gs://{}/{}'.format(bucket_name, job_folder)
+
+    config_path = '{}/{}'.format(job_dir, DEFAULT_CONFIG_FILENAME)
+    package_dir = '{}/{}'.format(job_dir, DEFAULT_PACKAGES_PATH)
+
+    package_files = tf.gfile.ListDirectory(package_dir)
+    package_filename = [n for n in package_files if n.endswith('tar.gz')][0]
+    package_path = '{}/{}'.format(package_dir, package_filename)
+
+    cloudml = cloud_service(credentials, 'ml')
+
+    args = [
+        ['--config', config_path],
+        ['--split', dataset_split],
+    ]
+
+    training_inputs = {
+        'scaleTier': scale_tier,
+        'packageUris': [package_path],
+        'pythonModule': 'luminoth.eval',
+        'args': args,
+        'region': region,
+        'jobDir': job_dir,
+        'runtimeVersion': '1.2'
+    }
+
+    evaluate_job_id = '{}_eval'.format(job_id)
+    job_spec = {
+        'jobId': evaluate_job_id,
+        'trainingInput': training_inputs
+    }
+
+    jobrequest = cloudml.projects().jobs().create(
+        body=job_spec, parent='projects/{}'.format(project_id))
+
+    try:
+        click.echo('Submitting evaluation job.')
+        res = jobrequest.execute()
+        click.echo('Job {} submitted successfully.'.format(evaluate_job_id))
+        click.echo('state = {}, createTime = {}'.format(
+            res.get('state'), res.get('createTime')))
+
+    except Exception as err:
+        click.echo(
+            'There was an error creating the evaluation job. '
             'Check the details: \n{}'.format(err._get_reason())
         )
 

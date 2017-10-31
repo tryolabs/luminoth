@@ -20,6 +20,18 @@ def load_config(filenames, warn_overwrite=True):
     return config
 
 
+def to_dict(config):
+    return {
+        k: (to_dict(v) if type(v) is EasyDict else v)
+        for k, v in config.items()
+    }
+
+
+def dump_config(config):
+    config = to_dict(config)
+    return yaml.dump(config, default_flow_style=False)
+
+
 def get_base_config(path, base_config_filename='base_config.yml'):
     config_path = os.path.join(os.path.dirname(path), base_config_filename)
     return load_config([config_path])
