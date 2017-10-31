@@ -8,17 +8,11 @@ import time
 from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets import get_dataset
+from luminoth.models import get_model
 from luminoth.tools.dataset import InvalidDataDirectory
-from luminoth.models import (
-    get_model
-)
-from luminoth.utils.config import (
-    get_model_config, load_config
-)
+from luminoth.utils.config import get_model_config, load_config
 from luminoth.utils.hooks import ImageVisHook
-from luminoth.utils.training import (
-    get_optimizer, clip_gradients_by_norm
-)
+from luminoth.utils.training import get_optimizer, clip_gradients_by_norm
 
 
 def run(custom_config, model_type, override_params, target='',

@@ -5,13 +5,9 @@ import tensorflow as tf
 import time
 
 from luminoth.datasets import get_dataset
-from luminoth.models import (
-    get_model
-)
-from luminoth.utils.config import (
-    get_model_config, load_config
-)
+from luminoth.models import get_model
 from luminoth.utils.bbox_overlap import bbox_overlap
+from luminoth.utils.config import get_model_config, load_config
 from luminoth.utils.image_vis import image_vis_summaries
 
 
@@ -547,3 +543,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     mean_ap = np.mean(ap_per_class)
 
     return mean_ap, ap_per_class
+
+
+if __name__ == '__main__':
+    evaluate()
