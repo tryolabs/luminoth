@@ -22,10 +22,9 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('--image-vis', is_flag=True, default=False, help='Display images in TensorBoard.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 def evaluate(dataset_split, config_files, job_dir, watch,
-             from_global_step, override_params, image_vis, files_per_class):
+             from_global_step, override_params, files_per_class):
     """
     Evaluate models using dataset.
     """
@@ -44,8 +43,10 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     )
 
     config.train.job_dir = job_dir or config.train.job_dir
-    # Only activate debug for image visualizations.
-    config.train.debug = image_vis
+
+    # Only activate debug for if needed for debug visualization mode.
+    if not config.train.debug:
+        config.train.debug = config.eval.image_vis == 'debug'
 
     if config.train.debug or config.train.tf_debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -127,7 +128,8 @@ def evaluate(dataset_split, config_files, job_dir, watch,
         'train_objects': train_objects,
         'losses': losses,
         'prediction_dict': prediction_dict,
-        'filename': train_filename
+        'filename': train_filename,
+        'train_image': train_image
     }
 
     metrics_scope = '{}_metrics'.format(dataset_split)
@@ -163,8 +165,9 @@ def evaluate(dataset_split, config_files, job_dir, watch,
             try:
                 start = time.time()
                 evaluate_once(
-                    writer, saver, ops, config.network.num_classes, checkpoint,
-                    metrics_scope=metrics_scope, image_vis=image_vis,
+                    writer, saver, ops, config.model.network.num_classes,
+                    checkpoint, metrics_scope=metrics_scope,
+                    image_vis=config.eval.image_vis,
                     files_per_class=files_per_class,
                     files_to_visualize=files_to_visualize
                 )
@@ -252,7 +255,7 @@ def get_checkpoints(config, from_global_step=None):
 
 
 def evaluate_once(writer, saver, ops, num_classes, checkpoint,
-                  metrics_scope='metrics', image_vis=False,
+                  metrics_scope='metrics', image_vis=None,
                   files_per_class=None, files_to_visualize=None):
     """Run the evaluation once.
 
@@ -266,7 +269,8 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
         ops (dict): All the operations needed to successfully run the model.
             Expects the following keys: ``init_op``, ``metric_ops``,
             ``pred_objects``, ``pred_objects_classes``,
-            ``pred_objects_scores``, ``train_objects``, ``losses`.
+            ``pred_objects_scores``, ``train_objects``, ``losses``,
+            ``train_image``.
         checkpoint (dict): Checkpoint-related data.
             Expects the following keys: ``global_step``, ``file``.
     """
@@ -293,14 +297,14 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     'bboxes': ops['pred_objects'],
                     'classes': ops['pred_objects_classes'],
                     'scores': ops['pred_objects_scores'],
-                    'gt_bboxes': ops['train_objects'],
+                    'gt_bboxes': ops['train_objects']
                 }
-                if image_vis:
+                if image_vis is not None:
                     fetches['prediction_dict'] = ops['prediction_dict']
                     fetches['filename'] = ops['filename']
+                    fetches['train_image'] = ops['train_image']
 
                 batch_fetched = sess.run(fetches)
-
                 output_per_batch['bboxes'].append(batch_fetched.get('bboxes'))
                 output_per_batch['classes'].append(batch_fetched['classes'])
                 output_per_batch['scores'].append(batch_fetched['scores'])
@@ -312,7 +316,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
 
                 val_losses = sess.run(ops['losses'])
 
-                if fetches:
+                if image_vis is not None:
                     filename = batch_fetched['filename'][:-4].decode('utf-8')
                     visualize_file = False
                     for gt_class in batch_gt_classes:
@@ -332,7 +336,10 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     if visualize_file:
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
-                            extra_tag=filename
+                            extra_tag=filename,
+                            image_visualization_mode=image_vis,
+                            image=batch_fetched['train_image'],
+                            gt_bboxes=batch_fetched['gt_bboxes']
                         )
                         for image_summary in image_summaries:
                             writer.add_summary(

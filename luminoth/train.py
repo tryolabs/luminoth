@@ -25,10 +25,11 @@ def run(custom_config, model_type, override_params, target='',
         cluster_spec=None, is_chief=True, job_name=None, task_index=None,
         get_model_fn=get_model, get_dataset_fn=get_dataset):
     model_class = get_model_fn(model_type)
-
     config = get_model_config(
         model_class.base_config, custom_config, override_params,
     )
+
+    image_vis = config.train.get('image_vis')
 
     if config.train.get('seed') is not None:
         tf.set_random_seed(config.train.seed)
@@ -152,18 +153,22 @@ def run(custom_config, model_type, override_params, target='',
     else:
         checkpoint_dir = config.train.job_dir
 
-    if config.train.display_every_steps or config.train.display_every_secs:
-        if not config.train.debug:
+    if (config.train.display_every_steps or config.train.display_every_secs and
+            image_vis is not None and checkpoint_dir is not None):
+        if not config.train.debug and image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
         else:
             # ImageVis only runs on the chief.
             chief_only_hooks.append(
                 ImageVisHook(
                     prediction_dict,
+                    image=train_dataset['image'],
+                    gt_bboxes=train_dataset['bboxes'],
                     with_rcnn=config.model.network.with_rcnn,
                     output_dir=checkpoint_dir,
                     every_n_steps=config.train.display_every_steps,
-                    every_n_secs=config.train.display_every_secs
+                    every_n_secs=config.train.display_every_secs,
+                    image_visualization_mode=image_vis
                 )
             )
 

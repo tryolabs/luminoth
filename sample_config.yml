@@ -1,6 +1,7 @@
 train:
   # Directory in which model checkpoints & summaries (for Tensorboard) will be saved
   job_dir: jobs/
+  debug: True
 
 dataset:
   type: tfrecord
