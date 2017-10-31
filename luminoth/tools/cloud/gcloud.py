@@ -17,6 +17,7 @@ from oauth2client import service_account
 
 from luminoth.models import get_model
 from luminoth.utils.config import get_model_config, load_config, dump_config
+from luminoth.utils.experiments import save_run
 
 
 SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
@@ -262,6 +263,9 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         click.echo('Job {} submitted successfully.'.format(job_id))
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
+
+        save_run(config, environment='gcloud', extra_config=job_spec)
+
     except Exception as err:
         click.echo(
             'There was an error creating the training job. '
