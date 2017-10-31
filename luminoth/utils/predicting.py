@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 from luminoth.models import get_model
-from luminoth.utils.config import get_model_config
+from luminoth.utils.config import get_model_config, load_config
 
 
 def resize_image(image, min_size, max_size):
@@ -28,7 +28,7 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_type, image, config_file, session=None,
+def get_prediction(model_type, image, config_files, session=None,
                    prediction_dict=None, image_tensor=None,
                    return_tf_vars=False):
     """
@@ -41,8 +41,9 @@ def get_prediction(model_type, image, config_file, session=None,
     the sesssion.
     """
     model_class = get_model(model_type)
+    custom_config = load_config(config_files)
     config = get_model_config(
-        model_class.base_config, config_file, None
+        model_class.base_config, custom_config, None
     )
 
     if session is None or prediction_dict is None or image_tensor is None:
