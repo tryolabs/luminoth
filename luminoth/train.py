@@ -13,11 +13,12 @@ from luminoth.tools.dataset import InvalidDataDirectory
 from luminoth.utils.config import get_model_config, load_config
 from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import get_optimizer, clip_gradients_by_norm
+from luminoth.utils.experiments import save_run
 
 
 def run(custom_config, model_type, override_params, target='',
         cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        get_model_fn=get_model, get_dataset_fn=get_dataset):
+        get_model_fn=get_model, get_dataset_fn=get_dataset, environment=None):
     model_class = get_model_fn(model_type)
     config = get_model_config(
         model_class.base_config, custom_config, override_params,
@@ -197,6 +198,11 @@ def run(custom_config, model_type, override_params, target='',
                         time.time() - before
                     ))
 
+                if is_chief and step == 1:
+                    # We save the run after first batch to make sure everything
+                    # works properly.
+                    save_run(config, environment=environment)
+
         except tf.errors.OutOfRangeError:
             tf.logging.info(
                 '{}finished training after {} epoch limit'.format(
@@ -235,6 +241,7 @@ def train(config_files, job_dir, override_params):
     cluster = tf_config.get('cluster')
     job_name = tf_config.get('task', {}).get('type')
     task_index = tf_config.get('task', {}).get('index')
+    environment = tf_config.get('environment', 'local')
 
     # Get the user config and the model type from it.
     custom_config = load_config(config_files)
@@ -250,7 +257,10 @@ def train(config_files, job_dir, override_params):
 
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
-        return run(custom_config, model_type, override_params)
+        return run(
+            custom_config, model_type, override_params,
+            environment=environment
+        )
 
     cluster_spec = tf.train.ClusterSpec(cluster)
     server = tf.train.Server(
@@ -267,7 +277,8 @@ def train(config_files, job_dir, override_params):
         return run(
             custom_config, model_type, override_params=override_params,
             target=server.target, cluster_spec=cluster_spec,
-            is_chief=is_chief, job_name=job_name, task_index=task_index
+            is_chief=is_chief, job_name=job_name, task_index=task_index,
+            environment=environment
         )
 
 
