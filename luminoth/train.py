@@ -80,7 +80,7 @@ def run(custom_config, model_type, override_params, target='',
         prediction_dict = model(train_image, train_bboxes, is_training=True)
         total_loss = model.loss(prediction_dict)
 
-        global_step = tf.contrib.framework.get_or_create_global_step()
+        global_step = tf.train.get_or_create_global_step()
 
         optimizer = get_optimizer(config.train, global_step)
 
