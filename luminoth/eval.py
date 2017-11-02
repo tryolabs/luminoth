@@ -313,7 +313,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                 val_losses = sess.run(ops['losses'])
 
                 if image_vis is not None:
-                    filename = batch_fetched['filename'][:-4].decode('utf-8')
+                    filename = batch_fetched['filename'].decode('utf-8')
                     visualize_file = False
                     for gt_class in batch_gt_classes:
                         cls_files = files_to_visualize.get(
