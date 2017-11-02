@@ -1,13 +1,12 @@
 import tensorflow as tf
 
 
-def focal_loss(cls_scores, cls_probs, targets, num_classes, gamma=2.0,
-               weights=None):
+def focal_loss(cls_scores, targets, num_classes, gamma=2.0,
+               weights=None, background_divider=1, use_softmax=False):
     """Compute RetinaNet's focal loss.
 
     Args:
         cls_scores: shape (num_proposals, num_classes + 1)
-        cls_probs: shape (num_proposals, num_classes + 1)
         targets: shape (num_proposals)
         num_classes: number of classes (not counting background)
         gamma: gamma parameter for focal loss.
@@ -17,6 +16,7 @@ def focal_loss(cls_scores, cls_probs, targets, num_classes, gamma=2.0,
     with tf.name_scope('focal_loss'):
         if weights is None:
             weights = 1.
+
         targets_one_hot = tf.one_hot(
             tf.cast(targets, tf.int32),
             depth=num_classes + 1,
@@ -26,11 +26,24 @@ def focal_loss(cls_scores, cls_probs, targets, num_classes, gamma=2.0,
             labels=targets_one_hot, logits=cls_scores,
             name='compute_cross_entropy'
         )
+        weights = tf.where(
+            tf.equal(targets, 0.),
+            x=tf.fill(tf.shape(targets), weights / background_divider),
+            y=tf.fill(tf.shape(targets), weights)
+        )
         weighted_cross_entropy = tf.multiply(
             cross_entropy, weights, name='apply_weights'
         )
-        focal_weights = tf.pow(1. - cls_probs, gamma, name='power_gamma')
-
+        if use_softmax:
+            cls_scores = tf.nn.softmax(cls_scores)
+        # Reduce max could be switched with reduce_sum, etc. as we're only
+        # getting one element per row.
+        focal_weights = tf.pow(
+            1. - tf.reduce_max(
+                tf.multiply(cls_scores, targets_one_hot), axis=1
+            ),
+            gamma, name='power_gamma'
+        )
         focal_loss = tf.multiply(
             focal_weights, weighted_cross_entropy,
             name='apply_gamma_focus'

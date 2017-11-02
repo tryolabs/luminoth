@@ -5,7 +5,11 @@ from luminoth.utils.bbox_transform_tf import change_order
 
 
 class RetinaProposal(snt.AbstractModule):
+    """Postprocessing of the output to get the proposals.
 
+    We apply class-based NMS and filter undesired proposals
+    (low probability, etc.)
+    """
     def __init__(self, config, num_classes, debug=False,
                  name='retina_proposal'):
         super(RetinaProposal, self).__init__(name=name)
@@ -18,39 +22,57 @@ class RetinaProposal(snt.AbstractModule):
         self._class_nms_threshold = config.class_nms_threshold
         # Maximum number of detections to return.
         self._total_max_detections = config.total_max_detections
-        # Threshold probability
-        self._min_prob_threshold = config.min_prob_threshold or 0.0
 
-    def _build(self, cls_prob, cls_score, proposals, all_anchors, im_shape):
+        self._min_prob_threshold = config.min_prob_threshold
+
+    def _build(self, cls_score, proposals, all_anchors):
+        """
+        Args:
+            cls_score: (num_proposals,)
+            proposals: (num_proposals, 4)
+            all_anchors: (num_proposals, 4)
+
+        Returns:
+            objects: (num_objects, 4)
+            proposal_label: (num_objects,)
+            proposal_label_prob: (num_objects,)
+            proposal_label_score: (num_objects,)
+        """
         # First we want get the most probable label for each proposal
         # We still have the background on idx 0 so we subtract 1 to the idxs.
-        proposal_label = tf.argmax(cls_prob, axis=1, name='label_argmax') - 1
-        # Get the probability for the selected label for each proposal.
-        proposal_label_prob = tf.reduce_max(cls_prob, axis=1, name='max_label')
+        proposal_label = tf.argmax(cls_score, axis=1, name='label_argmax') - 1
 
         # We are going to use only the non-background proposals.
         non_background_filter = tf.greater_equal(proposal_label, 0)
-        # Filter proposals with less than threshold probability.
-        min_prob_filter = tf.greater_equal(
-            proposal_label_prob, self._min_prob_threshold
+        # TODO: optimize this. We're doing softmax on the same scores several
+        # times per step.
+        cls_prob = tf.nn.softmax(cls_score)
+        prob_filter = tf.greater(
+            tf.reduce_max(cls_prob, axis=1, name='reduce_probs'),
+            self._min_prob_threshold,
+            name='get_prob_mask'
         )
+
         proposal_filter = tf.logical_and(
-            non_background_filter, min_prob_filter
+            non_background_filter, prob_filter, name='combined_filters'
         )
 
         total_proposals = tf.shape(proposals)[0]
 
         proposals = tf.boolean_mask(
-            proposals, proposal_filter, name='mask_proposals')
+            proposals, proposal_filter, name='mask_proposals'
+        )
         proposal_label = tf.boolean_mask(
-            proposal_label, proposal_filter, name='mask_labels')
-        proposal_label_prob = tf.boolean_mask(
-            proposal_label_prob, proposal_filter, name='mask_probs')
+            proposal_label, proposal_filter, name='mask_labels'
+        )
+        cls_score = tf.boolean_mask(
+            cls_score, proposal_filter, name='mask_scores'
+        )
 
         filtered_proposals = tf.shape(proposals)[0]
 
         tf.summary.scalar(
-            'background_or_low_prob_proposals',
+            'background_proposals',
             total_proposals - filtered_proposals,
             ['retina']
         )
@@ -68,22 +90,33 @@ class RetinaProposal(snt.AbstractModule):
             # Filter objects Tensors with class.
             class_filter = tf.equal(proposal_label, class_id)
             class_objects_tf = tf.boolean_mask(objects_tf, class_filter)
-            class_prob = tf.boolean_mask(proposal_label_prob, class_filter)
+            this_class_score = tf.boolean_mask(cls_score, class_filter)
+            this_class_score = this_class_score[:, class_id + 1]
+            this_class_score = tf.reshape(this_class_score, [-1])
+            this_class_score = tf.Print(
+                this_class_score,
+                [
+                    tf.shape(class_objects_tf), tf.shape(this_class_score)
+                ],
+                message='SHP_OBJS, SHP_SCORE: '
+            )
 
             # Apply class NMS.
             class_selected_idx = tf.image.non_max_suppression(
-                class_objects_tf, class_prob, self._class_max_detections,
+                class_objects_tf, this_class_score,
+                self._class_max_detections,
                 iou_threshold=self._class_nms_threshold
             )
 
             # Using NMS resulting indices, gather values from Tensors.
             class_objects_tf = tf.gather(class_objects_tf, class_selected_idx)
-            class_prob = tf.gather(class_prob, class_selected_idx)
+            this_class_score = tf.gather(
+                this_class_score, class_selected_idx)
 
             # We append values to a regular list which will later be transform
             # to a proper Tensor.
             selected_boxes.append(class_objects_tf)
-            selected_probs.append(class_prob)
+            selected_probs.append(tf.nn.softmax(this_class_score))
             # In the case of the class_id, since it is a loop on classes, we
             # already have a fixed class_id. We use `tf.tile` to create that
             # Tensor with the total number of indices returned by the NMS.

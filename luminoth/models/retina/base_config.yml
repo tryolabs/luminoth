@@ -1,14 +1,13 @@
-# KEY:
-# AMIP: as mentioned in the paper
-
 model:
   type: retina
+  share_weights: True
   anchors:
-    # Base size to use for anchors (in pyramid-level points)
+    # Base size to use for anchors.
+    # This is the size in level-'pixels'.
     base_size: 8
-    # Aspect ratios used for generating anchors (AMIP)
+    # Aspect ratios used for generating anchors (paper values)
     ratios: [0.5, 1., 2.]
-    # Scales of the anchors (AMIP)
+    # Scales of the anchors (paper values)
     scales: [0.666, 1., 1.333]
     # How many pixels outside the level we will allow the anchor to be.
     offset: 0
@@ -16,21 +15,31 @@ model:
   network:
     num_classes: 20
   fpn:
-    num_channels: 256  # AMIP
+    arg_scope:
+      # Regularization
+      weight_decay: 0.0005
+    num_channels: 256  # paper values
     architecture: resnet_v2_101
     train_base: True
+    download: True
     endpoints:
       - 'block4/unit_3/bottleneck_v2/conv3'
       - 'block3/unit_23/bottleneck_v2/conv1'
       - 'block2/unit_4/bottleneck_v2/conv1'
 
   loss:
-    gamma: 2.0
+    gamma: 2.0  # paper value
+    # Multiplier weight for the class loss.
+    class_weight: 1
+    # The weight of the loss for background will be divided by this number.
+    # Due to our use of the focal loss, high values here are overkill.
+    background_weight_divider: 4
+    # Whether or not to sum all the loss values. reduce_sum has given poor
+    # results in our experiments. If it's set to False, we use reduce_mean.
+    reduce_sum: False
 
   # Config for BBox delta prediction subnets.
   box_subnet:
-    # TODO: not implemented
-    share_weights: True
     # Config for the hidden layers of the net.
     hidden:
       depth: 4
@@ -40,11 +49,12 @@ model:
     # Config for the final layer of the net.
     final:
       kernel_shape: [3, 3]
-      activation: sigmoid
+      # activations here can severely limit the capacity of the network of
+      # predicting deltas for anchors.
+      activation: ""
 
   # Config for classification subnet(s).
   class_subnet:
-    # TODO: not implemented
     share_weights: True
     # Config for the hidden layers of the net.
     hidden:
@@ -56,31 +66,33 @@ model:
       activation: relu
     # Config for the final layer of the net.
     final:
-      # Pi as described in the paper. Used to initialize the bias of the
-      # final layer.
-      pi: 0.1  # In the paper, they use 0.01
+      init_bias:
+        # These will be the initial scores (approx) of foregrounds and
+        # background.
+        foreground: -0.5
+        background: 0.5
       kernel_shape: [3, 3]
-      activation: sigmoid
+      # As a general rule, don't use softmax if you're activating with sigmoid,
+      # and use it otherwise.
+      activation: ""
+      use_softmax: True
 
   target:
     # Threshold with GT to be considered positive
     foreground_threshold: 0.5
     # High and low threshold with GT to be considered negative
-    background_threshold_high: 0.5  # AMIP (Retina)
-    background_threshold_low: 0.1
+    background_threshold_high: 0.4  # AMIP (Retina)
+    background_threshold_low: 0.0
 
   proposal:
     # Maximum number of detections for each class
     class_max_detections: 100
     # NMS threshold used to remove "almost duplicate" of the same class
-    class_nms_threshold: 0.6
+    class_nms_threshold: 0.3
     # Maximum total detections for an image (sorted by score)
     total_max_detections: 300
     # Minimum prob to be used as proposed object
-    # TODO: figure this out
-    # With this value set to 0.5 we're having problems because at the initial
-    # state all labels get around 0.048 prob.
-    min_prob_threshold: 0.0
+    min_prob_threshold: 0.4
 
 dataset:
   type: tfrecord
@@ -113,6 +125,10 @@ dataset:
           lower: 0.5
           upper: 1.5
         prob: 0.3
+
+eval:
+  # Image visualization mode, options = train, eval, debug, (empty). Default=(empty)
+  image_vis: eval
 
 train:
   debug: False
@@ -154,8 +170,11 @@ train:
     _replace: True
     # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
     # You can define different decay methods using `decay_method` and defining all the necessary arguments.
-    decay_method:
-    learning_rate: 0.001
+    decay_method: piecewise_constant
+    values: [0.001, 0.0001, 0.00001]
+    boundaries:
+      - 40000
+      - 60000
 
   # Optimizer config
   optimizer:

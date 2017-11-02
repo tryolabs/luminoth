@@ -5,6 +5,10 @@ from luminoth.models.base import BaseNetwork
 
 
 class FPN(BaseNetwork):
+    """Module for building a Feature Pyramid Networks.
+
+    As seen in "Feature Pyramid Networks for Object Detection" (2017).
+    """
     def __init__(self, config, parent_name=None, name='fpn_builder'):
         super(FPN, self).__init__(config, name=name)
         self._config = config
@@ -12,37 +16,41 @@ class FPN(BaseNetwork):
         # Copy the endpoints to prevent unwanted behaviour.
         self._endpoints = config.endpoints[:]
         self._num_channels = config.num_channels
-        for i, endpoint in enumerate(self._endpoints):
-            self._endpoints[i] = '{}/{}/{}'.format(
-                self.module_name, config.architecture, self._endpoints[i]
-            )
-            if parent_name:
-                self._endpoints[i] = '{}/{}'.format(
-                    parent_name, self._endpoints[i]
-                )
 
     def _build(self, inputs, is_training=True):
+        """This takes an image and returns a list with FPN levels.
+
+        Args:
+            inputs: (1, height, width, 3)
+            is_training: Bool.
+
+        Returns:
+            fpn_levels: list of (1, H, W, 3) tensors.
+        """
+        inputs.set_shape([1, None, None, 3])
         base_pred = super(FPN, self)._build(
             inputs, is_training=is_training
         )
         end_points_unordered = self._get_endpoint_list(base_pred)
         # TODO: sort end_points.
-        end_points = end_points_unordered
+        # We make them public because we may need them for the layers that use
+        # FPN (e.g. Retina)
+        self.end_points = end_points_unordered
 
         # Create one 1x1 Conv layer for each pyramid level.
         conversors = []
-        for i in range(len(end_points)):
+        for i in range(len(self.end_points)):
             conversors.append(snt.Conv2D(
                 output_channels=self._num_channels,
                 kernel_shape=[1, 1], name='fpn_level_{}'.format(i)
             ))
 
         try:
-            fpn_levels = [conversors[0](end_points[0])]
+            fpn_levels = [conversors[0](self.end_points[0])]
         except IndexError:
             raise ValueError('No valid endpoints to build FPN.')
 
-        for i, end_point in enumerate(end_points):
+        for i, end_point in enumerate(self.end_points):
             if i == 0:
                 continue
             previous_level = fpn_levels[i - 1]
@@ -58,13 +66,20 @@ class FPN(BaseNetwork):
         return fpn_levels
 
     def _get_endpoint_list(self, base_pred):
+        """
+        Args:
+            base_pred: dict. Output of the base network.
+
+        Returns:
+            end_points: List of endpoints of the base that we will consider.
+        """
         end_points_dict = base_pred['end_points']
         end_points = []
-        for key in self._endpoints:
-            try:
-                end_points.append(end_points_dict[key])
-            except KeyError:
-                tf.logging.warning('Illegal endpoint name "{}"'.format(key))
+        for name in self._endpoints:
+            for key, value in end_points_dict.items():
+                if key.endswith(name):
+                    end_points.append(value)
+                    continue
         if len(end_points) < 1:
             raise ValueError('No legal endpoint names for FPN.')
         return end_points

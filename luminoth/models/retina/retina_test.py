@@ -2,12 +2,13 @@ import tensorflow as tf
 import numpy as np
 
 from luminoth.models.retina import Retina
+from luminoth.utils.config import get_base_config
 
 
 class RetinaTest(tf.test.TestCase):
     def setUp(self):
         super(RetinaTest, self).setUp()
-        self._base_config = Retina.base_config
+        self._base_config = get_base_config(Retina)
         self._model = Retina(config=self._base_config)
 
         self.image_size = (600, 800)
