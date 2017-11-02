@@ -66,26 +66,27 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         )
         model(inputs)
         # Variables in ResNet-50:
+        # (the order of beta and gamma depends on the TensorFlow's version)
         #   0 conv1/weights:0
-        #   1 conv1/BatchNorm/beta:0
-        #   2 conv1/BatchNorm/gamma:0
+        #   1 conv1/BatchNorm/(beta|gamma):0
+        #   2 conv1/BatchNorm/(beta|gamma):0
         #   3 block1/unit_1/bottleneck_v1/shortcut/weights:0
         #   (...)
         #   153 block4/unit_3/bottleneck_v1/conv2/weights:0
-        #   154 block4/unit_3/bottleneck_v1/conv2/BatchNorm/beta:0
-        #   155 block4/unit_3/bottleneck_v1/conv2/BatchNorm/gamma:0
+        #   154 block4/unit_3/bottleneck_v1/conv2/BatchNorm/(beta|gamma):0
+        #   155 block4/unit_3/bottleneck_v1/conv2/BatchNorm/(beta|gamma):0
         #   --- endpoint ---
         #   156 block4/unit_3/bottleneck_v1/conv3/weights:0
-        #   157 block4/unit_3/bottleneck_v1/conv3/BatchNorm/beta:0
-        #   158 block4/unit_3/bottleneck_v1/conv3/BatchNorm/gamma:0
+        #   157 block4/unit_3/bottleneck_v1/conv3/BatchNorm/(beta|gamma):0
+        #   158 block4/unit_3/bottleneck_v1/conv3/BatchNorm/(beta|gamma):0
         #   159 logits/weights:0
         #   160 logits/biases:0
         trainable_vars = model.get_trainable_vars()
         self.assertEqual(len(trainable_vars), 156)
         self.assertEqual(
-            trainable_vars[-1].name,
+            trainable_vars[-3].name,
             'truncated_base_network/resnet_v1_50/' +
-            'block4/unit_3/bottleneck_v1/conv2/BatchNorm/gamma:0'
+            'block4/unit_3/bottleneck_v1/conv2/weights:0'
         )
 
         model = TruncatedBaseNetwork(

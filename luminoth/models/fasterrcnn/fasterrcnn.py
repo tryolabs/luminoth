@@ -69,9 +69,7 @@ class FasterRCNN(snt.AbstractModule):
         self._losses_collections = ['fastercnn_losses']
 
         # We want the pretrained model to be outside the FasterRCNN name scope.
-        self.base_network = TruncatedBaseNetwork(
-            config.model.base_network, parent_name=self.module_name
-        )
+        self.base_network = TruncatedBaseNetwork(config.model.base_network)
 
     def _build(self, image, gt_boxes=None, is_training=True):
         """
