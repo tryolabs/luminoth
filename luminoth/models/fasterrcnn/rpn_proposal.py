@@ -29,7 +29,7 @@ class RPNProposal(snt.AbstractModule):
         # bound.
         self._post_nms_top_n = config.post_nms_top_n
         # Threshold to use for NMS.
-        self._nms_threshold = config.nms_threshold
+        self._nms_threshold = float(config.nms_threshold)
         # Currently we do not filter out proposals by size.
         self._min_size = config.min_size
         self._filter_outside_anchors = config.filter_outside_anchors

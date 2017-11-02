@@ -35,7 +35,7 @@ class RCNNProposal(snt.AbstractModule):
         # Max number of object detections per class.
         self._class_max_detections = config.class_max_detections
         # NMS intersection over union threshold to be used for classes.
-        self._class_nms_threshold = config.class_nms_threshold
+        self._class_nms_threshold = float(config.class_nms_threshold)
         # Maximum number of detections to return.
         self._total_max_detections = config.total_max_detections
         # Threshold probability
