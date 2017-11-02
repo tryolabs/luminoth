@@ -81,8 +81,8 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         #   159 logits/weights:0
         #   160 logits/biases:0
         trainable_vars = model.get_trainable_vars()
-        self.assertEquals(len(trainable_vars), 156)
-        self.assertEquals(
+        self.assertEqual(len(trainable_vars), 156)
+        self.assertEqual(
             trainable_vars[-1].name,
             'truncated_base_network/resnet_v1_50/' +
             'block4/unit_3/bottleneck_v1/conv2/BatchNorm/gamma:0'
@@ -104,7 +104,7 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         #   144 block4/unit_2/bottleneck_v1/conv2/weights:0
         #   145 block4/unit_2/bottleneck_v1/conv2/BatchNorm/beta:0
         #   146 block4/unit_2/bottleneck_v1/conv2/BatchNorm/gamma:0
-        self.assertEquals(len(trainable_vars), 6)
+        self.assertEqual(len(trainable_vars), 6)
 
         #
         # Check that we raise proper exception if fine_tune_from is after

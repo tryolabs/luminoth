@@ -18,10 +18,10 @@ class BaseNetworkTest(tf.test.TestCase):
 
     def testDefaultImageSize(self):
         m = BaseNetwork(easydict.EasyDict({'architecture': 'vgg_16'}))
-        self.assertEquals(m.default_image_size, 224)
+        self.assertEqual(m.default_image_size, 224)
 
         m = BaseNetwork(easydict.EasyDict({'architecture': 'resnet_v1_50'}))
-        self.assertEquals(m.default_image_size, 224)
+        self.assertEqual(m.default_image_size, 224)
 
     def testSubtractChannels(self):
         m = BaseNetwork(self.config)
@@ -66,7 +66,7 @@ class BaseNetworkTest(tf.test.TestCase):
         #   30 fc8/weights:0
         #   31 fc8/biases:0
 
-        self.assertEquals(len(model.get_trainable_vars()), 32)
+        self.assertEqual(len(model.get_trainable_vars()), 32)
 
         model = BaseNetwork(
             easydict.EasyDict(
@@ -83,7 +83,7 @@ class BaseNetworkTest(tf.test.TestCase):
         #   fc7/biases:0
         #   fc8/weights:0
         #   fc8/biases:0
-        self.assertEquals(len(model.get_trainable_vars()), 8)
+        self.assertEqual(len(model.get_trainable_vars()), 8)
 
         #
         # Check invalid fine_tune_from raises proper exception
