@@ -22,20 +22,14 @@ class TruncatedBaseNetwork(BaseNetwork):
     a good image representation for other ML tasks.
     """
 
-    def __init__(self, config, parent_name=None, name='truncated_base_network',
-                 **kwargs):
+    def __init__(self, config, name='truncated_base_network', **kwargs):
         super(TruncatedBaseNetwork, self).__init__(config, name=name, **kwargs)
         self._endpoint = (
             config.endpoint or DEFAULT_ENDPOINTS[config.architecture]
         )
-        self._parent_name = parent_name
         self._scope_endpoint = '{}/{}/{}'.format(
             self.module_name, config.architecture, self._endpoint
         )
-        if parent_name:
-            self._scope_endpoint = '{}/{}'.format(
-                parent_name, self._scope_endpoint
-            )
 
     def _build(self, inputs, is_training=True):
         """
@@ -51,13 +45,8 @@ class TruncatedBaseNetwork(BaseNetwork):
         pred = super(TruncatedBaseNetwork, self)._build(
             inputs, is_training=is_training
         )
-        try:
-            return dict(pred['end_points'])[self._scope_endpoint]
-        except KeyError:
-            raise ValueError(
-                '"{}" is an invalid value of endpoint for this '
-                'architecture.'.format(self._endpoint)
-            )
+
+        return self._get_endpoint(dict(pred['end_points']))
 
     def get_trainable_vars(self):
         """
@@ -90,3 +79,28 @@ class TruncatedBaseNetwork(BaseNetwork):
             )
 
         return all_trainable[:index + 1]
+
+    def _get_endpoint(self, endpoints):
+        """
+        Returns the endpoint tensor from the list of possible endpoints.
+
+        Since we already have a dictionary with variable names we should be
+        able to get the desired tensor directly. Unfortunately the variable
+        names change with scope and the scope changes between TensorFlow
+        versions. We opted to just select the tensor for which the variable
+        name ends with the endpoint name we want (it should be just one).
+
+        Args:
+            endpoints: a dictionary with {variable_name: tensor}.
+
+        Returns:
+            endpoint_value: a tensor.
+        """
+        for endpoint_key, endpoint_value in endpoints.items():
+            if endpoint_key.endswith(self._scope_endpoint):
+                return endpoint_value
+
+        raise ValueError(
+            '"{}" is an invalid value of endpoint for this '
+            'architecture.'.format(self._scope_endpoint)
+        )
