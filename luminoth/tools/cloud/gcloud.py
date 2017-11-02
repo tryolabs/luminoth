@@ -280,8 +280,10 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
+@click.option('--rebuild', default=False, is_flag=True, help='Rebuild and upload package.')  # noqa
+@click.option('--postfix', default='eval', help='Postfix for the evaluation job name.')  # noqa
 def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
-             scale_tier):
+             scale_tier, rebuild, postfix):
     project_id = get_project_id(service_account_json)
     if project_id is None:
         raise ValueError(
@@ -296,8 +298,12 @@ def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
 
     credentials = get_credentials(service_account_json)
     validate_region(region, project_id, credentials)
-
     job_folder = 'lumi_{}'.format(job_id)
+
+    if rebuild:
+        bucket = get_bucket(service_account_json, bucket_name)
+        build_package(bucket, job_folder)
+
     job_dir = 'gs://{}/{}'.format(bucket_name, job_folder)
 
     config_path = '{}/{}'.format(job_dir, DEFAULT_CONFIG_FILENAME)
@@ -324,7 +330,7 @@ def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
         'runtimeVersion': '1.2'
     }
 
-    evaluate_job_id = '{}_eval'.format(job_id)
+    evaluate_job_id = '{}_{}'.format(job_id, postfix)
     job_spec = {
         'jobId': evaluate_job_id,
         'trainingInput': training_inputs
