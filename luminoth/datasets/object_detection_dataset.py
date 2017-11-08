@@ -2,7 +2,8 @@ import sonnet as snt
 import tensorflow as tf
 
 from luminoth.utils.image import (
-    resize_image, flip_image, random_patch, random_resize, random_distortion
+    resize_image_fixed, resize_image, flip_image, random_patch, random_resize,
+    random_distortion
 )
 DATA_AUGMENTATION_STRATEGIES = {
     'flip': flip_image,
@@ -48,6 +49,16 @@ class ObjectDetectionDataset(snt.AbstractModule):
         self._image_min_size = config.dataset.image_preprocessing.min_size
         self._image_max_size = config.dataset.image_preprocessing.max_size
         self._random_shuffle = config.train.random_shuffle
+        self._fixed_resize = (
+            config.dataset.image_preprocessing.get('fixed_resize', False)
+        )
+        if self._fixed_resize:
+            self._image_height_size = (
+                config.dataset.image_preprocessing.height_size
+            )
+            self._image_width_size = (
+                config.dataset.image_preprocessing.width_size
+            )
         # In case no keys are defined, default to empty list.
         self._data_augmentation = config.dataset.data_augmentation or []
         self._seed = config.train.seed
@@ -135,9 +146,15 @@ class ObjectDetectionDataset(snt.AbstractModule):
             scale_factor: Scale factor used to modify the image (1.0 means no
                 change).
         """
-        resized = resize_image(
-            image, bboxes=bboxes, min_size=self._image_min_size,
-            max_size=self._image_max_size
-        )
+        if self._fixed_resize:
+            resized = resize_image_fixed(
+                image, self._image_height_size, self._image_width_size,
+                bboxes=bboxes
+            )
+        else:
+            resized = resize_image(
+                image, bboxes=bboxes, min_size=self._image_min_size,
+                max_size=self._image_max_size
+            )
 
         return resized['image'], resized['bboxes'], resized['scale_factor']

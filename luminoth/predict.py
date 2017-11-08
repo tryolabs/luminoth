@@ -32,17 +32,35 @@ def predict(image_path, config_files, model_type, save):
         json.dump(results, outfile)
 
     if save:
+        fixed_resize = config.dataset.image_preprocessing.fixed_resize
         # Draw bounding boxes
         draw = ImageDraw.Draw(image)
-        scale = results['scale_factor']
-        for ind, bbox in enumerate(results['objects']):
-            bbox_res = [i / scale for i in bbox]
-            draw.rectangle(bbox_res, outline='red')
-            draw.text(
-                bbox_res[:2],
-                ' '.join((str(results['objects_labels'][ind]),
-                         str(results['objects_labels_prob'][ind])))
-            )
+        if fixed_resize:
+            scale_height = results['scale_height']
+            scale_width = results['scale_width']
+
+            for ind, bbox in enumerate(results['objects']):
+                bbox_res = [bbox[0] / scale_width,
+                            bbox[1] / scale_height,
+                            bbox[2] / scale_width,
+                            bbox[3] / scale_height]
+                draw.rectangle(bbox_res, outline='red')
+                draw.text(
+                    bbox_res[:2],
+                    ' '.join((str(results['objects_labels'][ind]),
+                             str(results['objects_labels_prob'][ind]))),
+                    outline='black'
+                )
+        else:
+            scale = results['scale_factor']
+            for ind, bbox in enumerate(results['objects']):
+                bbox_res = [i / scale for i in bbox]
+                draw.rectangle(bbox_res, outline='red')
+                draw.text(
+                    bbox_res[:2],
+                    ' '.join((str(results['objects_labels'][ind]),
+                             str(results['objects_labels_prob'][ind])))
+                )
 
         # Save the image
         tf.logging.info('Saving image with bounding boxes in {}'

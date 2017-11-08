@@ -1,10 +1,5 @@
 import sonnet as snt
 import tensorflow as tf
-import functools
-
-from tensorflow.contrib.slim.nets import (
-    vgg,
-)
 import tensorflow.contrib.slim as slim
 
 from luminoth.models.base import BaseNetwork
@@ -27,22 +22,53 @@ class FullyConvolutionalNetwork(BaseNetwork):
 
         self._architecture = config.get('architecture')
         self._config = config
+        self.parent_name = parent_name
 
     def network(self, inputs, is_training=True):
         endpoints = {}
         if self.vgg_type:
-            vgg_net = functools.partial(getattr(vgg, self._architecture))
-            _, vgg_endpoints = vgg_net(
-                inputs,
-                is_training=is_training,
-                spatial_squeeze=self._config.get('spatial_squeeze', False)
-            )
-            vgg_endpoints = dict(vgg_endpoints)
+            scope = self.module_name
+            if self.parent_name:
+                scope = self.parent_name + '/' + scope
 
-            endpoints['fc_network/vgg_16/conv4/conv4_3'] = (
-                vgg_endpoints['fc_network/vgg_16/conv4/conv4_3']
-            )
-            conv5_3 = vgg_endpoints['fc_network/vgg_16/conv5/conv5_3']
+            vgg_endpoints = {}
+            with tf.variable_scope('vgg_16', [inputs], reuse=None):
+                # Original VGG-16 blocks.
+                net = slim.repeat(inputs, 2, slim.conv2d, 64, [3, 3],
+                                  scope='conv1')
+                net = slim.max_pool2d(net, [2, 2], scope='pool1')
+                # Block 2.
+                net = slim.repeat(net, 2, slim.conv2d, 128, [3, 3],
+                                  scope='conv2')
+                net = slim.max_pool2d(net, [2, 2], scope='pool2')
+                # Block 3.
+                net = slim.repeat(net, 3, slim.conv2d, 256, [3, 3],
+                                  scope='conv3')
+                net = slim.max_pool2d(net, [2, 2], scope='pool3')
+                # Block 4.
+                net = slim.repeat(net, 3, slim.conv2d, 512, [3, 3],
+                                  scope='conv4')
+                vgg_endpoints[scope + '/vgg_16/conv4/conv4_3'] = net
+                net = slim.max_pool2d(net, [2, 2], scope='pool4')
+                # Block 5.
+                net = slim.repeat(net, 3, slim.conv2d, 512, [3, 3],
+                                  scope='conv5')
+                vgg_endpoints[scope + '/vgg_16/conv5/conv5_3'] = net
+            with tf.variable_scope('vgg_16', reuse=None):
+                net = slim.conv2d(net, 4096, [7, 7], padding='VALID',
+                                  scope='fc6')
+                net = slim.conv2d(net, 4096, [1, 1], scope='fc7')
+
+            # Add padding to divide by 2 without loss
+            conv4_3 = vgg_endpoints[scope + '/vgg_16/conv4/conv4_3']
+            paddings = [[0, 0], [1, 0], [1, 0], [0, 0]]
+            conv4_3 = tf.pad(conv4_3, paddings, mode='CONSTANT')
+            endpoints['vgg_16/conv4/conv4_3'] = conv4_3
+
+            # Add padding to divide by 2 without loss
+            conv5_3 = vgg_endpoints[scope + '/vgg_16/conv5/conv5_3']
+            paddings = [[0, 0], [1, 0], [1, 0], [0, 0]]
+            conv5_3 = tf.pad(conv5_3, paddings, mode='CONSTANT')
             net = slim.max_pool2d(conv5_3, [3, 3], stride=1, scope='pool5',
                                   padding='SAME')
 
@@ -50,24 +76,22 @@ class FullyConvolutionalNetwork(BaseNetwork):
             # Block 6: Use atrous convolution
             net = slim.conv2d(net, 1024, [3, 3], rate=6, scope='conv6',
                               padding='SAME')
-            endpoints['block6'] = net
+            endpoints['vgg_16/fc6'] = net
             # Block 7: 1x1 conv
             net = slim.conv2d(net, 1024, [1, 1], scope='conv7')
-            endpoints['block7'] = net
-
-            return {
-                'net': net,
-                'endpoints': endpoints
-            }
+            endpoints['vgg_16/fc7'] = net
+            return net, endpoints, vgg_endpoints
 
     def _build(self, inputs, is_training=True):
         inputs = self.preprocess(inputs)
         with slim.arg_scope(self.arg_scope):
-            net, end_points = self.network(inputs, is_training=is_training)
+            net, end_points, vgg_endpoints = self.network(
+                inputs, is_training=is_training)
 
             return {
                 'net': net,
                 'end_points': end_points,
+                'vgg_end_points': vgg_endpoints
             }
 
     def load_weights(self):
@@ -83,7 +107,7 @@ class FullyConvolutionalNetwork(BaseNetwork):
         if self.vgg_type:
             if self._config.get('weights') is None and \
                not self._config.get('download'):
-                return tf.no_op(name='not_loading_fc_network')
+                return tf.no_op(name='not_loading_network')
 
             if self._config.get('weights') is None:
                 # Download the weights (or used cached) if is is not specified
@@ -95,17 +119,22 @@ class FullyConvolutionalNetwork(BaseNetwork):
             module_variables = snt.get_variables_in_module(
                 self, tf.GraphKeys.MODEL_VARIABLES
             )
+
             assert len(module_variables) > 0
 
-            var_to_modify = ['fc_network/conv6/weights',
-                             'fc_network/conv6/biases',
-                             'fc_network/conv7/weights',
-                             'fc_network/conv7/biases']
+            scope = self.module_name
+            var_to_modify = [
+                             self.module_name + '/conv6/weights',
+                             self.module_name + '/conv6/biases',
+                             self.module_name + '/conv7/weights',
+                             self.module_name + '/conv7/biases'
+                             ]
+
             load_variables = []
             variables = (
                 [(v, v.op.name) for v in module_variables if v.op.name not in
                  var_to_modify]
-             )
+            )
 
             variable_scope_len = len(self.variable_scope.name) + 1
 
@@ -117,28 +146,46 @@ class FullyConvolutionalNetwork(BaseNetwork):
                 load_variables.append(
                     tf.assign(var, var_value)
                 )
-            with tf.variable_scope('', reuse=True):
+            with tf.variable_scope(scope, reuse=True):
+                module_variables = snt.get_variables_in_module(
+                    self, tf.GraphKeys.MODEL_VARIABLES
+                )
+                variables = (
+                    [(v, v.op.name) for v in module_variables]
+                )
+                # TODO: make this works
                 # Original weigths and biases
-                fc6_weights = tf.get_variable('fc_network/vgg_16/fc6/weights')
-                fc6_biases = tf.get_variable('fc_network/vgg_16/fc6/biases')
-                fc7_weights = tf.get_variable('fc_network/vgg_16/fc7/weights')
-                fc7_biases = tf.get_variable('fc_network/vgg_16/fc7/biases')
-
-                # Weights and biases to surgery
-                block6_weights = tf.get_variable('fc_network/conv6/weights')
-                block6_biases = tf.get_variable('fc_network/conv6/biases')
-                block7_weights = tf.get_variable('fc_network/conv7/weights')
-                block7_biases = tf.get_variable('fc_network/conv7/biases')
-
-                # surgery
-                load_variables.append(
-                    tf.assign(block6_weights, fc6_weights[::3, ::3, :, ::4]))
-                load_variables.append(
-                    tf.assign(block6_biases, fc6_biases[::4]))
-                load_variables.append(
-                    tf.assign(block7_weights, fc7_weights[:, :, ::4, ::4]))
-                load_variables.append(
-                    tf.assign(block7_biases, fc7_biases[::4]))
+                # fc6_weights = tf.get_variable(#scope +
+                #                               'vgg_16/fc6/weights')
+                # fc6_biases = tf.get_variable(#scope +
+                #                              'vgg_16/fc6/biases')
+                # fc7_weights = tf.get_variable(#scope +
+                #                               'vgg_16/fc7/weights')
+                # fc7_biases = tf.get_variable(#scope +
+                #                              'vgg_16/fc7/biases')
+                # # load_variables.append(fc6_weights)
+                # # load_variables.append(fc6_biases)
+                # # load_variables.append(fc7_weights)
+                # # load_variables.append(fc7_biases)
+                # # Weights and biases to surgery
+                # block6_weights = tf.get_variable(scope +
+                #                                  'conv6/weights')
+                # block6_biases = tf.get_variable(scope +
+                #                                 'conv6/biases')
+                # block7_weights = tf.get_variable(scope +
+                #                                  'conv7/weights')
+                # block7_biases = tf.get_variable(scope +
+                #                                 'conv7/biases')
+                #
+                # # surgery
+                # load_variables.append(
+                #     tf.assign(block6_weights, fc6_weights[::3, ::3, :, ::4]))
+                # load_variables.append(
+                #     tf.assign(block6_biases, fc6_biases[::4]))
+                # load_variables.append(
+                #     tf.assign(block7_weights, fc7_weights[:, :, ::4, ::4]))
+                # load_variables.append(
+                #     tf.assign(block7_biases, fc7_biases[::4]))
 
             tf.logging.info(
                 'Constructing op to load {} variables from pretrained '
@@ -148,3 +195,13 @@ class FullyConvolutionalNetwork(BaseNetwork):
 
             load_op = tf.group(*load_variables)
             return load_op
+
+    def get_trainable_vars(self):
+        """Get trainable vars for the network.
+
+        TODO: Make this configurable.
+
+        Returns:
+            trainable_variables: A list of variables.
+        """
+        return snt.get_variables_in_module(self)

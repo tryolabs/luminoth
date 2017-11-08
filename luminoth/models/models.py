@@ -1,9 +1,11 @@
 from luminoth.models.fasterrcnn import FasterRCNN
+from luminoth.models.ssd import SSD
 
 
 # TODO: More models :)
 MODELS = {
     'fasterrcnn': FasterRCNN,
+    'ssd': SSD
 }
 
 

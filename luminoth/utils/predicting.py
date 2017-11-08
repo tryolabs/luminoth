@@ -28,6 +28,19 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
+def resize_image_fixed(image, new_height, new_width):
+    """
+    Resizes `image` if it's necesary
+    """
+    scale_height = new_height / image.height
+    scale_width = new_width / image.width
+    image = image.resize((new_height, new_width))
+    image_array = np.array(image)[:, :, :3]  # TODO Read RGB
+    image_array = np.expand_dims(image_array, axis=0)
+
+    return image_array, scale_height, scale_width
+
+
 def get_prediction(model_type, image, config_files, session=None,
                    pred_dict=None, image_tensor=None,
                    return_tf_vars=False):
@@ -75,7 +88,12 @@ def get_prediction(model_type, image, config_files, session=None,
                 )
                 session.run(init_op)
 
-            if config.model.network.with_rcnn:
+            if config.model.type == 'ssd':
+                cls_prediction = pred_dict['classification_prediction']
+                objects_tf = cls_prediction['objects']
+                objects_labels_tf = cls_prediction['labels']
+                objects_labels_prob_tf = cls_prediction['probs']
+            elif config.model.network.get('with_rcnn', False):
                 cls_prediction = pred_dict['classification_prediction']
                 objects_tf = cls_prediction['objects']
                 objects_labels_tf = cls_prediction['labels']
@@ -91,14 +109,20 @@ def get_prediction(model_type, image, config_files, session=None,
 
     image_resize_config = model_class.base_config.dataset.image_preprocessing
 
-    image_array, scale_factor = resize_image(
-        image, float(image_resize_config.min_size),
-        float(image_resize_config.max_size)
-    )
-
+    resize_fixed = config.dataset.image_preprocessing.fixed_resize
+    if resize_fixed:
+        image_array, scale_height, scale_width = resize_image_fixed(
+            image, image_resize_config.height_size,
+            image_resize_config.width_size
+        )
+    else:
+        image_array, scale_factor = resize_image(
+            image, float(image_resize_config.min_size),
+            float(image_resize_config.max_size)
+        )
     start_time = time.time()
     objects, objects_labels, objects_labels_prob = session.run([
-        objects_tf, objects_labels_tf, objects_labels_prob_tf
+        objects_tf, objects_labels_tf, objects_labels_prob_tf,
     ], feed_dict={
         image_tensor: image_array
     })
@@ -118,8 +142,13 @@ def get_prediction(model_type, image, config_files, session=None,
         'objects_labels': objects_labels,
         'objects_labels_prob': objects_labels_prob.tolist(),
         'inference_time': end_time - start_time,
-        'scale_factor': scale_factor,
     }
+
+    if resize_fixed:
+        res['scale_height'] = scale_height
+        res['scale_width'] = scale_width
+    else:
+        res['scale_factor'] = scale_factor
 
     if return_tf_vars:
         res['image_tensor'] = image_tensor
