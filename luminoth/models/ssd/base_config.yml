@@ -1,0 +1,148 @@
+train:
+  # Run on debug mode (which enables more logging)
+  debug: True
+  # Seed for random operations
+  seed:
+  # Training batch size for images.
+  batch_size: 1
+  # Directory in which model checkpoints & summaries (for Tensorboard) will be saved
+  job_dir: jobs/
+  # Enables TensorFlow debug mode, which stops and lets you analyze Tensors
+  # after each Session.run
+  tf_debug: False
+  # Run name is used for better checkpoint and log hierarchy
+  run_name: cavani
+  # Disables logging and saving checkpoints
+  no_log: False
+  # Displays debugging images with results every N steps. Debug mode must be
+  # enabled
+  display_every_steps:
+  # Display debugging images every N seconds.
+  display_every_secs:
+  # Shuffle the dataset. It should only be disabled when trying to reproduce
+  # some problem on some sample
+  random_shuffle: False
+  # Save Tensorboard timeline
+  save_timeline: False
+  # The frequency, in seconds, that a checkpoint is saved.
+  save_checkpoint_secs: 600
+  # The frequency, in number of global steps, that the summaries are written to disk
+  save_summaries_steps:
+  # The frequency, in secs, that the summaries are written to disk.
+  # If both save_summaries_steps and save_summaries_secs are set to empty, then the
+  # default summary saver isn't used
+  save_summaries_secs: 30
+  # Run TensorFlow using full_trace mode for memory and running time logging
+  # Debug mode must be enabled.
+  full_trace: False
+  # Learning rate config.
+  learning_rate:
+    # Because we're using kwargs, we want the learning_rate dict to be replaced
+    # as a whole.
+    _replace: True
+    # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
+    # You can define different decay methods using `decay_method` and defining all the necessary arguments.
+    decay_method:
+    learning_rate: 0.01
+
+  # Optimizer config
+  optimizer:
+    # Because we're using kwargs, we want the optimizer dict to be replaced
+    # as a whole.
+    _replace: True
+    # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
+    type: momentum
+    # any options are passed directly to the optimizer as kwarg.
+    momentum: 0.9
+
+  # Number of epochs (complete dataset batches) to run
+  num_epochs: 10000
+
+dataset:
+  type: tfrecord
+  # From which directory to read the dataset
+  dir: 'datasets/cavani/tf'
+  # Which split of tfrecords to look for
+  split: train
+  # Resize image according to min_size and max_size of if fixed_size is True
+  # resize the image to height_size and width_size
+  image_preprocessing:
+    min_size: 300
+    max_size: 300
+    fixed_resize: True
+    height_size: 300
+    width_size: 300
+
+  # Data augmentation techniques
+  data_augmentation:
+
+model:
+  type: ssd
+  network:
+    # Total number of classes to predict
+    num_classes: 2
+
+  base_network:
+    # Which type of pretrained network to use
+    architecture: vgg_16
+    # Which endpoints should we use of the fully convolutional base network
+    fc_endpoints: ['vgg_16/fc7']
+    # Outputs of the fc_endpoints
+    fc_endpoints_output: [[19, 19]]
+    # Which endpoint should we use to construct the ssd architecture
+    hook_endpoint: 'vgg_16/fc7'
+    # Should we train the pretrained network
+    trainable: True
+    # From which file to load the weights
+    weights:
+    # Should we download weights if not available
+    download: True
+    endpoint:  # Delete this TODO
+    # Which endpoint layer to use as feature map for network
+    endpoints: ['vgg_16/conv4/conv4_3']
+    # Outputs of the endpoints
+    endpoints_output: [[38, 38]]
+    # Is trainable, how many layers from the endpoint are we training
+    finetune_num_layers:
+    arg_scope:
+      # Regularization
+      weight_decay: 0.0005
+
+  loss:
+    # Loss weights for calculating the total loss
+    localization_loss_weight: 1.0
+
+  anchors:
+    # Number of anchors per point in each feature map. This anchors must be in order
+    # and they must match with the number of total endpoints
+    anchors_per_point: [4, 6, 6, 6, 6, 4]
+    # Aspect ratios used for generating anchors. If there is more ratios than
+    # anchors per point, it will be used only the firsts to calculate the sclaes.
+    # By now, the ratio of 1 must always be at the begin of the array
+    ratios: [1, 0.5, 2, 0.3, 3]
+    # Minimum and maximum scale of anchors
+    min_scale: 0.2
+    max_scale: 0.99
+
+  target:
+    # The ratio of positives-negatives will be 1:`hard_negative_ratio`
+    hard_negative_ratio: 3.
+    # Threshold with GT to be considered positive
+    foreground_threshold: 0.55
+    # High and low threshold with GT to be considered negative
+    background_threshold_high: 0.4
+    background_threshold_low: 0.0
+
+  proposals:
+    # NMS threshold used when removing "almost duplicates"
+    nms_threshold: 0.6
+    # Maximum number of detections for each class
+    class_max_detections: 100
+    # NMS threshold used to remove "almost duplicate" of the same class
+    class_nms_threshold: 0.6
+    # Maximum total detections for an image (sorted by score)
+    total_max_detections: 300
+    # Minimum prob to be used as proposed object
+    min_prob_threshold: 0.5
+    # Filter proposals from anchors partially outside the image.
+    filter_outside_anchors: True

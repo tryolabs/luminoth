@@ -5,7 +5,6 @@ import tensorflow as tf
 
 from luminoth.models.base.fully_convolutional_network import (
     FullyConvolutionalNetwork,
-    # VALID_ARCHITECTURES
 )
 from luminoth.models.base.base_network import _R_MEAN, _G_MEAN, _B_MEAN
 
@@ -18,10 +17,10 @@ class BaseNetworkTest(tf.test.TestCase):
         })
         tf.reset_default_graph()
 
-    def testSubstractChannels(self):
+    def testSubtractChannels(self):
         m = FullyConvolutionalNetwork(self.config)
         inputs = tf.placeholder(tf.float32, [1, 2, 2, 3])
-        substracted_inputs = m._substract_channels(inputs)
+        substracted_inputs = m._subtract_channels(inputs)
         # white image
         r = 255. - _R_MEAN
         g = 255. - _G_MEAN
@@ -47,15 +46,15 @@ class BaseNetworkTest(tf.test.TestCase):
         tf.reset_default_graph()
         gc.collect(generation=2)
 
-    # Commented becuase Travis fails
+    # Commented because Travis fails
     # def testLoadWeights(self):
     #     m = FullyConvolutionalNetwork(self.config)
     #     inputs = tf.placeholder(tf.float32, [1, None, None, 3])
-    #     m(inputs)
+    #     res = m(inputs)
     #
     #     with tf.Session() as sess:
     #         sess.run(tf.global_variables_initializer())
-    #         sess.run(tf.local_variables_initializer())
+    #         sess.run(res, feed_dict={inputs: np.ones([1, 200, 200, 3])*255})
     #         load = m.load_weights()
     #         sess.run(load)
 

@@ -28,15 +28,15 @@ class SSDTarget(snt.AbstractModule):
         self._background_threshold_low = config.background_threshold_low
         self._seed = seed
 
-    def _build(self, proposals, gt_boxes):
+    def _build(self, probs, proposals, gt_boxes, im_shape):
         """
         Args:
             proposals: A Tensor with the RPN bounding boxes proposals.
-                The shape of the Tensor is (num_proposals, 5), where the first
-                of the 5 values for each proposal is the batch number.
+                The shape of the Tensor is (num_proposals, 4).
             gt_boxes: A Tensor with the ground truth boxes for the image.
                 The shape of the Tensor is (num_gt, 5), having the truth label
                 as the last value for each box.
+            im_shape: (1, height, width, )
         Returns:
             proposals_label: Either a truth value of the proposals (a value
                 between 0 and num_classes, with 0 being background), or -1 when
@@ -50,42 +50,46 @@ class SSDTarget(snt.AbstractModule):
 
         proposals = tf.cast(proposals, tf.float32)
         gt_boxes = tf.cast(gt_boxes, tf.float32)
+
+        # We are going to label each proposal based on the IoU with
+        # `gt_boxes`. Start by filling the labels with 0, marking them as
+        # unknown (-2).
+        proposals_label_shape = tf.gather(tf.shape(proposals), [0])
+        proposals_label = tf.fill(
+            dims=proposals_label_shape,
+            value=-2.
+        )
+
         overlaps = bbox_overlap_tf(proposals, gt_boxes[:, :4])
         # overlaps now contains (num_proposals, num_gt_boxes) with the IoU of
         # proposal P and ground truth box G in overlaps[P, G]
 
-        # We are going to label each proposal based on the IoU with
-        # `gt_boxes`. Start by filling the labels with -1, marking them as
-        # ignored.
-        proposals_label_shape = tf.gather(tf.shape(proposals), [0])
-        proposals_label = tf.fill(
-            dims=proposals_label_shape,
-            value=-1.
-        )
-        # For each overlap there is three possible outcomes for labelling:
-        #  if max(iou) < config.background_threshold_low then we ignore.
-        #  elif max(iou) <= config.background_threshold_high then we label
-        #      background.
-        #  elif max(iou) > config.foreground_threshold then we label with
+        # For each overlap there is two possible outcomes for labelling by now:
+        #  if max(iou) > config.foreground_threshold then we label with
         #      the highest IoU in overlap.
-        #
+        #  elif (config.background_threshold_low <= max(iou) <=
+        #       config.background_threshold_high) we label with background (0)
+        #  else we label with -1.
+
         # max_overlaps gets, for each proposal, the index in which we can
         # find the gt_box with which it has the highest overlap.
         max_overlaps = tf.reduce_max(overlaps, axis=1)
 
-        iou_is_high_enough_for_bg = tf.greater_equal(
-            max_overlaps, self._background_threshold_low
+        # Filter proposals with negative or zero area.
+        (x_min, y_min, x_max, y_max) = tf.unstack(
+            proposals, axis=1
         )
-        iou_is_not_too_high_for_bg = tf.less(
-            max_overlaps, self._background_threshold_high
+        proposal_filter = tf.greater(
+            tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
+            0.0
         )
-        bg_condition = tf.logical_and(
-            iou_is_high_enough_for_bg, iou_is_not_too_high_for_bg
-        )
+        # We (force) reshape the filter so that we can use it as a boolean mask
+        proposal_filter = tf.reshape(proposal_filter, [-1])
+        # Ignore the proposals with negative area with a -1
         proposals_label = tf.where(
-            condition=bg_condition,
-            x=tf.zeros_like(proposals_label, dtype=tf.float32),
-            y=proposals_label
+            condition=proposal_filter,
+            x=proposals_label,
+            y=tf.fill(dims=proposals_label_shape, value=-1.)
         )
 
         # Get the index of the best gt_box for each proposal.
@@ -127,7 +131,7 @@ class SSDTarget(snt.AbstractModule):
         best_proposals_gt_labels = tf.sparse_to_dense(
             sparse_indices=tf.reshape(best_proposals_idxs, [-1]),
             sparse_values=gt_boxes[:, 4] + 1,
-            default_value=0.,
+            default_value=-1,
             output_shape=tf.cast(proposals_label_shape, tf.int64),
             validate_indices=False,
             name="get_right_labels_for_bestboxes"
@@ -139,104 +143,30 @@ class SSDTarget(snt.AbstractModule):
             name="update_labels_for_bestbox_proposals"
         )
 
-        # proposals_label now has a value in [0, num_classes + 1] for
-        # proposals we are going to use and -1 for the ones we should ignore.
-        # But we still need to make sure we don't have a number of proposals
-        # higher than minibatch_size * foreground_fraction.
-        max_fg = tf.cast(self._foreground_fraction *
-                         tf.cast(self._num_anchors, tf.float32),
-                         tf.int32)
-        fg_condition = tf.logical_or(
-            iou_is_fg, is_best_box
-        )
-        fg_inds = tf.where(
-            condition=fg_condition
-        )
-
-        def disable_some_fgs():
-            # We want to delete a randomly-selected subset of fg_inds of
-            # size `fg_inds.shape[0] - max_fg`.
-            # We shuffle along the dimension 0 and then we get the first
-            # num_fg_inds - max_fg indices and we disable them.
-            shuffled_inds = tf.random_shuffle(fg_inds, seed=self._seed)
-            disable_place = (tf.shape(fg_inds)[0] - max_fg)
-            # This function should never run if num_fg_inds <= max_fg, so we
-            # add an assertion to catch the wrong behaviour if it happens.
-            integrity_assertion = tf.assert_positive(
-                disable_place,
-                message="disable_place in disable_some_fgs is negative."
-            )
-            with tf.control_dependencies([integrity_assertion]):
-                disable_inds = shuffled_inds[:disable_place]
-            is_disabled = tf.sparse_to_dense(
-                sparse_indices=disable_inds,
-                sparse_values=True, default_value=False,
-                output_shape=tf.cast(proposals_label_shape, tf.int64),
-                # We are shuffling the indices, so they may not be ordered.
-                validate_indices=False
-            )
-            return tf.where(
-                condition=is_disabled,
-                # We set it to -label for debugging purposes.
-                x=tf.negative(proposals_label),
-                y=proposals_label
-            )
-        # Disable some fgs if we have too many foregrounds.
-        proposals_label = tf.cond(
-            tf.greater(tf.shape(fg_inds)[0], max_fg),
-            true_fn=disable_some_fgs,
-            false_fn=lambda: proposals_label
-        )
-
-        total_fg_in_batch = tf.shape(
-            tf.where(
-                condition=tf.greater(proposals_label, 0)
-            )
-        )[0]
-
-        # Now we want to do the same for backgrounds.
+        # Disable some backgrounds according to hard minning ratio.
+        num_fg_mask = tf.greater(proposals_label, 0.0)
+        num_fg = tf.cast(tf.count_nonzero(num_fg_mask), tf.float32)
+        # Use the worst backgrounds (the bgs which probability of being fg is
+        # the greatest)
+        probs_no_bg = probs[:, 1:]
+        max_probs = tf.reduce_max(probs_no_bg, axis=1)
         # We calculate up to how many backgrounds we desire based on the
-        # final number of foregrounds and the total desired batch size.
-        max_bg = self._num_anchors - total_fg_in_batch
+        # final number of foregrounds and the hard minning ratio.
+        num_bg = tf.cast(num_fg * self._foreground_fraction, tf.int32)
+        top_k_bg = tf.nn.top_k(max_probs, k=num_bg)
 
-        # We can't use bg_condition because some of the proposals that satisfy
-        # the IoU conditions to be background may have been labeled as
-        # foreground due to them being the best proposal for a certain gt_box.
-        bg_mask = tf.equal(proposals_label, 0)
-        bg_inds = tf.where(
-            condition=bg_mask,
-        )
-
-        def disable_some_bgs():
-            # Mutatis mutandis, all comments from disable_some_fgs apply.
-            shuffled_inds = tf.random_shuffle(bg_inds, seed=self._seed)
-            disable_place = (tf.shape(bg_inds)[0] - max_bg)
-            integrity_assertion = tf.assert_non_negative(
-                disable_place,
-                message="disable_place in disable_some_bgs is negative."
-            )
-            with tf.control_dependencies([integrity_assertion]):
-                disable_inds = shuffled_inds[:disable_place]
-            is_disabled = tf.sparse_to_dense(
-                sparse_indices=disable_inds,
+        set_bg = tf.sparse_to_dense(
+                sparse_indices=top_k_bg.indices,
                 sparse_values=True, default_value=False,
-                output_shape=tf.cast(proposals_label_shape, tf.int64),
+                output_shape=proposals_label_shape,
                 validate_indices=False
             )
-            return tf.where(
-                condition=is_disabled,
-                x=tf.fill(
-                    dims=proposals_label_shape,
-                    value=-1.
-                ),
+
+        proposals_label = tf.where(
+                condition=set_bg,
+                x=tf.fill(dims=proposals_label_shape, value=0.),
                 y=proposals_label
             )
-
-        proposals_label = tf.cond(
-            tf.greater_equal(tf.shape(bg_inds)[0], max_bg),
-            true_fn=disable_some_bgs,
-            false_fn=lambda: proposals_label
-        )
 
         """
         Next step is to calculate the proper targets for the proposals labeled
@@ -272,8 +202,6 @@ class SSDTarget(snt.AbstractModule):
             proposals_with_target,
             proposals_gt_boxes,
         )
-        # TODO: We should normalize it in order for bbox_targets to have zero
-        # mean and unit variance according to the paper.
 
         # We unmap targets to proposal_labels (containing the length of
         # proposals)

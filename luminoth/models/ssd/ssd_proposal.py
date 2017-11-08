@@ -30,7 +30,7 @@ class SSDProposal(snt.AbstractModule):
         self._num_classes = num_classes
 
         # Threshold to use for NMS.
-        self._nms_threshold = config.nms_threshold
+        self._class_nms_threshold = config.class_nms_threshold
         # Max number of proposals detections per class.
         self._class_max_detections = config.class_max_detections
         # Maximum number of detections to return.
@@ -64,24 +64,6 @@ class SSDProposal(snt.AbstractModule):
                     (x_min, y_min, x_max, y_max).
                 proposal_label: It's shape is (final_num_proposals,)
                 proposal_label_prob: It's shape is (final_num_proposals,)
-
-
-                nms_proposals: A Tensor with the final selected proposed
-                    bounding boxes. Its shape should be
-                    (total_nms_proposals, 4).
-                nms_proposals_scores: A Tensor with the probability of being an
-                    object for that proposal. Its shape should be
-                    (total_nms_proposals, 1)
-                scores:  A Tensor with the scores of the proposals contained
-                    in `proposals` and `proposals_unclipped`.
-                proposals: A Tensor with all the valid area RPN proposals, this
-                    tensor is returned in debug mode and is used for
-                    testing, the proposals are clipped if `clip_after_nms` is
-                    set to False.
-                proposals_unclipped: Same as proposals but the proposals in
-                    this tensor are never clipped.
-                all_proposals: A Tensor with all the proposals, including the
-                    ones with zero or negative area.
         """
         # First we want get the most probable label for each anchor
         # We still have the background on idx 0 so we substract 1 to the idxs,
@@ -89,31 +71,6 @@ class SSDProposal(snt.AbstractModule):
         proposal_label = tf.argmax(cls_prob, axis=1) - 1
         # Get the probability for the selected label for each proposal.
         proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
-
-        # Filter outside anchors
-        if self._filter_outside_anchors:
-            with tf.name_scope('filter_outside_anchors'):
-                (x_min_anchor, y_min_anchor,
-                 x_max_anchor, y_max_anchor) = tf.unstack(all_anchors, axis=1)
-
-                anchor_filter = tf.logical_and(
-                    tf.logical_and(
-                        tf.greater_equal(x_min_anchor, 0),
-                        tf.greater_equal(y_min_anchor, 0)
-                    ),
-                    tf.logical_and(
-                        tf.less(x_max_anchor, im_shape[1]),
-                        tf.less(y_max_anchor, im_shape[0])
-                    )
-                )
-                anchor_filter = tf.reshape(anchor_filter, [-1])
-                # Do the filtering
-                all_anchors = tf.boolean_mask(
-                    all_anchors, anchor_filter, name='filter_anchors')
-                loc_pred = tf.boolean_mask(loc_pred, anchor_filter)
-                proposal_label = tf.boolean_mask(proposal_label, anchor_filter)
-                proposal_label_prob = tf.boolean_mask(
-                    proposal_label_prob, anchor_filter)
 
         # We are going to use only the non-background anchors.
         non_background_filter = tf.greater_equal(proposal_label, 0)
@@ -147,25 +104,6 @@ class SSDProposal(snt.AbstractModule):
              total_anchors - filtered_anchors, ['ssd_proposal']
          )
 
-        # Create one hot with labels for using it to filter bbox_predictions.
-        label_one_hot = tf.one_hot(proposal_label, depth=self._num_classes)
-        # Flatten label_one_hot to get
-        # (num_non_background_anchors * num_classes, 1) for filtering.
-        label_one_hot_flatten = tf.cast(
-            tf.reshape(label_one_hot, [-1]), tf.bool
-        )
-        # Flatten bbox_predictions getting
-        # (num_non_background_proposals * num_classes, 4).
-        loc_pred_flatten = tf.reshape(loc_pred, [-1, 4])
-
-        equal_shapes = tf.assert_equal(
-            tf.shape(loc_pred_flatten)[0], tf.shape(label_one_hot_flatten)[0]
-        )
-        with tf.control_dependencies([equal_shapes]):
-            # Control same number of dimensions between bbox and mask.
-            loc_pred = tf.boolean_mask(
-                loc_pred_flatten, label_one_hot_flatten)
-
         # Using the loc_pred and the anchors we generate the proposals.
         raw_proposals = decode(all_anchors, loc_pred)
         # Clip boxes to image.
@@ -173,7 +111,7 @@ class SSDProposal(snt.AbstractModule):
 
         # Filter proposals that have an non-valid area.
         (x_min, y_min, x_max, y_max) = tf.unstack(clipped_proposals, axis=1)
-        proposal_filter = tf.greater_equal(
+        proposal_filter = tf.greater(
             tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
             0.0
         )
@@ -256,8 +194,7 @@ class SSDProposal(snt.AbstractModule):
         top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
 
         return {
-            'raw_proposals': raw_proposals,
-            'proposals': top_k_proposals,
-            'proposal_label': top_k_proposal_label,
-            'proposal_label_prob': top_k_proposal_label_prob
+            'objects': top_k_proposals,
+            'labels': top_k_proposal_label,
+            'probs': top_k_proposal_label_prob
         }
