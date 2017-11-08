@@ -114,6 +114,38 @@ def resize_image(image, bboxes=None, min_size=None, max_size=None):
     }
 
 
+def resize_image_fixed(image, new_height, new_width, bboxes=None):
+
+    image_shape = tf.to_float(tf.shape(image))
+    height = image_shape[0]
+    width = image_shape[1]
+
+    scale_factor = height / new_height
+
+    # Resize image using TensorFlow's own `resize_image` utility.
+    image = tf.image.resize_images(
+        image, tf.stack(tf.to_int32([new_height, new_width])),
+        method=tf.image.ResizeMethod.BILINEAR
+    )
+
+    if bboxes is not None:
+        bboxes = adjust_bboxes(
+            bboxes,
+            old_height=height, old_width=width,
+            new_height=new_height, new_width=new_width
+        )
+        return {
+            'image': image,
+            'bboxes': bboxes,
+            'scale_factor': scale_factor,
+        }
+
+    return {
+        'image': image,
+        'scale_factor': scale_factor,
+    }
+
+
 def patch_image(image, bboxes=None, offset_height=0, offset_width=0,
                 target_height=None, target_width=None):
     """Gets a patch using tf.image.crop_to_bounding_box and adjusts bboxes

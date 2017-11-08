@@ -71,7 +71,12 @@ class PredictorNetwork(object):
                 )
                 self.session.run(init_op)
 
-            if config.model.network.with_rcnn:
+            if config.model.type == 'ssd':
+                cls_prediction = pred_dict['classification_prediction']
+                objects_tf = cls_prediction['objects']
+                objects_labels_tf = cls_prediction['labels']
+                objects_labels_prob_tf = cls_prediction['probs']
+            elif config.model.network.get('with_rcnn', False):
                 cls_prediction = pred_dict['classification_prediction']
                 objects_tf = cls_prediction['objects']
                 objects_labels_tf = cls_prediction['labels']

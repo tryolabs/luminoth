@@ -15,6 +15,17 @@ class BaseDataset(snt.AbstractModule):
         self._random_shuffle = config.train.random_shuffle
         self._seed = config.train.seed
 
+        self._fixed_resize = (
+            config.dataset.image_preprocessing.get('fixed_resize', False)
+        )
+        if self._fixed_resize:
+            self._image_height_size = (
+                config.dataset.image_preprocessing.height_size
+            )
+            self._image_width_size = (
+                config.dataset.image_preprocessing.width_size
+            )
+
         self._total_queue_ops = 20
 
     def _build(self):

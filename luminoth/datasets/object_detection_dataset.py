@@ -2,7 +2,8 @@ import tensorflow as tf
 
 from luminoth.datasets.base_dataset import BaseDataset
 from luminoth.utils.image import (
-    resize_image, flip_image, random_patch, random_resize, random_distortion
+    resize_image_fixed, resize_image, flip_image, random_patch, random_resize,
+    random_distortion
 )
 
 DATA_AUGMENTATION_STRATEGIES = {
@@ -216,10 +217,16 @@ class ObjectDetectionDataset(BaseDataset):
             scale_factor: Scale factor used to modify the image (1.0 means no
                 change).
         """
-        resized = resize_image(
-            image, bboxes=bboxes, min_size=self._image_min_size,
-            max_size=self._image_max_size
-        )
+        if self._fixed_resize:
+            resized = resize_image_fixed(
+                image, self._image_height_size, self._image_width_size,
+                bboxes=bboxes
+            )
+        else:
+            resized = resize_image(
+                image, bboxes=bboxes, min_size=self._image_min_size,
+                max_size=self._image_max_size
+            )
 
         return resized['image'], resized.get('bboxes'), resized['scale_factor']
 
