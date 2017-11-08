@@ -148,10 +148,18 @@ def validate_region(region, project_id, credentials):
     )
     try:
         regionrequest.execute()
-    except HttpError:
-        click.echo(
-            'Error: Couldn\'t find region "{}" for project "{}".'.format(
-                region, project_id))
+    except HttpError as err:
+        if err.resp.status == 404:
+            click.echo(
+                'Error: Couldn\'t find region "{}" for project "{}".'.format(
+                    region, project_id))
+        elif err.resp.status == 403:
+            click.echo('Error: Forbidden access to resources.')
+            click.echo(
+                'Make sure to enable "Cloud Compute API", "ML Engine" and '
+                '"Storage" for project.')
+        else:
+            click.echo('Unknown error: {}'.format(err.resp))
         sys.exit(1)
 
 
