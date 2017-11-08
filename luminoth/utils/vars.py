@@ -71,15 +71,9 @@ def get_activation_function(activation_function):
     if not activation_function:
         return lambda a: a
 
-    if activation_function == 'relu':
-        return tf.nn.relu
-    elif activation_function == 'relu6':
-        return tf.nn.relu6
-    elif activation_function == 'sigmoid':
-        return tf.sigmoid
-    elif activation_function == 'tanh':
-        return tf.tanh
-    else:
+    try:
+        return getattr(tf.nn, activation_function)
+    except AttributeError:
         raise ValueError(
             'Invalid activation function "{}"'.format(activation_function))
 
