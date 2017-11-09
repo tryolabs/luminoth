@@ -3,7 +3,7 @@ import click
 import tensorflow as tf
 
 from luminoth.datasets.exceptions import InvalidDataDirectory
-
+from luminoth.utils.config import parse_override
 from .readers import get_reader, READERS
 from .writers import ObjectDetectionWriter
 
@@ -31,9 +31,10 @@ def get_output_subfolder(only_filename, limit_examples, limit_classes):
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
 @click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')  # noqa
 @click.option('--seed', type=int, help='Seed used for picking random classes.')
+@click.option('overrides', '--override', '-o', multiple=True, help='Custom parameters for readers.')  # noqa
 @click.option('--debug', is_flag=True, help='Set level logging to DEBUG.')
 def transform(dataset_reader, data_dir, output_dir, splits, only_filename,
-              limit_examples, limit_classes, seed, debug):
+              limit_examples, limit_classes, seed, overrides, debug):
     """
     Prepares dataset for ingestion.
 
@@ -61,13 +62,15 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_filename,
     # All splits must have a consistent set of classes.
     classes = None
 
+    reader_kwargs = parse_override(overrides)
+
     try:
         for split in splits:
             # Create instance of reader.
             split_reader = reader(
                 data_dir, split,
                 only_filename=only_filename, limit_examples=limit_examples,
-                limit_classes=limit_classes, seed=seed
+                limit_classes=limit_classes, seed=seed, **reader_kwargs
             )
 
             if classes is None:

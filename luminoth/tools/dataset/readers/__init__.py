@@ -1,11 +1,12 @@
 from .base_reader import BaseReader, InvalidDataDirectory  # noqa
 from .object_detection import ObjectDetectionReader  # noqa
-from .object_detection import ImageNetReader, PascalVOCReader
+from .object_detection import ImageNetReader, PascalVOCReader, CSVReader
 
 READERS = {
     'imagenet': ImageNetReader,
     'pascal': PascalVOCReader,
     'voc': PascalVOCReader,
+    'csv': CSVReader,
 }
 
 
