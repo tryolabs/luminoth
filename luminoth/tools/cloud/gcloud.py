@@ -214,13 +214,10 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 
     args.extend([
         '-o', 'dataset.dir={}'.format(dataset),
-        '-o', 'dataset.data_augmentation=false'
     ])
 
     override_params = [
         'dataset.dir={}'.format(dataset),
-        # TODO: Turning off data_augmentation because of TF 1.2 limitations
-        'dataset.data_augmentation=false'
     ]
 
     custom_config = load_config(config_files)

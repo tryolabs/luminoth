@@ -97,13 +97,18 @@ class ObjectDetectionDataset(snt.AbstractModule):
             prob = tf.to_float(aug_config.pop('prob', default_prob))
             apply_aug_strategy = tf.less(random_number, prob)
 
-            augmented = tf.cond(
+            augmented = aug_fn(image, bboxes, **aug_config)
+
+            image = tf.cond(
                 apply_aug_strategy,
-                lambda: aug_fn(image, bboxes, **aug_config),
-                lambda: {'image': image, 'bboxes': bboxes}
+                lambda: augmented['image'],
+                lambda: image
             )
-            image = augmented['image']
-            bboxes = augmented.get('bboxes')
+            bboxes = tf.cond(
+                apply_aug_strategy,
+                lambda: augmented['bboxes'],
+                lambda: bboxes
+            )
 
             applied_data_augmentation.append({aug_type: apply_aug_strategy})
 
