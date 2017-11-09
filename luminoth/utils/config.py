@@ -170,7 +170,7 @@ def parse_override(override_options):
 
         local_override_dict[nested_keys[-1]] = parse_config_value(value)
 
-    return EasyDict(override_dict)
+    return override_dict
 
 
 def parse_config_value(value):
@@ -220,7 +220,7 @@ def get_model_config(base_config, custom_config, override_params):
         # then we merge those values to the base_config.
         config = merge_into(custom_config, config, overwrite=True)
     if override_params:
-        override_config = parse_override(override_params)
+        override_config = EasyDict(parse_override(override_params))
         config = merge_into(override_config, config, overwrite=True)
 
     # Delete meta-keys before returning.
