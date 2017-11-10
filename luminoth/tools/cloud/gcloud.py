@@ -285,11 +285,11 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 @click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
-@click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
+@click.option('--machine-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--rebuild', default=False, is_flag=True, help='Rebuild and upload package.')  # noqa
 @click.option('--postfix', default='eval', help='Postfix for the evaluation job name.')  # noqa
 def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
-             scale_tier, rebuild, postfix):
+             machine_type, rebuild, postfix):
     project_id = get_project_id(service_account_json)
     if project_id is None:
         raise ValueError(
@@ -327,13 +327,14 @@ def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
     ]
 
     training_inputs = {
-        'scaleTier': scale_tier,
+        'scaleTier': 'CUSTOM',
+        'masterType': machine_type,
         'packageUris': [package_path],
         'pythonModule': 'luminoth.eval',
         'args': args,
         'region': region,
         'jobDir': job_dir,
-        'runtimeVersion': RUNTIME_VERSION
+        'runtimeVersion': RUNTIME_VERSION,
     }
 
     evaluate_job_id = '{}_{}'.format(job_id, postfix)
