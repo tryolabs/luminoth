@@ -41,6 +41,8 @@ class RPNTest(tf.test.TestCase):
                 'min_size': 0,
                 'clip_after_nms': False,
                 'filter_outside_anchors': False,
+                'apply_nms': True,
+                'min_prob_threshold': 0.0,
             },
             'target': {
                 'allowed_border': 0,

@@ -37,7 +37,6 @@ DEFAULT_PATH = get_default_path()
 
 
 def get_checkpoint_path(path=DEFAULT_PATH):
-    tf.logging.info('Creating folder "{}" to save checkpoints.'.format(path))
     # Expand user if path is relative to user home.
     path = os.path.expanduser(path)
 
@@ -45,7 +44,10 @@ def get_checkpoint_path(path=DEFAULT_PATH):
         # We don't need to create Google cloud storage "folders"
         path = os.path.abspath(path)
 
-    tf.gfile.MakeDirs(path)
+    if not tf.gfile.Exists(path):
+        tf.logging.info(
+            'Creating folder "{}" to save checkpoints.'.format(path))
+        tf.gfile.MakeDirs(path)
 
     return path
 

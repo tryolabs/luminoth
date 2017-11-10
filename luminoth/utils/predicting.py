@@ -29,7 +29,7 @@ def resize_image(image, min_size, max_size):
 
 
 def get_prediction(model_type, image, config_files, session=None,
-                   prediction_dict=None, image_tensor=None,
+                   pred_dict=None, image_tensor=None,
                    return_tf_vars=False):
     """
     Gets the prediction given by the model `model_type` of the image `image`.
@@ -46,14 +46,14 @@ def get_prediction(model_type, image, config_files, session=None,
         model_class.base_config, custom_config, None
     )
 
-    if session is None or prediction_dict is None or image_tensor is None:
+    if session is None or pred_dict is None or image_tensor is None:
         graph = tf.Graph()
         session = tf.Session(graph=graph)
 
         with graph.as_default():
             image_tensor = tf.placeholder(tf.float32, (1, None, None, 3))
             model = model_class(model_class.base_config)
-            prediction_dict = model(image_tensor)
+            pred_dict = model(image_tensor)
 
             # Restore checkpoint
             if config.train.job_dir and config.train.run_name:
@@ -75,10 +75,20 @@ def get_prediction(model_type, image, config_files, session=None,
                 )
                 session.run(init_op)
 
-    classification_prediction = prediction_dict['classification_prediction']
-    objects_tf = classification_prediction['objects']
-    objects_labels_tf = classification_prediction['labels']
-    objects_labels_prob_tf = classification_prediction['probs']
+            if config.model.network.with_rcnn:
+                cls_prediction = pred_dict['classification_prediction']
+                objects_tf = cls_prediction['objects']
+                objects_labels_tf = cls_prediction['labels']
+                objects_labels_prob_tf = cls_prediction['probs']
+            else:
+                rpn_prediction = pred_dict['rpn_prediction']
+                objects_tf = rpn_prediction['proposals']
+                objects_labels_prob_tf = rpn_prediction['scores']
+                # All labels without RCNN are zero
+                objects_labels_tf = tf.zeros(
+                    tf.shape(objects_labels_prob_tf), dtype=tf.int32
+                )
+
     image_resize_config = model_class.base_config.dataset.image_preprocessing
 
     image_array, scale_factor = resize_image(
@@ -113,7 +123,7 @@ def get_prediction(model_type, image, config_files, session=None,
 
     if return_tf_vars:
         res['image_tensor'] = image_tensor
-        res['prediction_dict'] = prediction_dict
+        res['prediction_dict'] = pred_dict
         res['session'] = session
 
     return res

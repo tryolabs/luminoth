@@ -173,8 +173,8 @@ class RPN(snt.AbstractModule):
         proposal_prediction = self._proposal(
             rpn_cls_prob, rpn_bbox_pred, all_anchors, im_shape)
 
-        prediction_dict['proposals'] = proposal_prediction['nms_proposals']
-        prediction_dict['scores'] = proposal_prediction['nms_proposals_scores']
+        prediction_dict['proposals'] = proposal_prediction['proposals']
+        prediction_dict['scores'] = proposal_prediction['scores']
 
         if self._debug:
             prediction_dict['proposal_prediction'] = proposal_prediction
@@ -192,24 +192,24 @@ class RPN(snt.AbstractModule):
 
             if self._debug:
                 prediction_dict['rpn_max_overlap'] = rpn_max_overlap
-
-            variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+                variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
 
         # Variables summaries.
-        variable_summaries(
-            proposal_prediction['nms_proposals_scores'], 'rpn_scores', ['rpn'])
+        variable_summaries(prediction_dict['scores'], 'rpn_scores', ['rpn'])
         variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
         variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
-        variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
-        variable_summaries(
-            rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])
-        variable_summaries(
-            rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
 
-        # Layer summaries.
-        layer_summaries(self._rpn, ['rpn'])
-        layer_summaries(self._rpn_cls, ['rpn'])
-        layer_summaries(self._rpn_bbox, ['rpn'])
+        if self._debug:
+            variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
+            variable_summaries(
+                rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])
+            variable_summaries(
+                rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
+
+            # Layer summaries.
+            layer_summaries(self._rpn, ['rpn'])
+            layer_summaries(self._rpn_cls, ['rpn'])
+            layer_summaries(self._rpn_bbox, ['rpn'])
 
         return prediction_dict
 

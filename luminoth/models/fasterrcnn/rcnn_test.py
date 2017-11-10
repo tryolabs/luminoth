@@ -68,7 +68,7 @@ class RCNNTest(tf.test.TestCase):
             tf.float32, shape=self._pretrained_feature_map_shape
         )
 
-        self._proposals_shape = (self._num_proposals, 5)
+        self._proposals_shape = (self._num_proposals, 4)
         self._proposals_ph = tf.placeholder(
             tf.float32, shape=self._proposals_shape
         )

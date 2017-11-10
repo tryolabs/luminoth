@@ -449,8 +449,8 @@ def draw_top_proposals(pred_dict, image, min_score=0.8, max_display=20,
         'green = matches background in batch, red = ignored in batch)')
     proposal_prediction = pred_dict['rpn_prediction']['proposal_prediction']
     if top_k:
-        scores = proposal_prediction['top_k_scores']
-        proposals = proposal_prediction['top_k_proposals']
+        scores = proposal_prediction['sorted_top_scores']
+        proposals = proposal_prediction['sorted_top_proposals']
     else:
         scores = proposal_prediction['scores']
         proposals = proposal_prediction['proposals']
@@ -594,8 +594,6 @@ def draw_top_nms_proposals(pred_dict, image, min_score=0.8, draw_gt=False):
     logger.debug('Top NMS proposals (min_score = {})'.format(min_score))
     scores = pred_dict['rpn_prediction']['scores']
     proposals = pred_dict['rpn_prediction']['proposals']
-    # Remove batch id
-    proposals = proposals[:, 1:]
     top_scores_mask = scores > min_score
     scores = scores[top_scores_mask]
     proposals = proposals[top_scores_mask]
@@ -883,7 +881,7 @@ def draw_rcnn_cls_batch(pred_dict, image, foreground=True, background=True):
         '(GT labels are -1 from cls targets)')
     logger.debug('blue => GT, green => foreground, red => background')
 
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     cls_targets = pred_dict['classification_prediction']['target']['cls']
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
@@ -929,7 +927,7 @@ def draw_rcnn_cls_batch_errors(pred_dict, image, foreground=True,
         'used for training classifier.'.format('worst' if worst else 'best'))
     logger.debug('blue => GT, green => foreground, red => background')
 
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     cls_targets = pred_dict['classification_prediction']['target']['cls']
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
@@ -990,7 +988,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, image):
         'blue => GT, green => foreground, '
         'r`regression_loss` - c`classification_loss`.')
 
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     cls_targets = pred_dict['classification_prediction']['target']['cls']
     bbox_offsets_targets = pred_dict[
         'classification_prediction']['target']['bbox_offsets']
@@ -1076,7 +1074,7 @@ def draw_rcnn_reg_batch_errors(pred_dict, image):
 
 
 def recalculate_objects(pred_dict, image):
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     proposals_prob = pred_dict['classification_prediction']['rcnn']['cls_prob']
     proposals_target = proposals_prob.argmax(axis=1) - 1
     bbox_offsets = pred_dict[
@@ -1158,7 +1156,7 @@ def draw_correct_rpn_proposals_anchors(pred_dict, image, top_k=5):
 
 
 def draw_rpn_correct_proposals(pred_dict, image):
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     gt_bboxes = pred_dict['gt_bboxes']
     gt_boxes = gt_bboxes[:, :4]
 
@@ -1182,7 +1180,7 @@ def draw_rcnn_input_proposals(pred_dict, image):
     logger.debug(
         'Display RPN proposals used in training classification. '
         'Top IoU with GT is displayed.')
-    proposals = pred_dict['rpn_prediction']['proposals'][:, 1:]
+    proposals = pred_dict['rpn_prediction']['proposals']
     gt_bboxes = pred_dict['gt_bboxes']
     gt_boxes = gt_bboxes[:, :4]
 

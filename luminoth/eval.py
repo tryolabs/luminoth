@@ -14,7 +14,7 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.command(help='Evaluate trained (or training) models')
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
-@click.option('--job-dir', required=True, help='Directory from where to read saved models and write evaluation logs.')  # noqa
+@click.option('--job-dir', help='Directory from where to read saved models and write evaluation logs.')  # noqa
 @click.option('--watch/--no-watch', default=True, help='Keep watching checkpoint directory for new files.')  # noqa
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
@@ -86,10 +86,22 @@ def evaluate(dataset_split, config_files, job_dir, watch,
         train_image, train_objects
     )
 
-    pred = prediction_dict['classification_prediction']
-    pred_objects = pred['objects']
-    pred_objects_classes = pred['labels']
-    pred_objects_scores = pred['probs']
+    if config.model.network.with_rcnn:
+        pred = prediction_dict['classification_prediction']
+        pred_objects = pred['objects']
+        pred_objects_classes = pred['labels']
+        pred_objects_scores = pred['probs']
+    else:
+        # Force the num_classes to 1
+        config.model.network.num_classes = 1
+
+        pred = prediction_dict['rpn_prediction']
+        pred_objects = pred['proposals']
+        pred_objects_scores = pred['scores']
+        # When using only RPN all classes are 0.
+        pred_objects_classes = tf.zeros(
+            (tf.shape(pred_objects_scores)[0],), dtype=tf.int32
+        )
 
     # Retrieve *all* the losses from the model and calculate their streaming
     # means, so we get the loss over the whole dataset.
@@ -161,8 +173,8 @@ def evaluate(dataset_split, config_files, job_dir, watch,
             try:
                 start = time.time()
                 evaluate_once(
-                    writer, saver, ops, config.model.network.num_classes,
-                    checkpoint, metrics_scope=metrics_scope,
+                    config, writer, saver, ops, checkpoint,
+                    metrics_scope=metrics_scope,
                     image_vis=config.eval.image_vis,
                     files_per_class=files_per_class,
                     files_to_visualize=files_to_visualize
@@ -250,7 +262,7 @@ def get_checkpoints(config, from_global_step=None):
     return checkpoints
 
 
-def evaluate_once(writer, saver, ops, num_classes, checkpoint,
+def evaluate_once(config, writer, saver, ops, checkpoint,
                   metrics_scope='metrics', image_vis=None,
                   files_per_class=None, files_to_visualize=None):
     """Run the evaluation once.
@@ -261,6 +273,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
 
     Args:
         config: Config object for the model.
+        writer: Summary writers.
         saver: Saver object to restore checkpoint parameters.
         ops (dict): All the operations needed to successfully run the model.
             Expects the following keys: ``init_op``, ``metric_ops``,
@@ -332,6 +345,7 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                     if visualize_file:
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
+                            with_rcnn=config.model.network.with_rcnn,
                             extra_tag=filename,
                             image_visualization_mode=image_vis,
                             image=batch_fetched['train_image'],
@@ -347,8 +361,12 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
             # Save final evaluation stats into summary under the checkpoint's
             # global step.
             map_0_5, per_class_0_5 = calculate_map(
-                output_per_batch, num_classes, 0.5
+                output_per_batch, config.model.network.num_classes, 0.5
             )
+
+            tf.logging.info('Finished evaluation at step {}.'.format(
+                checkpoint['global_step']))
+            tf.logging.info('mAP@0.5 = {:.2f}'.format(map_0_5))
 
             # TODO: Find a way to generate these summaries automatically, or
             # less manually.
@@ -359,16 +377,19 @@ def evaluate_once(writer, saver, ops, num_classes, checkpoint,
                 ),
             ]
 
-            for loss_name, loss_value in val_losses.items():
-                summary.append(tf.Summary.Value(
-                    tag=loss_name,
-                    simple_value=loss_value
-                ))
-
             for idx, val in enumerate(per_class_0_5):
+                tf.logging.debug('AP@0.5 for {} = {:.2f}'.format(idx, val))
                 summary.append(tf.Summary.Value(
                     tag='{}/AP@0.5/{}'.format(metrics_scope, idx),
                     simple_value=val
+                ))
+
+            for loss_name, loss_value in val_losses.items():
+                tf.logging.debug('{} loss = {:.4f}'.format(
+                    loss_name, loss_value))
+                summary.append(tf.Summary.Value(
+                    tag=loss_name,
+                    simple_value=loss_value
                 ))
 
             total_bboxes_per_batch = [

@@ -60,10 +60,10 @@ class ROIPoolingTest(tf.test.TestCase):
         result a 'roi_pool' of 2x2.
         """
         roi_proposals = np.array([
-            [0, 1, 1, 4, 4],  # Inside mat_A
-            [1, 6, 1, 9, 4],  # Inside mat_B
-            [2, 1, 6, 4, 9],  # Inside mat_C
-            [3, 6, 6, 9, 9],  # Inside mat_D
+            [1, 1, 4, 4],  # Inside mat_A
+            [6, 1, 9, 4],  # Inside mat_B
+            [1, 6, 4, 9],  # Inside mat_C
+            [6, 6, 9, 9],  # Inside mat_D
         ])
 
         results = self._run_roi_pooling(
@@ -117,10 +117,10 @@ class ROIPoolingTest(tf.test.TestCase):
         result a 'roi_pool' of 2x2. with
         """
         roi_proposals = np.array([
-            [0, 3, 1, 6, 4],  # Across mat_A and mat_B (half-half)
-            [1, 1, 3, 4, 7],  # Across mat_A and mat_C (half-half)
-            [2, 5, 3, 9, 7],  # Inside mat_B and mat_D (half-half)
-            [3, 3, 6, 6, 9],  # Inside mat_C and mat_D (half-half)
+            [3, 1, 6, 4],  # Across mat_A and mat_B (half-half)
+            [1, 3, 4, 7],  # Across mat_A and mat_C (half-half)
+            [5, 3, 9, 7],  # Inside mat_B and mat_D (half-half)
+            [3, 6, 6, 9],  # Inside mat_C and mat_D (half-half)
         ])
         a = self.multiplier_a
         b = self.multiplier_b
@@ -183,10 +183,10 @@ class ROIPoolingTest(tf.test.TestCase):
         """
 
         roi_proposals = np.array([
-            [0, 4, 1, 7, 4],  # Across mat_A and mat_B (1/4 - 3/4)
-            [1, 1, 4, 4, 8],  # Across mat_A and mat_C (1/4 - 3/4)
-            [2, 5, 4, 9, 8],  # Inside mat_B and mat_D (1/4 - 3/4)
-            [3, 4, 6, 7, 9],  # Inside mat_C and mat_D (1/4 - 3/4)
+            [4, 1, 7, 4],  # Across mat_A and mat_B (1/4 - 3/4)
+            [1, 4, 4, 8],  # Across mat_A and mat_C (1/4 - 3/4)
+            [5, 4, 9, 8],  # Inside mat_B and mat_D (1/4 - 3/4)
+            [4, 6, 7, 9],  # Inside mat_C and mat_D (1/4 - 3/4)
         ])
         a = self.multiplier_a
         b = self.multiplier_b

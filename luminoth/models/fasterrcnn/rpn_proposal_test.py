@@ -19,6 +19,8 @@ class RPNProposalTest(tf.test.TestCase):
             'min_size': 0,
             'clip_after_nms': False,
             'filter_outside_anchors': False,
+            'apply_nms': True,
+            'min_prob_threshold': 0.0,
         })
         tf.reset_default_graph()
 
@@ -95,12 +97,12 @@ class RPNProposalTest(tf.test.TestCase):
         # Check we get exactly 2 'nms proposals' because 2 IoU equals to 0.
         # Also check that we get the corrects scores.
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (2, 5)
+            results['proposals'].shape,
+            (2, 4)
         )
 
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.9, 0.8]
         )
 
@@ -112,12 +114,12 @@ class RPNProposalTest(tf.test.TestCase):
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
         # Also check that we get the corrects scores.
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (3, 5)
+            results['proposals'].shape,
+            (3, 4)
         )
 
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.9, 0.8, 0.2]
         )
 
@@ -129,12 +131,12 @@ class RPNProposalTest(tf.test.TestCase):
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.3.
         # Also check that we get the corrects scores.
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (3, 5)
+            results['proposals'].shape,
+            (3, 4)
         )
 
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.9, 0.8, 0.2]
         )
 
@@ -146,12 +148,12 @@ class RPNProposalTest(tf.test.TestCase):
         # Check we get exactly 3 'nms proposals' because 3 IoU lowers than 0.8.
         # Also check that we get the corrects scores.
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (3, 5)
+            results['proposals'].shape,
+            (3, 4)
         )
 
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.9, 0.8, 0.2]
         )
 
@@ -163,8 +165,8 @@ class RPNProposalTest(tf.test.TestCase):
         # Check we get 'post_nms_top_n' nms proposals because
         # 'nms_threshold' = 1 and this only removes duplicates.
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (4, 5)
+            results['proposals'].shape,
+            (4, 4)
         )
 
     def testOutsidersAndTopN(self):
@@ -193,22 +195,22 @@ class RPNProposalTest(tf.test.TestCase):
         results = self._run_rpn_proposal(
             all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
-        # Check we get exactly 3 'nms proposals' and 3 'proposals' because
-        # we have 4 gt_boxes, but 1 outsider (and nms_threshold = 1).
+        # Check we get exactly 3 'nms proposals' and 3 'unsorted_proposals'
+        # because we have 4 gt_boxes, but 1 outsider (and nms_threshold = 1).
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (3, 5)
+            results['proposals'].shape,
+            (3, 4)
         )
 
         # We don't remove proposals outside, we just clip them.
         self.assertEqual(
-            results['proposals'].shape,
+            results['unsorted_proposals'].shape,
             (4, 4)
         )
 
         # Also check that we get the corrects scores.
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.7, 0.6, 0.2]
         )
 
@@ -219,26 +221,26 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 2 we have only 2 'nms proposals'
-        # but 3 'proposals'.
+        # but 3 'unsorted_proposals'.
         self.assertAllEqual(
-            results['nms_proposals'].shape,
-            (2, 5)
+            results['proposals'].shape,
+            (2, 4)
         )
 
         self.assertEqual(
-            results['proposals'].shape,
+            results['unsorted_proposals'].shape,
             (4, 4)
         )
 
         # Also check that we get the corrects scores.
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.7, 0.6]
         )
 
         # Sorted
         self.assertAllClose(
-            results['top_k_scores'],
+            results['sorted_top_scores'],
             [0.7, 0.6, 0.2, 0.1]
         )
 
@@ -250,27 +252,27 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 3 and pre_nms_top = 2
-        # we have only 2 'nms proposals' and 2 'proposals'.
+        # we have only 2 'nms proposals' and 2 'unsorted_proposals'.
 
         self.assertAllEqual(
-            results['nms_proposals'].shape,
-            (2, 5)
+            results['proposals'].shape,
+            (2, 4)
         )
 
         # Filter pre nms
         self.assertEqual(
-            results['top_k_proposals'].shape,
+            results['sorted_top_proposals'].shape,
             (2, 4)
         )
 
         # Also check that we get the corrects scores.
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.7, 0.6]
         )
 
         self.assertAllClose(
-            results['top_k_scores'],
+            results['sorted_top_scores'],
             [0.7, 0.6]
         )
 
@@ -281,25 +283,25 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes)
 
         # Check that with a post_nms_top_n = 1 and pre_nms_top = 2
-        # we have only 1 'nms proposals' and 2 'proposals'.
+        # we have only 1 'nms proposals' and 2 'unsorted_proposals'.
         self.assertAllEqual(
-            results['nms_proposals'].shape,
-            (1, 5)
+            results['proposals'].shape,
+            (1, 4)
         )
 
         self.assertEqual(
-            results['top_k_proposals'].shape,
+            results['sorted_top_proposals'].shape,
             (2, 4)
         )
 
         # Also check that we get the corrects scores.
         self.assertAllClose(
-            results['nms_proposals_scores'],
+            results['scores'],
             [0.7]
         )
 
         self.assertAllClose(
-            results['top_k_scores'],
+            results['sorted_top_scores'],
             [0.7, 0.6]
         )
 
@@ -329,15 +331,15 @@ class RPNProposalTest(tf.test.TestCase):
         results = self._run_rpn_proposal(
             all_anchors, rpn_cls_prob, self.config, gt_boxes=gt_boxes)
 
-        # Check we get exactly 2 'nms proposals' and 2 'proposals' because
+        # Check we get exactly 2 'proposals' and 2 'unsorted_proposals' because
         # we have 4 gt_boxes, but 2 with negative area (and nms_threshold = 1).
         self.assertEqual(
-            results['nms_proposals'].shape,
-            (2, 5)
+            results['proposals'].shape,
+            (2, 4)
         )
 
         self.assertEqual(
-            results['proposals'].shape,
+            results['unsorted_proposals'].shape,
             (2, 4)
         )
 
@@ -367,7 +369,7 @@ class RPNProposalTest(tf.test.TestCase):
         )
 
         self.assertEqual(
-            results['proposals'].shape,
+            results['unsorted_proposals'].shape,
             (3, 4)
         )
 
@@ -407,27 +409,27 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
             rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
-        proposals = tf.placeholder(
+        proposals_unclipped = tf.placeholder(
             tf.float32, shape=(results_before['proposals_unclipped'].shape))
-        clip_bboxes_tf = clip_boxes(proposals, im_size)
+        clip_bboxes_tf = clip_boxes(proposals_unclipped, im_size)
 
         with self.test_session() as sess:
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results_before['proposals_unclipped'],
+                proposals_unclipped: results_before['proposals_unclipped'],
                 im_size: self.im_size
             })
 
         # Check we clip proposals right after filtering the invalid area ones.
         self.assertAllEqual(
-            results_before['proposals'],
+            results_before['unsorted_proposals'],
             clipped_proposals
         )
 
         # Checks all NMS proposals have values inside the image boundaries
-        nms_proposals = results_before['nms_proposals'][:, 1:]
-        self.assertTrue((nms_proposals >= 0).all())
+        proposals = results_before['proposals']
+        self.assertTrue((proposals >= 0).all())
         self.assertTrue(
-            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+            (proposals < np.array(self.im_size + self.im_size)).all()
         )
 
         # After NMS
@@ -436,27 +438,27 @@ class RPNProposalTest(tf.test.TestCase):
             all_anchors, rpn_cls_prob, config, gt_boxes=gt_boxes,
             rpn_bbox_pred=rpn_bbox_pred)
         im_size = tf.placeholder(tf.float32, shape=(2,))
-        proposals = tf.placeholder(
+        proposals_unclipped = tf.placeholder(
             tf.float32, shape=(results_after['proposals_unclipped'].shape))
-        clip_bboxes_tf = clip_boxes(proposals, im_size)
+        clip_bboxes_tf = clip_boxes(proposals_unclipped, im_size)
 
         with self.test_session() as sess:
             clipped_proposals = sess.run(clip_bboxes_tf, feed_dict={
-                proposals: results_after['proposals_unclipped'],
+                proposals_unclipped: results_after['proposals_unclipped'],
                 im_size: self.im_size
             })
 
         # Check we don't clip proposals in the beginning of the function.
         self.assertAllEqual(
-            results_after['proposals'],
+            results_after['unsorted_proposals'],
             results_after['proposals_unclipped']
         )
 
-        nms_proposals = results_after['nms_proposals'][:, 1:]
+        proposals = results_after['proposals']
         # Checks all NMS proposals have values inside the image boundaries
-        self.assertTrue((nms_proposals >= 0).all())
+        self.assertTrue((proposals >= 0).all())
         self.assertTrue(
-            (nms_proposals < np.array(self.im_size + self.im_size)).all()
+            (proposals < np.array(self.im_size + self.im_size)).all()
         )
 
     def testFilterOutsideAnchors(self):

@@ -11,8 +11,6 @@ class RCNNProposalTest(tf.test.TestCase):
         super(RCNNProposalTest, self).setUp()
 
         self._num_classes = 3
-        self._batch_number = 1
-
         self._image_shape = (900, 1440)
         self._config = EasyDict({
             'class_max_detections': 100,
@@ -53,7 +51,7 @@ class RCNNProposalTest(tf.test.TestCase):
 
         def bbox_encode(gt_boxes):
             return encode(
-                proposed_boxes[:, 1:], gt_boxes
+                proposed_boxes, gt_boxes
             )
         bbox_pred_tensor = tf.map_fn(
             bbox_encode, gt_boxes_per_class,
@@ -84,9 +82,9 @@ class RCNNProposalTest(tf.test.TestCase):
         """
 
         proposed_boxes = tf.constant([
-            (self._batch_number, 85, 500, 730, 590),
-            (self._batch_number, 50, 500, 70, 530),
-            (self._batch_number, 700, 570, 740, 598),
+            (85, 500, 730, 590),
+            (50, 500, 70, 530),
+            (700, 570, 740, 598),
         ])
         gt_boxes_per_class = tf.constant([
             [(101, 101, 201, 249)],
@@ -140,9 +138,9 @@ class RCNNProposalTest(tf.test.TestCase):
         # The first two boxes have a very high IoU between them. One of them
         # should be filtered by the NMS filter.
         proposed_boxes = tf.constant([
-            (self._batch_number, 85, 500, 730, 590),
-            (self._batch_number, 50, 500, 740, 570),
-            (self._batch_number, 700, 570, 740, 598),
+            (85, 500, 730, 590),
+            (50, 500, 740, 570),
+            (700, 570, 740, 598),
         ])
         gt_boxes_per_class = tf.constant([
             [(101, 101, 201, 249)],
@@ -177,9 +175,9 @@ class RCNNProposalTest(tf.test.TestCase):
         """
 
         proposed_boxes = tf.constant([
-            (self._batch_number, 1300, 800, 1435, 870),
-            (self._batch_number, 10, 1, 30, 7),
-            (self._batch_number, 2, 870, 80, 898),
+            (1300, 800, 1435, 870),
+            (10, 1, 30, 7),
+            (2, 870, 80, 898),
         ])
         gt_boxes_per_class = tf.constant([
             [(1320, 815, 1455, 912)],
@@ -225,9 +223,9 @@ class RCNNProposalTest(tf.test.TestCase):
         """
 
         proposed_boxes = tf.constant([
-            (self._batch_number, 200, 315, 400, 370),
-            (self._batch_number, 56, 0, 106, 4),
-            (self._batch_number, 15, 15, 20, 20),
+            (200, 315, 400, 370),
+            (56, 0, 106, 4),
+            (15, 15, 20, 20),
         ])
 
         gt_boxes_per_class = tf.constant([
@@ -279,15 +277,15 @@ class RCNNProposalTest(tf.test.TestCase):
         limits_model = RCNNProposal(limits_num_classes, limits_config)
 
         proposed_boxes = tf.constant([
-            (self._batch_number, 0, 0, 1, 1),  # class 0
-            (self._batch_number, 5, 5, 10, 10),  # class 1
-            (self._batch_number, 15, 15, 20, 20),  # class 1
-            (self._batch_number, 25, 25, 30, 30),  # class 0
-            (self._batch_number, 35, 35, 40, 40),
-            (self._batch_number, 38, 40, 65, 65),
-            (self._batch_number, 70, 50, 90, 90),  # class 0
-            (self._batch_number, 95, 95, 100, 100),
-            (self._batch_number, 105, 105, 110, 110),  # class 1
+            (0, 0, 1, 1),  # class 0
+            (5, 5, 10, 10),  # class 1
+            (15, 15, 20, 20),  # class 1
+            (25, 25, 30, 30),  # class 0
+            (35, 35, 40, 40),
+            (38, 40, 65, 65),
+            (70, 50, 90, 90),  # class 0
+            (95, 95, 100, 100),
+            (105, 105, 110, 110),  # class 1
         ])
         # All zeroes for our bbox_pred.
         bbox_pred = tf.constant([[0.] * limits_num_classes * 4] * 9)
