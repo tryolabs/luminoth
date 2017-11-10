@@ -47,8 +47,7 @@ class RCNNTarget(snt.AbstractModule):
         """
         Args:
             proposals: A Tensor with the RPN bounding boxes proposals.
-                The shape of the Tensor is (num_proposals, 5), where the first
-                of the 5 values for each proposal is the batch number.
+                The shape of the Tensor is (num_proposals, 4).
             gt_boxes: A Tensor with the ground truth boxes for the image.
                 The shape of the Tensor is (num_gt, 5), having the truth label
                 as the last value for each box.
@@ -62,12 +61,6 @@ class RCNNTarget(snt.AbstractModule):
                 other proposal we return zeros.
                 The shape of the Tensor is (num_proposals, 4).
         """
-        # TODO: revise casts to int64 in tf.sparse_to_dense and tf.scatter_nd
-        # calls.
-
-        # Remove batch id from proposals.
-        proposals = proposals[:, 1:]
-
         overlaps = bbox_overlap_tf(proposals, gt_boxes[:, :4])
         # overlaps now contains (num_proposals, num_gt_boxes) with the IoU of
         # proposal P and ground truth box G in overlaps[P, G]

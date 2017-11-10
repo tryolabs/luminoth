@@ -158,10 +158,7 @@ class RCNN(snt.AbstractModule):
                 'bbox_offsets': bbox_offsets_target,
             }
 
-        roi_prediction = self._roi_pool(
-            proposals, conv_feature_map,
-            im_shape
-        )
+        roi_prediction = self._roi_pool(proposals, conv_feature_map, im_shape)
 
         if self._debug:
             # Save raw roi prediction in debug mode.
@@ -224,10 +221,12 @@ class RCNN(snt.AbstractModule):
         # Calculate summaries for results
         variable_summaries(cls_prob, 'cls_prob', ['rcnn'])
         variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
-        variable_summaries(pooled_features, 'pooled_features', ['rcnn'])
 
-        layer_summaries(self._classifier_layer, ['rcnn'])
-        layer_summaries(self._bbox_layer, ['rcnn'])
+        if self._debug:
+            variable_summaries(pooled_features, 'pooled_features', ['rcnn'])
+
+            layer_summaries(self._classifier_layer, ['rcnn'])
+            layer_summaries(self._bbox_layer, ['rcnn'])
 
         return prediction_dict
 

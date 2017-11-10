@@ -15,7 +15,6 @@ class RCNNTargetTest(tf.test.TestCase):
         # these tests.
         self._num_classes = 5
         self._placeholder_label = 3.
-        self._batch_number = 1
 
         self._config = EasyDict({
             'foreground_threshold': 0.5,
@@ -41,7 +40,7 @@ class RCNNTargetTest(tf.test.TestCase):
             gt_boxes: a Tensor holding the ground truth boxes, with shape
                 (num_gt, 5). The last value is the class label.
             proposed_boxes: a Tensor holding the proposed boxes. Its shape is
-                (num_proposals, 5). The first value is the batch number.
+                (num_proposals, 4). The first value is the batch number.
 
         Returns:
             The tuple returned by RCNNTarget._build().
@@ -66,12 +65,12 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 55, 75, 85, 105),  # Background
-                                                        # IoU ~0.1293
-                (self._batch_number, 25, 21, 85, 105),  # Foreground
-                                                        # IoU ~0.7934
-                (self._batch_number, 78, 98, 99, 135),  # Ignored
-                                                        # IoU ~0.0015
+                (55, 75, 85, 105),  # Background
+                                    # IoU ~0.1293
+                (25, 21, 85, 105),  # Foreground
+                                    # IoU ~0.7934
+                (78, 98, 99, 135),  # Ignored
+                                    # IoU ~0.0015
             ],
             dtype=tf.float32
         )
@@ -107,10 +106,10 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 491, 70, 510, 92),  # IoU 0.0277
-                (self._batch_number, 400, 60, 450, 92),  # IoU 0.1147
-                (self._batch_number, 413, 40, 480, 77),  # IoU 0.4998: highest
-                (self._batch_number, 411, 40, 480, 77),  # IoU 0.4914
+                (491, 70, 510, 92),  # IoU 0.0277
+                (400, 60, 450, 92),  # IoU 0.1147
+                (413, 40, 480, 77),  # IoU 0.4998: highest
+                (411, 40, 480, 77),  # IoU 0.4914
             ],
             dtype=tf.float32
         )
@@ -145,9 +144,9 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 0, 0, 39, 89),
-                (self._batch_number, 101, 106, 300, 450),
-                (self._batch_number, 340, 199, 410, 420),
+                (0, 0, 39, 89),
+                (101, 106, 300, 450),
+                (340, 199, 410, 420),
             ],
             dtype=tf.float32
         )
@@ -185,15 +184,15 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 12, 70, 350, 540),  # noise
-                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-                (self._batch_number, 0, 0, 400, 400),  # noise
-                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-                (self._batch_number, 0, 0, 400, 400),  # noise
+                (12, 70, 350, 540),  # noise
+                (190, 310, 240, 370),  # IoU: 0.4763
+                (197, 300, 252, 389),  # IoU: 0.9015
+                (196, 300, 252, 389),  # IoU: 0.8859
+                (197, 303, 252, 394),  # IoU: 0.8459
+                (180, 310, 235, 370),  # IoU: 0.3747
+                (0, 0, 400, 400),  # noise
+                (197, 302, 252, 389),  # IoU: 0.8832
+                (0, 0, 400, 400),  # noise
             ],
             dtype=tf.float32
         )
@@ -248,17 +247,17 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 12, 70, 350, 540),  # noise
-                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-                (self._batch_number, 0, 0, 400, 400),  # noise
-                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-                (self._batch_number, 0, 0, 400, 400),  # noise
+                (12, 70, 350, 540),  # noise
+                (190, 310, 240, 370),  # IoU: 0.4763
+                (197, 300, 252, 389),  # IoU: 0.9015
+                (196, 300, 252, 389),  # IoU: 0.8859
+                (197, 303, 252, 394),  # IoU: 0.8459
+                (180, 310, 235, 370),  # IoU: 0.3747
+                (0, 0, 400, 400),  # noise
+                (197, 302, 252, 389),  # IoU: 0.8832
+                (180, 310, 235, 370),  # IoU: 0.3747
+                (180, 310, 235, 370),  # IoU: 0.3747
+                (0, 0, 400, 400),  # noise
             ],
             dtype=tf.float32
         )
@@ -316,15 +315,15 @@ class RCNNTargetTest(tf.test.TestCase):
 
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 12, 70, 350, 540),  # noise
-                (self._batch_number, 190, 310, 240, 370),  # IoU: 0.4763
-                (self._batch_number, 197, 300, 252, 389),  # IoU: 0.9015
-                (self._batch_number, 196, 300, 252, 389),  # IoU: 0.8859
-                (self._batch_number, 197, 303, 252, 394),  # IoU: 0.8459
-                (self._batch_number, 180, 310, 235, 370),  # IoU: 0.3747
-                (self._batch_number, 0, 0, 400, 400),  # noise
-                (self._batch_number, 197, 302, 252, 389),  # IoU: 0.8832
-                (self._batch_number, 0, 0, 400, 400),  # noise
+                (12, 70, 350, 540),  # noise
+                (190, 310, 240, 370),  # IoU: 0.4763
+                (197, 300, 252, 389),  # IoU: 0.9015
+                (196, 300, 252, 389),  # IoU: 0.8859
+                (197, 303, 252, 394),  # IoU: 0.8459
+                (180, 310, 235, 370),  # IoU: 0.3747
+                (0, 0, 400, 400),  # noise
+                (197, 302, 252, 389),  # IoU: 0.8832
+                (0, 0, 400, 400),  # noise
             ],
             dtype=tf.float32
         )
@@ -372,15 +371,15 @@ class RCNNTargetTest(tf.test.TestCase):
         )
         proposed_boxes = tf.constant(
             [
-                (self._batch_number, 12, 70, 350, 540),  # noise
-                (self._batch_number, 190, 310, 240, 370),  # 2
-                (self._batch_number, 197, 300, 252, 389),  # 1
-                (self._batch_number, 196, 300, 252, 389),  # 1
-                (self._batch_number, 197, 303, 252, 394),  # 1
-                (self._batch_number, 180, 310, 235, 370),  # 2
-                (self._batch_number, 0, 0, 400, 400),  # 0
-                (self._batch_number, 197, 302, 252, 389),  # 1
-                (self._batch_number, 0, 0, 400, 400),  # 0
+                (12, 70, 350, 540),  # noise
+                (190, 310, 240, 370),  # 2
+                (197, 300, 252, 389),  # 1
+                (196, 300, 252, 389),  # 1
+                (197, 303, 252, 394),  # 1
+                (180, 310, 235, 370),  # 2
+                (0, 0, 400, 400),  # 0
+                (197, 302, 252, 389),  # 1
+                (0, 0, 400, 400),  # 0
             ],
             dtype=tf.float32
         )
@@ -428,13 +427,10 @@ class RCNNTargetTest(tf.test.TestCase):
             proposed_boxes = generate_gt_boxes(
                 total_proposals, im_shape
             )
-            proposed_boxes_w_batch = np.concatenate(
-                [[[self._batch_number]] * total_proposals, proposed_boxes],
-                axis=1
-            ).astype(np.float32)
             # Run RCNNTarget.
             (proposals_label, _) = self._run_rcnn_target(
-                self._shared_model, gt_boxes_w_label, proposed_boxes_w_batch
+                self._shared_model, gt_boxes_w_label,
+                proposed_boxes.astype(np.float32)
             )
             # Assertion
             foreground_number = proposals_label[proposals_label > 0].shape[0]
@@ -455,8 +451,8 @@ class RCNNTargetTest(tf.test.TestCase):
             [10, 10, 20, 20, 0]
         ], dtype=tf.float32)
 
-        proposed_boxes_backgrounds = [[1, 21, 21, 30, 30]] * 100
-        proposed_boxes_foreground = [[1, 11, 11, 19, 19]] * 100
+        proposed_boxes_backgrounds = [[21, 21, 30, 30]] * 100
+        proposed_boxes_foreground = [[11, 11, 19, 19]] * 100
 
         proposed_boxes = tf.constant(
             proposed_boxes_backgrounds + proposed_boxes_foreground,
@@ -506,8 +502,8 @@ class RCNNTargetTest(tf.test.TestCase):
         # Both proposals have the first gt_box as the best match, but one of
         # them should be assigned to the label of the second gt_box anyway.
         proposed_boxes = tf.constant([
-            [self._batch_number, 10, 10, 20, 20],
-            [self._batch_number, 12, 10, 20, 20],
+            [10, 10, 20, 20],
+            [12, 10, 20, 20],
         ], dtype=tf.float32)
 
         (proposals_label, _) = self._run_rcnn_target(

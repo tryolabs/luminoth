@@ -42,7 +42,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         Args:
             roi_proposals: A Tensor with the bounding boxes of shape
                 (total_proposals, 5), where the values for each proposal are
-                (batch_num, x_min, y_min, x_max, y_max).
+                (x_min, y_min, x_max, y_max).
             im_shape: A Tensor with the shape of the image (height, width).
 
         Returns:
@@ -52,7 +52,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         with tf.name_scope('get_bboxes'):
             im_shape = tf.cast(im_shape, tf.float32)
 
-            _, x1, y1, x2, y2 = tf.unstack(
+            x1, y1, x2, y2 = tf.unstack(
                 roi_proposals, axis=1
             )
 

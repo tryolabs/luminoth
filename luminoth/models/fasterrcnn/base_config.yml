@@ -175,6 +175,8 @@ model:
       pre_nms_top_n: 12000
       # Total proposals to use after NMS (sorted by score)
       post_nms_top_n: 2000
+      # Option to apply NMS
+      apply_nms: True
       # NMS threshold used when removing "almost duplicates"
       nms_threshold: 0.6
       min_size: 0  # disable using 0
@@ -182,6 +184,8 @@ model:
       clip_after_nms: False
       # Filter proposals from anchors partially outside the image.
       filter_outside_anchors: False
+      # Minimum prob to be used as proposed object
+      min_prob_threshold: 0.0
 
     target:
       # Margin to crop proposals to close to the border

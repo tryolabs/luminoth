@@ -104,6 +104,8 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                         'min_size': 0,
                         'clip_after_nms': False,
                         'filter_outside_anchors': False,
+                        'apply_nms': True,
+                        'min_prob_threshold': 0.0,
                     },
                     'target': {
                         'allowed_border': 0,
@@ -210,10 +212,10 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             np.ones((rpn_prediction['rpn_cls_prob'].shape[0]))
         )
 
-        # Check that every rpn proposal has 4 coordinates + 1 batch index
+        # Check that every rpn proposal has 4 coordinates
         self.assertEqual(
             rpn_prediction['proposals'].shape[1],
-            5
+            4
         )
 
         # Check we get rpn proposals clipped to the image.
