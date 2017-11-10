@@ -47,7 +47,7 @@ class ObjectDetectionWriter(BaseWriter):
     def save(self):
         """
         """
-        tf.logging.info('Saving split {} in output_dir = {}'.format(
+        tf.logging.info('Saving split "{}" in output_dir = {}'.format(
             self._split, self._output_dir))
         if not tf.gfile.Exists(self._output_dir):
             tf.gfile.MakeDirs(self._output_dir)
@@ -70,12 +70,16 @@ class ObjectDetectionWriter(BaseWriter):
         if self._reader.yielded_records == 0:
             tf.logging.error('Data is missing. Removing record file.')
             tf.gfile.Remove(record_file)
+            return
         elif self._reader.errors > 0:
             tf.logging.warning(
-                'Failed on {} records. Saved {}.'.format(
+                'Failed on {} records.'.format(
                     self._reader.errors, self._reader.yielded_records
                 )
             )
+
+        tf.logging.info('Saved {} records to "{}"'.format(
+            self._reader.yielded_records, record_file))
 
     def _validate_record(self, record):
         """
