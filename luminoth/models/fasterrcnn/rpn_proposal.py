@@ -150,7 +150,9 @@ class RPNProposal(snt.AbstractModule):
                 # We cut the pre_nms filter in pure TF version and go straight
                 # into NMS.
                 selected_indices = tf.image.non_max_suppression(
-                    proposals_tf_order, tf.squeeze(sorted_top_scores),
+                    proposals_tf_order, tf.reshape(
+                        sorted_top_scores, [-1]
+                    ),
                     self._post_nms_top_n, iou_threshold=self._nms_threshold
                 )
 
