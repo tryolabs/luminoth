@@ -56,24 +56,6 @@ def get_learning_rate(train_config, global_step=None):
         **lr_config
     )
 
-    # if decay_method == 'piecewise_constant':
-    #     learning_rate = tf.train.piecewise_constant(
-    #         global_step, boundaries=[
-    #             tf.cast(train_config.learning_rate_decay, tf.int64), ],
-    #         values=[
-    #             train_config.initial_learning_rate,
-    #             train_config.initial_learning_rate * 0.1
-    #         ], name='learning_rate_piecewise_constant'
-    #     )
-
-    # elif decay_method == 'exponential_decay':
-    #     learning_rate = tf.train.exponential_decay(
-    #         learning_rate=train_config.initial_learning_rate,
-    #         global_step=global_step,
-    #         decay_steps=train_config.learning_rate_decay, decay_rate=0.96,
-    #         staircase=True, name='learning_rate_with_decay'
-    #     )
-
     tf.summary.scalar('losses/learning_rate', learning_rate)
 
     return learning_rate
