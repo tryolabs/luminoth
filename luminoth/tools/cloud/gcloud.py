@@ -168,7 +168,7 @@ def validate_region(region, project_id, credentials):
 @click.option('--service-account-json', required=True)
 @click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
-@click.option('--dataset', required=True, help='Bucket where the dataset is located.')  # noqa
+@click.option('--dataset', help='Bucket where the dataset is located.')  # noqa
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Path to config to use in training.')  # noqa
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
@@ -205,20 +205,17 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     base_path = 'lumi_{}'.format(job_id)
 
     package_path = build_package(bucket, base_path)
-
-    # Check if absolute or relative dataset path
-    if not dataset.startswith('gs://'):
-        dataset = 'gs://{}'.format(dataset)
-
-    args = []
-
-    args.extend([
-        '-o', 'dataset.dir={}'.format(dataset),
-    ])
+    job_dir = 'gs://{}/{}/'.format(bucket_name, base_path)
 
     override_params = [
-        'dataset.dir={}'.format(dataset),
+        'train.job_dir={}'.format(job_dir),
     ]
+
+    if dataset:
+        # Check if absolute or relative dataset path
+        if not dataset.startswith('gs://'):
+            dataset = 'gs://{}'.format(dataset)
+        override_params.append('dataset.dir={}'.format(dataset))
 
     custom_config = load_config(config_files)
     model_class = get_model(custom_config.model.type)
@@ -231,7 +228,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     config_path = os.path.join(base_path, DEFAULT_CONFIG_FILENAME)
     upload_data(bucket, config_path, dump_config(config))
 
-    args = ['--config', 'gs://{}/{}'.format(bucket_name, config_path)]
+    args = ['--config', os.path.join(job_dir, DEFAULT_CONFIG_FILENAME)]
 
     cloudml = cloud_service(credentials, 'ml')
 
@@ -243,7 +240,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         'pythonModule': 'luminoth.train',
         'args': args,
         'region': region,
-        'jobDir': 'gs://{}/{}/'.format(bucket_name, base_path),
+        'jobDir': job_dir,
         'runtimeVersion': RUNTIME_VERSION
     }
 
