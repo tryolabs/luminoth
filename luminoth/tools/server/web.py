@@ -32,22 +32,21 @@ def predict(model_name):
     if image_array is None:
         return jsonify(error='Missing image.')
 
+    config_files = app.config['config_files']
+
     if model_name in LOADED_MODELS:
-        image_tensor, prediction_dict, session = LOADED_MODELS[model_name]
+        image_tensor, fetches, session = LOADED_MODELS[model_name]
         pred = get_prediction(
-            model_name, image_array, app.config['config_files'],
-            session=session, prediction_dict=prediction_dict,
+            image_array, config_files, session=session, fetches=fetches,
             image_tensor=image_tensor
         )
-
     else:
-        pred = get_prediction(model_name, image_array,
-                              app.config['config_files'], return_tf_vars=True)
-        LOADED_MODELS[model_name] = (pred['image_tensor'],
-                                     pred['prediction_dict'],
-                                     pred['session'])
+        pred = get_prediction(image_array, config_files, return_tf_vars=True)
+        LOADED_MODELS[model_name] = (
+            pred['image_tensor'], pred['fetches'], pred['session']
+        )
 
-        del pred['image_tensor'], pred['prediction_dict'], pred['session']
+        del pred['image_tensor'], pred['fetches'], pred['session']
     return jsonify(pred)
 
 

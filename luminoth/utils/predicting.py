@@ -1,9 +1,10 @@
 import json
+import numpy as np
 import os
+import tensorflow as tf
 import time
 
-import numpy as np
-import tensorflow as tf
+from PIL import Image
 
 from luminoth.models import get_model
 from luminoth.utils.config import get_model_config, load_config
@@ -28,8 +29,57 @@ def resize_image(image, min_size, max_size):
     return image_array, upscale * downscale
 
 
-def get_prediction(model_type, image, config_files, session=None,
-                   pred_dict=None, image_tensor=None,
+def get_predictions(image_paths, config_files):
+    """
+    Get predictions for multiple images.
+
+    When predicting many images we don't want to load the checkpoint each time.
+    We load the checkpoint in the first iteration and then use the same
+    session and graph for subsequent images.
+    """
+    session = None
+    fetches = None
+    image_tensor = None
+
+    predictions = []
+
+    for image_path in image_paths:
+        with tf.gfile.Open(image_path, 'rb') as im_file:
+            try:
+                image = Image.open(im_file)
+            except tf.errors.OutOfRangeError as e:
+                predictions.append({
+                    'error': '{}'.format(e),
+                    'image_path': image_path,
+                })
+                continue
+
+        preds = get_prediction(
+            image, config_files, return_tf_vars=True,
+            session=session, fetches=fetches,
+            image_tensor=image_tensor
+        )
+
+        if session is None:
+            # After first loop
+            session = preds['session']
+            fetches = preds['fetches']
+            image_tensor = preds['image_tensor']
+
+        predictions.append({
+            'objects': preds['objects'],
+            'objects_labels': preds['objects_labels'],
+            'objects_labels_prob': preds['objects_labels_prob'],
+            'inference_time': preds['inference_time'],
+            'scale_factor': preds['scale_factor'],
+            'image_path': image_path,
+        })
+
+    return predictions
+
+
+def get_prediction(image, config_files, session=None,
+                   fetches=None, image_tensor=None,
                    return_tf_vars=False):
     """
     Gets the prediction given by the model `model_type` of the image `image`.
@@ -40,13 +90,13 @@ def get_prediction(model_type, image, config_files, session=None,
     True, returns the image tensor, the entire prediction of the model and
     the sesssion.
     """
-    model_class = get_model(model_type)
     custom_config = load_config(config_files)
+    model_class = get_model(custom_config.model.type)
     config = get_model_config(
         model_class.base_config, custom_config, None
     )
 
-    if session is None or pred_dict is None or image_tensor is None:
+    if session is None and fetches is None and image_tensor is None:
         graph = tf.Graph()
         session = tf.Session(graph=graph)
 
@@ -56,19 +106,20 @@ def get_prediction(model_type, image, config_files, session=None,
             pred_dict = model(image_tensor)
 
             # Restore checkpoint
-            if config.train.job_dir and config.train.run_name:
-                ckpt = tf.train.get_checkpoint_state(os.path.join(
-                    config.train.job_dir, config.train.run_name))
+            if config.train.job_dir:
+                ckpt = tf.train.get_checkpoint_state(config.train.job_dir)
                 if not ckpt or not ckpt.all_model_checkpoint_paths:
                     raise ValueError('Could not find checkpoint in {}.'.format(
                         config.train.job_dir
                     ))
                 ckpt = ckpt.all_model_checkpoint_paths[-1]
-                ckpt_dir = os.path.join('.', ckpt)
                 saver = tf.train.Saver(sharded=True, allow_empty=True)
-                saver.restore(session, ckpt_dir)
-            # A prediction without checkpoint is just used for testing
+                saver.restore(session, ckpt)
+                tf.logging.info('Loaded checkpoint.')
             else:
+                # A prediction without checkpoint is just used for testing
+                tf.logging.warning(
+                    'Could not load checkpoint. Using initialized model.')
                 init_op = tf.group(
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()
@@ -89,6 +140,17 @@ def get_prediction(model_type, image, config_files, session=None,
                     tf.shape(objects_labels_prob_tf), dtype=tf.int32
                 )
 
+            fetches = {
+                'objects': objects_tf,
+                'labels': objects_labels_tf,
+                'probs': objects_labels_prob_tf,
+            }
+    elif session is None or fetches is None or image_tensor is None:
+        raise ValueError(
+            'Either all `session`, `fetches` and `image_tensor` are None, '
+            'or neither of them are.'
+        )
+
     image_resize_config = model_class.base_config.dataset.image_preprocessing
 
     image_array, scale_factor = resize_image(
@@ -97,21 +159,23 @@ def get_prediction(model_type, image, config_files, session=None,
     )
 
     start_time = time.time()
-    objects, objects_labels, objects_labels_prob = session.run([
-        objects_tf, objects_labels_tf, objects_labels_prob_tf
-    ], feed_dict={
+    fetched = session.run(fetches, feed_dict={
         image_tensor: image_array
     })
     end_time = time.time()
 
+    objects = fetched['objects']
+    objects_labels = fetched['labels']
+    objects_labels_prob = fetched['probs']
+
+    objects_labels = objects_labels.tolist()
+
     if config.dataset.dir:
         # Gets the names of the classes
         classes_file = os.path.join(config.dataset.dir, 'classes.json')
-        class_labels = json.load(tf.gfile.GFile(classes_file))
-        objects_labels = [class_labels[obj] for obj in objects_labels]
-
-    else:
-        objects_labels = objects_labels.tolist()
+        if tf.gfile.Exists(classes_file):
+            class_labels = json.load(tf.gfile.GFile(classes_file))
+            objects_labels = [class_labels[obj] for obj in objects_labels]
 
     res = {
         'objects': objects.tolist(),
@@ -123,7 +187,7 @@ def get_prediction(model_type, image, config_files, session=None,
 
     if return_tf_vars:
         res['image_tensor'] = image_tensor
-        res['prediction_dict'] = pred_dict
+        res['fetches'] = fetches
         res['session'] = session
 
     return res
