@@ -6,7 +6,6 @@ from luminoth.models.fasterrcnn.rcnn import RCNN
 from luminoth.models.fasterrcnn.rpn import RPN
 from luminoth.models.base import TruncatedBaseNetwork
 from luminoth.utils.anchors import generate_anchors_reference
-from luminoth.utils.config import get_base_config
 from luminoth.utils.vars import variable_summaries, get_saver
 
 
@@ -20,9 +19,6 @@ class FasterRCNN(snt.AbstractModule):
     It is also responsible for building the anchor reference which is used in
     graph for generating the dynamic anchors.
     """
-
-    base_config = get_base_config(__file__)
-
     def __init__(self, config, name='fasterrcnn'):
         super(FasterRCNN, self).__init__(name=name)
 
@@ -77,7 +73,7 @@ class FasterRCNN(snt.AbstractModule):
 
         Args:
             image: A tensor with the image.
-                Its shape should be `(1, height, width, 3)`.
+                Its shape should be `(height, width, 3)`.
             gt_boxes: A tensor with all the ground truth boxes of that image.
                 Its shape should be `(num_gt_boxes, 5)`
                 Where for each gt box we have (x1, y1, x2, y2, label),
@@ -97,7 +93,14 @@ class FasterRCNN(snt.AbstractModule):
         # A Tensor with the feature map for the image,
         # its shape should be `(feature_height, feature_width, 512)`.
         # The shape depends of the pretrained network in use.
-        conv_feature_map = self.base_network(image, is_training=is_training)
+
+        # Set rank and last dimension before using base network
+        # TODO: Why does it loose information when using queue?
+        image.set_shape((None, None, 3))
+
+        conv_feature_map = self.base_network(
+            tf.expand_dims(image, 0), is_training=is_training
+        )
 
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(
@@ -112,7 +115,7 @@ class FasterRCNN(snt.AbstractModule):
                 debug=self._debug, seed=self._seed
             )
 
-        image_shape = tf.shape(image)[1:3]
+        image_shape = tf.shape(image)[0:2]
 
         variable_summaries(
             conv_feature_map, 'conv_feature_map', ['rpn'])

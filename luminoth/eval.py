@@ -7,7 +7,7 @@ import time
 from luminoth.datasets import get_dataset
 from luminoth.models import get_model
 from luminoth.utils.bbox_overlap import bbox_overlap
-from luminoth.utils.config import get_model_config, load_config
+from luminoth.utils.config import get_config
 from luminoth.utils.image_vis import image_vis_summaries
 
 
@@ -24,19 +24,12 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     """
     Evaluate models using dataset.
     """
-    custom_config = load_config(config_files)
     # If the config file is empty, our config will be the base_config for the
     # default model.
     try:
-        model_type = custom_config['model']['type']
+        config = get_config(config_files, override_params=override_params)
     except KeyError:
         raise KeyError('model.type should be set on the custom config.')
-
-    model_class = get_model(model_type)
-
-    config = get_model_config(
-        model_class.base_config, custom_config, override_params,
-    )
 
     config.train.job_dir = job_dir or config.train.job_dir
 
@@ -64,6 +57,7 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     # Set pretrained as not training
     config.model.base_network.trainable = False
 
+    model_class = get_model(config.model.type)
     model = model_class(config)
     dataset_class = get_dataset(config.dataset.type)
     dataset = dataset_class(config)
@@ -72,13 +66,6 @@ def evaluate(dataset_split, config_files, job_dir, watch,
     train_image = train_dataset['image']
     train_objects = train_dataset['bboxes']
     train_filename = train_dataset['filename']
-
-    # TODO: This is not the best place to configure rank? Why is rank not
-    # transmitted through the queue
-    train_image.set_shape((None, None, 3))
-    # We add fake batch dimension to train data. TODO: DEFINITELY NOT THE BEST
-    # PLACE
-    train_image = tf.expand_dims(train_image, 0)
 
     # Build the graph of the model to evaluate, retrieving required
     # intermediate tensors.

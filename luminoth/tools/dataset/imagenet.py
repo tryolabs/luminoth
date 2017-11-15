@@ -7,7 +7,9 @@ from PIL import Image
 from luminoth.utils.dataset import (
     read_xml, read_image, to_int64, to_string, to_bytes
 )
-from .dataset import DatasetTool, InvalidDataDirectory
+from luminoth.datasets.exceptions import InvalidDataDirectory
+
+from .dataset import DatasetTool
 
 WNIDS_FILE = 'imagenet_wnids.json'
 

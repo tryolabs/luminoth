@@ -2,9 +2,8 @@
 import tensorflow as tf
 
 from easydict import EasyDict
-# from PIL import Image
 from luminoth.models import get_model
-# from luminoth.tools.server.web import get_prediction
+from luminoth.utils.config import get_base_config
 
 
 class WebTest(tf.test.TestCase):
@@ -14,7 +13,8 @@ class WebTest(tf.test.TestCase):
     def setUp(self):
         tf.reset_default_graph()
         model_class = get_model('fasterrcnn')
-        image_resize = model_class.base_config.dataset.image_preprocessing
+        base_config = get_base_config(model_class)
+        image_resize = base_config.dataset.image_preprocessing
         self.config = EasyDict({
             'image_resize_min': image_resize.min_size,
             'image_resize_max': image_resize.max_size

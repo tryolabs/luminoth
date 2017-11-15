@@ -4,7 +4,7 @@ train:
   debug: True
 
 dataset:
-  type: tfrecord
+  type: object_detection
   # From which directory to read the dataset
   dir: datasets/voc/tf
 

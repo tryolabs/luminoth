@@ -1,18 +1,34 @@
+import inspect
 import os.path
 import tensorflow as tf
 import yaml
 
 from easydict import EasyDict
 
+from luminoth.models import get_model
+
+
 REPLACE_KEY = '_replace'
 
 
-def load_config(filenames, warn_overwrite=True):
+def get_config(config_files, override_params=None):
+    custom_config = load_config_files(config_files)
+    model_class = get_model(custom_config['model']['type'])
+    model_base_config = get_base_config(model_class)
+    config = get_model_config(
+        model_base_config, custom_config, override_params
+    )
+
+    return config
+
+
+def load_config_files(filenames, warn_overwrite=True):
     if len(filenames) <= 0:
         tf.logging.error("Tried to load 0 config files.")
     config = EasyDict({})
     for filename in filenames:
-        new_config = EasyDict(yaml.load(tf.gfile.GFile(filename)))
+        with tf.gfile.GFile(filename) as f:
+            new_config = EasyDict(yaml.load(f))
         config = merge_into(
             new_config,
             config, overwrite=True, warn_overwrite=warn_overwrite
@@ -21,10 +37,12 @@ def load_config(filenames, warn_overwrite=True):
 
 
 def to_dict(config):
-    return {
-        k: (to_dict(v) if type(v) is EasyDict else v)
-        for k, v in config.items()
-    }
+    if type(config) is list:
+        return [to_dict(c) for c in config]
+    elif type(config) is EasyDict:
+        return dict([(k, to_dict(v)) for k, v in config.items()])
+    else:
+        return config
 
 
 def dump_config(config):
@@ -32,9 +50,10 @@ def dump_config(config):
     return yaml.dump(config, default_flow_style=False)
 
 
-def get_base_config(path, base_config_filename='base_config.yml'):
+def get_base_config(model_class, base_config_filename='base_config.yml'):
+    path = inspect.getfile(model_class)
     config_path = os.path.join(os.path.dirname(path), base_config_filename)
-    return load_config([config_path])
+    return load_config_files([config_path])
 
 
 def is_basestring(value):
