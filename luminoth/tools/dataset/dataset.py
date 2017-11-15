@@ -6,12 +6,6 @@ import random
 import tensorflow as tf
 
 
-class InvalidDataDirectory(Exception):
-    """
-    Error raised when the chosen intput directory for the dataset is not valid.
-    """
-
-
 class DatasetTool(object):
 
     VALID_SPLITS = ['train', 'val', 'test']

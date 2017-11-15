@@ -15,8 +15,7 @@ from google.cloud import storage
 from googleapiclient.errors import HttpError
 from oauth2client import service_account
 
-from luminoth.models import get_model
-from luminoth.utils.config import get_model_config, load_config, dump_config
+from luminoth.utils.config import get_config, dump_config
 from luminoth.utils.experiments import save_run
 
 
@@ -217,11 +216,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
             dataset = 'gs://{}'.format(dataset)
         override_params.append('dataset.dir={}'.format(dataset))
 
-    custom_config = load_config(config_files)
-    model_class = get_model(custom_config.model.type)
-    config = get_model_config(
-        model_class.base_config, custom_config, override_params,
-    )
+    config = get_config(config_files, override_params=override_params)
     # We should validate config before submitting job
 
     # Update final config file to job bucket

@@ -7,26 +7,8 @@ import time
 from PIL import Image
 
 from luminoth.models import get_model
-from luminoth.utils.config import get_model_config, load_config
-
-
-def resize_image(image, min_size, max_size):
-    """
-    Resizes `image` if it's necesary
-    """
-    min_dimension = min(image.height, image.width)
-    upscale = max(min_size / min_dimension, 1.)
-
-    max_dimension = max(image.height, image.width)
-    downscale = min(max_size / max_dimension, 1.)
-
-    new_width = int(upscale * downscale * image.width)
-    new_height = int(upscale * downscale * image.height)
-
-    image = image.resize((new_width, new_height))
-    image_array = np.array(image)[:, :, :3]  # TODO Read RGB
-    image_array = np.expand_dims(image_array, axis=0)
-    return image_array, upscale * downscale
+from luminoth.datasets import get_dataset
+from luminoth.utils.config import get_config
 
 
 def get_predictions(image_paths, config_files):
@@ -37,6 +19,17 @@ def get_predictions(image_paths, config_files):
     We load the checkpoint in the first iteration and then use the same
     session and graph for subsequent images.
     """
+    config = get_config(config_files)
+
+    # Don't use data augmentation in predictions
+    config.dataset.data_augmentation = None
+
+    if config.dataset.dir:
+        # Gets the names of the classes
+        classes_file = os.path.join(config.dataset.dir, 'classes.json')
+        if tf.gfile.Exists(classes_file):
+            class_labels = json.load(tf.gfile.GFile(classes_file))
+
     session = None
     fetches = None
     image_tensor = None
@@ -55,9 +48,10 @@ def get_predictions(image_paths, config_files):
                 continue
 
         preds = get_prediction(
-            image, config_files, return_tf_vars=True,
+            image, config,
             session=session, fetches=fetches,
-            image_tensor=image_tensor
+            image_tensor=image_tensor, class_labels=class_labels,
+            return_tf_vars=True
         )
 
         if session is None:
@@ -71,15 +65,14 @@ def get_predictions(image_paths, config_files):
             'objects_labels': preds['objects_labels'],
             'objects_labels_prob': preds['objects_labels_prob'],
             'inference_time': preds['inference_time'],
-            'scale_factor': preds['scale_factor'],
             'image_path': image_path,
         })
 
     return predictions
 
 
-def get_prediction(image, config_files, session=None,
-                   fetches=None, image_tensor=None,
+def get_prediction(image, config, session=None,
+                   fetches=None, image_tensor=None, class_labels=None,
                    return_tf_vars=False):
     """
     Gets the prediction given by the model `model_type` of the image `image`.
@@ -90,20 +83,20 @@ def get_prediction(image, config_files, session=None,
     True, returns the image tensor, the entire prediction of the model and
     the sesssion.
     """
-    custom_config = load_config(config_files)
-    model_class = get_model(custom_config.model.type)
-    config = get_model_config(
-        model_class.base_config, custom_config, None
-    )
 
     if session is None and fetches is None and image_tensor is None:
+        dataset_class = get_dataset(config.dataset.type)
+        model_class = get_model(config.model.type)
+        dataset = dataset_class(config)
+        model = model_class(config)
+
         graph = tf.Graph()
         session = tf.Session(graph=graph)
 
         with graph.as_default():
-            image_tensor = tf.placeholder(tf.float32, (1, None, None, 3))
-            model = model_class(model_class.base_config)
-            pred_dict = model(image_tensor)
+            image_tensor = tf.placeholder(tf.float32, (None, None, 3))
+            image_tf, _, process_meta = dataset.preprocess(image_tensor)
+            pred_dict = model(image_tf)
 
             # Restore checkpoint
             if config.train.job_dir:
@@ -144,45 +137,41 @@ def get_prediction(image, config_files, session=None,
                 'objects': objects_tf,
                 'labels': objects_labels_tf,
                 'probs': objects_labels_prob_tf,
+                'scale_factor': process_meta['scale_factor']
             }
+
     elif session is None or fetches is None or image_tensor is None:
         raise ValueError(
             'Either all `session`, `fetches` and `image_tensor` are None, '
             'or neither of them are.'
         )
 
-    image_resize_config = model_class.base_config.dataset.image_preprocessing
-
-    image_array, scale_factor = resize_image(
-        image, float(image_resize_config.min_size),
-        float(image_resize_config.max_size)
-    )
-
     start_time = time.time()
     fetched = session.run(fetches, feed_dict={
-        image_tensor: image_array
+        image_tensor: np.array(image)
     })
     end_time = time.time()
+
+    tf.logging.debug('Fetched in {:.4f}s'.format(end_time - start_time))
 
     objects = fetched['objects']
     objects_labels = fetched['labels']
     objects_labels_prob = fetched['probs']
+    scale_factor = fetched['scale_factor']
 
     objects_labels = objects_labels.tolist()
 
-    if config.dataset.dir:
-        # Gets the names of the classes
-        classes_file = os.path.join(config.dataset.dir, 'classes.json')
-        if tf.gfile.Exists(classes_file):
-            class_labels = json.load(tf.gfile.GFile(classes_file))
-            objects_labels = [class_labels[obj] for obj in objects_labels]
+    if class_labels is not None:
+        objects_labels = [class_labels[obj] for obj in objects_labels]
+
+    # Scale objects to origina image dimensions
+    objects /= scale_factor
 
     res = {
         'objects': objects.tolist(),
         'objects_labels': objects_labels,
         'objects_labels_prob': objects_labels_prob.tolist(),
         'inference_time': end_time - start_time,
-        'scale_factor': scale_factor,
     }
 
     if return_tf_vars:

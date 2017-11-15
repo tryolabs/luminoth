@@ -2,7 +2,9 @@ import sys
 import click
 import tensorflow as tf
 
-from .dataset import RecordSaver, InvalidDataDirectory
+from luminoth.datasets.exceptions import InvalidDataDirectory
+
+from .dataset import RecordSaver
 from .imagenet import ImageNet
 from .pascalvoc import PascalVOC
 

@@ -8,21 +8,18 @@ import time
 from tensorflow.python import debug as tf_debug
 
 from luminoth.datasets import get_dataset
+from luminoth.datasets.exceptions import InvalidDataDirectory
 from luminoth.models import get_model
-from luminoth.tools.dataset import InvalidDataDirectory
-from luminoth.utils.config import get_model_config, load_config
+from luminoth.utils.config import get_config
 from luminoth.utils.hooks import ImageVisHook
 from luminoth.utils.training import get_optimizer, clip_gradients_by_norm
 from luminoth.utils.experiments import save_run
 
 
-def run(custom_config, model_type, override_params, target='',
-        cluster_spec=None, is_chief=True, job_name=None, task_index=None,
-        get_model_fn=get_model, get_dataset_fn=get_dataset, environment=None):
-    model_class = get_model_fn(model_type)
-    config = get_model_config(
-        model_class.base_config, custom_config, override_params,
-    )
+def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
+        task_index=None, get_model_fn=get_model, get_dataset_fn=get_dataset,
+        environment=None):
+    model_class = get_model_fn(config.model.type)
 
     image_vis = config.train.get('image_vis')
 
@@ -64,13 +61,6 @@ def run(custom_config, model_type, override_params, target='',
         train_image = train_dataset['image']
         train_filename = train_dataset['filename']
         train_bboxes = train_dataset['bboxes']
-
-        # TODO: This is not the best place to configure rank? Why is rank not
-        # transmitted through the queue
-        train_image.set_shape((None, None, 3))
-        # We add fake batch dimension to train data.
-        # TODO: DEFINITELY NOT THE BEST PLACE
-        train_image = tf.expand_dims(train_image, 0)
 
         prediction_dict = model(train_image, train_bboxes, is_training=True)
         total_loss = model.loss(prediction_dict)
@@ -244,10 +234,8 @@ def train(config_files, job_dir, override_params):
     environment = tf_config.get('environment', 'local')
 
     # Get the user config and the model type from it.
-    custom_config = load_config(config_files)
-
     try:
-        model_type = custom_config['model']['type']
+        config = get_config(config_files, override_params=override_params)
     except KeyError:
         # Without mode type defined we can't use the default config settings.
         raise KeyError('model.type should be set on the custom config.')
@@ -258,8 +246,7 @@ def train(config_files, job_dir, override_params):
     # If cluster information is empty or TF_CONFIG is not available, run local
     if job_name is None or task_index is None:
         return run(
-            custom_config, model_type, override_params,
-            environment=environment
+            config, environment=environment
         )
 
     cluster_spec = tf.train.ClusterSpec(cluster)
@@ -275,8 +262,7 @@ def train(config_files, job_dir, override_params):
     elif job_name in ['master', 'worker']:
         is_chief = job_name == 'master'
         return run(
-            custom_config, model_type, override_params=override_params,
-            target=server.target, cluster_spec=cluster_spec,
+            config, target=server.target, cluster_spec=cluster_spec,
             is_chief=is_chief, job_name=job_name, task_index=task_index,
             environment=environment
         )

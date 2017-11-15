@@ -121,7 +121,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         })
 
         self.image_size = (600, 800)
-        self.image = np.random.randint(low=0, high=255, size=(1, 600, 800, 3))
+        self.image = np.random.randint(low=0, high=255, size=(600, 800, 3))
         self.gt_boxes = np.array([
             [10, 10, 26, 28, 1],
             [10, 10, 20, 22, 1],

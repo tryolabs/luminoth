@@ -67,7 +67,6 @@ def predict(image_path, config_files, output_dir, save, min_prob, debug):
             # Draw bounding boxes
             draw = ImageDraw.Draw(image)
 
-            scale = res['scale_factor']
             objects = res['objects']
             labels = res['objects_labels']
             probs = res['objects_labels_prob']
@@ -77,7 +76,6 @@ def predict(image_path, config_files, output_dir, save, min_prob, debug):
                 if prob < min_prob:
                     continue
 
-                bbox = [i / scale for i in bbox]
                 draw.rectangle(bbox, outline='red')
                 label = str(label)
                 prob = '{:.2f}'.format(prob)
