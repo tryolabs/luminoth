@@ -45,7 +45,7 @@ class TrainTest(tf.test.TestCase):
         self.config = EasyDict({
             'model_type': 'fasterrcnn',
             'dataset_type': '',
-            'config_files': [],
+            'config_files': (),
             'override_params': [],
             'base_network': {
                 'download': False

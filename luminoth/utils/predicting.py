@@ -29,6 +29,8 @@ def get_predictions(image_paths, config_files):
         classes_file = os.path.join(config.dataset.dir, 'classes.json')
         if tf.gfile.Exists(classes_file):
             class_labels = json.load(tf.gfile.GFile(classes_file))
+        else:
+            class_labels = None
 
     session = None
     fetches = None
