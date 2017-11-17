@@ -23,10 +23,11 @@ def get_config(config_files, override_params=None):
 
 
 def load_config_files(filename_or_filenames, warn_overwrite=True):
-    if not isinstance(filename_or_filenames, list):
-        filenames = [filename_or_filenames]
-    else:
+    if (isinstance(filename_or_filenames, list) or
+       isinstance(filename_or_filenames, tuple)):
         filenames = filename_or_filenames
+    else:
+        filenames = [filename_or_filenames]
 
     if len(filenames) <= 0:
         tf.logging.error("Tried to load 0 config files.")
