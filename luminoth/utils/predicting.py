@@ -34,17 +34,15 @@ def get_predictions(image_paths, config_files):
     fetches = None
     image_tensor = None
 
-    predictions = []
-
     for image_path in image_paths:
         with tf.gfile.Open(image_path, 'rb') as im_file:
             try:
                 image = Image.open(im_file)
             except tf.errors.OutOfRangeError as e:
-                predictions.append({
+                yield {
                     'error': '{}'.format(e),
                     'image_path': image_path,
-                })
+                }
                 continue
 
         preds = get_prediction(
@@ -60,15 +58,13 @@ def get_predictions(image_paths, config_files):
             fetches = preds['fetches']
             image_tensor = preds['image_tensor']
 
-        predictions.append({
+        yield {
             'objects': preds['objects'],
             'objects_labels': preds['objects_labels'],
             'objects_labels_prob': preds['objects_labels_prob'],
             'inference_time': preds['inference_time'],
             'image_path': image_path,
-        })
-
-    return predictions
+        }
 
 
 def get_prediction(image, config, session=None,
@@ -151,8 +147,6 @@ def get_prediction(image, config, session=None,
         image_tensor: np.array(image)
     })
     end_time = time.time()
-
-    tf.logging.debug('Fetched in {:.4f}s'.format(end_time - start_time))
 
     objects = fetched['objects']
     objects_labels = fetched['labels']

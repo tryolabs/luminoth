@@ -14,32 +14,49 @@ def is_image(filename):
 
 
 @click.command(help='Obtain a model\'s predictions on an image or directory of images.')  # noqa
-@click.argument('image-path')
+@click.argument('path-or-dir')
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
 @click.option('--output-dir', help='Where to write output')
 @click.option('--save/--no-save', default=False, help='Save the image with the prediction of the model')  # noqa
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def predict(image_path, config_files, output_dir, save, min_prob, debug):
+def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
     multiple = False
-    if tf.gfile.IsDirectory(image_path):
+    if tf.gfile.IsDirectory(path_or_dir):
         image_paths = [
-            os.path.join(image_path, f)
-            for f in tf.gfile.ListDirectory(image_path)
+            os.path.join(path_or_dir, f)
+            for f in tf.gfile.ListDirectory(path_or_dir)
             if is_image(f)
         ]
         multiple = True
     else:
-        image_paths = [image_path]
+        image_paths = [path_or_dir]
 
-    results = get_predictions(image_paths, config_files)
-    errors = [r for r in results if r.get('error') is not None]
-    results = [r for r in results if r.get('error') is None]
+    total_images = len(image_paths)
+    results = []
+    errors = []
+
+    tf.logging.info('Getting predictions for {} files.'.format(total_images))
+
+    prediction_iter = get_predictions(image_paths, config_files)
+    if multiple:
+        with click.progressbar(prediction_iter, length=total_images) as preds:
+            for prediction in preds:
+                if prediction.get('error') is None:
+                    results.append(prediction)
+                else:
+                    errors.append(prediction)
+    else:
+        for prediction in prediction_iter:
+            if prediction.get('error') is None:
+                results.append(prediction)
+            else:
+                errors.append(prediction)
 
     if multiple:
         tf.logging.info('{} images with predictions'.format(len(results)))
@@ -50,12 +67,22 @@ def predict(image_path, config_files, output_dir, save, min_prob, debug):
     if len(errors):
         tf.logging.warning('{} errors.'.format(len(errors)))
 
+    dir_log = output_dir if output_dir else 'current directory'
+    if save:
+        tf.logging.info(
+            'Saving results and images with bounding boxes drawn in {}'.format(
+                dir_log))
+    else:
+        tf.logging.info('Saving results in {}'.format(dir_log))
+
+    if output_dir:
+        # Create dir if it doesn't exists
+        tf.gfile.MakeDirs(output_dir)
+
     for res in results:
         image_path = res['image_path']
         save_path = 'pred_' + os.path.basename(image_path)
         if output_dir:
-            # Create dir if it doesn't exists
-            tf.gfile.MakeDirs(output_dir)
             save_path = os.path.join(output_dir, save_path)
 
         with open(save_path + '.json', 'w') as outfile:
@@ -82,6 +109,4 @@ def predict(image_path, config_files, output_dir, save, min_prob, debug):
                 draw.text(bbox[:2], '{} - {}'.format(label, prob))
 
             # Save the image
-            tf.logging.info(
-                'Saving image with bounding boxes in {}'.format(save_path))
             image.save(save_path)
