@@ -1,4 +1,5 @@
 from luminoth.cli import cli  # noqa
+from luminoth.utils.predicting import get_predictions  # noqa
 
 __version__ = '0.0.2.dev0'
 

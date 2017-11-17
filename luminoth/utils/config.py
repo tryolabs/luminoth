@@ -22,9 +22,15 @@ def get_config(config_files, override_params=None):
     return config
 
 
-def load_config_files(filenames, warn_overwrite=True):
+def load_config_files(filename_or_filenames, warn_overwrite=True):
+    if not isinstance(filename_or_filenames, list):
+        filenames = [filename_or_filenames]
+    else:
+        filenames = filename_or_filenames
+
     if len(filenames) <= 0:
         tf.logging.error("Tried to load 0 config files.")
+
     config = EasyDict({})
     for filename in filenames:
         with tf.gfile.GFile(filename) as f:
