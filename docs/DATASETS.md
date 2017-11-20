@@ -11,7 +11,7 @@ For this purpose, Luminoth provides the `lumi dataset transform` command, which 
 - [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html)
 
 ```
-$ lumi dataset transform --type pascalvoc --data-dir ~/dataset/pascalvoc/ --output-dir ~/dataset/pascalvoc/tf/
+$ lumi dataset transform --type pascal --data-dir ~/dataset/pascal/ --output-dir ~/dataset/pascal/tf/
 ```
 
 - [ImageNet](http://image-net.org/download)
