@@ -38,6 +38,13 @@ def predict(model_name):
     if image_array is None:
         return jsonify(error='Missing image.')
 
+    total = request.args.get('total')
+    if total is not None:
+        try:
+            total = int(total)
+        except ValueError:
+            total = None
+
     config = app.config['config']
     class_labels = app.config.get('class_labels')
 
@@ -45,11 +52,11 @@ def predict(model_name):
         image_tensor, fetches, session = LOADED_MODELS[model_name]
         pred = get_prediction(
             image_array, config, session=session, fetches=fetches,
-            image_tensor=image_tensor, class_labels=class_labels
+            image_tensor=image_tensor, class_labels=class_labels, total=total
         )
     else:
         pred = get_prediction(
-            image_array, config, class_labels=class_labels,
+            image_array, config, class_labels=class_labels, total=total,
             return_tf_vars=True
         )
         LOADED_MODELS[model_name] = (
@@ -62,7 +69,13 @@ def predict(model_name):
 
 @click.command(help='Start basic web application.')
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
-def web(config_files):
+@click.option('--debug', is_flag=True, help='Set debug level logging.')
+def web(config_files, debug):
+    if debug:
+        tf.logging.set_verbosity(tf.logging.DEBUG)
+    else:
+        tf.logging.set_verbosity(tf.logging.INFO)
+
     config = get_config(config_files)
     app.config['config'] = config
     if config.dataset.dir:
@@ -72,4 +85,4 @@ def web(config_files):
             app.config['class_labels'] = json.load(
                 tf.gfile.GFile(classes_file))
 
-    app.run(debug=True)
+    app.run(debug=debug)

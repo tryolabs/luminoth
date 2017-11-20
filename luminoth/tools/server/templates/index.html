@@ -56,33 +56,33 @@
         ctx.strokeRect(this.x, this.y, this.w, this.h);
       }
 
-      function drawCanvas(canvas, imageFile, objects, scaleFactor) {
+      function drawCanvas(canvas, imageFile, objects) {
         ctx = canvas.getContext('2d');
 
         image = new Image();
         image.src = URL.createObjectURL(imageFile);
         image.onload = function () {
 
-          var imageWidth = image.width * scaleFactor;
-          var imageHeight = image.height * scaleFactor
+          var imageWidth = image.width;
+          var imageHeight = image.height
 
           ctx.canvas.width  = imageWidth;
           ctx.canvas.height = imageHeight;
 
           ctx.drawImage(
             image, 0,0,
-            image.width * scaleFactor,
-            image.height * scaleFactor
+            image.width,
+            image.height
           );
 
           for (var i = 0; i < objects.length; i++) {
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            ctx.fillStyle = 'rgba(20, 220, 20, 0.15)';
             var x = objects[i][0]
             var y = objects[i][1];
             var width = objects[i][2] - objects[i][0];
             var height = objects[i][3] - objects[i][1];
             ctx.fillRect(x, y, width, height);
-            ctx.strokeStyle = '#F00';
+            ctx.strokeStyle = 'rgba(230, 20, 20, 0.55)';
             ctx.lineWidth = 1;
             ctx.strokeRect(x, y, width, height);
           }
@@ -92,32 +92,36 @@
 
       document.addEventListener('DOMContentLoaded', function() {
         var form = document.getElementById('imageForm');
-        var modelType = document.getElementById('modelField').value;
-        var resultsDiv = document.getElementById('results-row');
-        var jsonDiv = document.getElementById('results');
-        var imageCanvas = document.getElementById('image-canvas');
 
         form.addEventListener('submit', function(event) {
           event.preventDefault();
 
+          var modelType = document.getElementById('modelField').value;
+          var total = document.getElementById('totalField').value;
+          var resultsDiv = document.getElementById('results-row');
+          var jsonDiv = document.getElementById('results');
+          var imageCanvas = document.getElementById('image-canvas');
+
           var xhr = new XMLHttpRequest();
           var formdata = new FormData(form);
+          url = '/api/' + modelType + '/predict';
+          if (total) {
+            url += '?total=' + total
+          }
 
-          xhr.open('POST', '/api/' + modelType + '/predict', true);
+          xhr.open('POST', url, true);
           xhr.send(formdata);
 
           xhr.onreadystatechange = function(){
             if(xhr.readyState == 4 && xhr.status == 200) {
               jsonDiv.innerHTML = xhr.response;
               response = JSON.parse(xhr.response);
-              var scaleFactor = response.scale_factor;
               resultsDiv.style.display = '';
 
               drawCanvas(
                 imageCanvas,
                 formdata.getAll('image')[0],
-                response.objects,
-                scaleFactor
+                response.objects
               );
             }
           }
@@ -127,7 +131,7 @@
   </head>
   <body>
       <div id="menu">
-        <img src="/static/luminoth-logo.png"/>
+        <img src="/static/luminoth-logo.png" class="logo"/>
         <h3 class="title">Luminoth HTTP Server</h3>
       </div>
 
@@ -151,6 +155,12 @@
                   <select id="modelField">
                     <option value="fasterrcnn">Faster RCNN</option>
                   </select>
+                </div>
+              </div>
+              <div class="row">
+                <div class="12u">
+                  <label for="totalField">Total predictions</label>
+                  <input name="total" type="text" id="totalField" />
                 </div>
               </div>
               <div class="row">

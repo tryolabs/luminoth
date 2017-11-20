@@ -1822,7 +1822,7 @@
 		-webkit-transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 		-ms-transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 		transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
-		border-bottom: dotted 1px #666;
+		margin-bottom: 1px;
 		color: inherit;
 		text-decoration: none;
 	}
@@ -3018,7 +3018,7 @@
 		padding-left: 0.5em ;
 		border-bottom: none;
 		text-decoration: none;
-		padding-top: 0.5em;
+		padding-top: 0.25em;
 	}
 
 #tryo{
@@ -3494,27 +3494,9 @@
 	color: #003A6F;
 }
 
-/* GIF */
-
-#gif{
-	display: flex;
-	justify-content: center;
-	height: 90px;
-
-}
-
-#gif p {
-	padding-top: 1em;
-	text-align: center;
-	font-size: 90%;
-
-}
-
-#head{
-	width: 450px;
-	height: 62px;
-	background-image: url("images/luminoth.png");
-
+.logo {
+	width: 100px;
+	height: 70px;
 }
 
 /* PANTALLA */
@@ -3524,36 +3506,4 @@
 	justify-content: center;
 	padding-top: 0;
 	padding-bottom: 5em;
-
-
-}
-
-/*#pantalla img{
-	width: 100%;
-	height: 50%;
-	padding: 0 5%;
-}*/
-
-/* ONE 2 */
-
-#one2{
-	background-color: #3A3A3A;
-}
-
-#p2{
-	color: #ffffff;
-}
-
-/* ONE*/
-
-#one{
-	background-color: #58585B;
-}
-
-/* BOTON */
-
-#boton{
-	display: flex;
-	justify-content: center;
-	padding-top: 1em;
 }
