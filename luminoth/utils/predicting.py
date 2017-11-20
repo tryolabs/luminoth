@@ -21,9 +21,6 @@ def get_predictions(image_paths, config_files):
     """
     config = get_config(config_files)
 
-    # Don't use data augmentation in predictions
-    config.dataset.data_augmentation = None
-
     if config.dataset.dir:
         # Gets the names of the classes
         classes_file = os.path.join(config.dataset.dir, 'classes.json')
@@ -69,7 +66,7 @@ def get_predictions(image_paths, config_files):
         }
 
 
-def get_prediction(image, config, session=None,
+def get_prediction(image, config, total=None, session=None,
                    fetches=None, image_tensor=None, class_labels=None,
                    return_tf_vars=False):
     """
@@ -83,6 +80,9 @@ def get_prediction(image, config, session=None,
     """
 
     if session is None and fetches is None and image_tensor is None:
+        # Don't use data augmentation in predictions
+        config.dataset.data_augmentation = None
+
         dataset_class = get_dataset(config.dataset.type)
         model_class = get_model(config.model.type)
         dataset = dataset_class(config)
@@ -160,13 +160,21 @@ def get_prediction(image, config, session=None,
     if class_labels is not None:
         objects_labels = [class_labels[obj] for obj in objects_labels]
 
-    # Scale objects to origina image dimensions
+    # Scale objects to original image dimensions
     objects /= scale_factor
 
+    objects = objects.tolist()
+    objects_labels_prob = objects_labels_prob.tolist()
+
+    if total is not None:
+        objects = objects[:total]
+        objects_labels = objects_labels[:total]
+        objects_labels_prob = objects_labels_prob[:total]
+
     res = {
-        'objects': objects.tolist(),
+        'objects': objects,
         'objects_labels': objects_labels,
-        'objects_labels_prob': objects_labels_prob.tolist(),
+        'objects_labels_prob': objects_labels_prob,
         'inference_time': end_time - start_time,
     }
 
