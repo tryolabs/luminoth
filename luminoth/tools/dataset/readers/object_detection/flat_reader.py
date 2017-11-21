@@ -1,6 +1,7 @@
-import os
-import tensorflow as tf
 import json
+import os
+import six
+import tensorflow as tf
 
 from PIL import Image
 
@@ -97,11 +98,9 @@ class FlatReader(ObjectDetectionReader):
                 self.errors += 1
                 continue
 
-            # TODO: consider alternatives to using Pillow here.
-            image_pil = Image.open(image_path)
+            image_pil = Image.open(six.BytesIO(image))
             width = image_pil.width
             height = image_pil.height
-            image_pil.close()
 
             gt_boxes = []
             for b in annotation[self._objects_key]:

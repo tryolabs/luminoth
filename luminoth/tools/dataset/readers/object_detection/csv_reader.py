@@ -1,6 +1,7 @@
-import os
-import tensorflow as tf
 import csv
+import os
+import six
+import tensorflow as tf
 
 from PIL import Image
 
@@ -102,9 +103,9 @@ class CSVReader(ObjectDetectionReader):
                 self.errors += 1
                 continue
 
-            with Image.open(image_path) as image_pil:
-                width = image_pil.width
-                height = image_pil.height
+            image_pil = Image.open(six.BytesIO(image))
+            width = image_pil.width
+            height = image_pil.height
 
             gt_boxes = []
             for b in image_data:
