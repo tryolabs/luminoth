@@ -116,7 +116,7 @@ class OpenImagesReader(ObjectDetectionReader):
 
                 # Append annotation to current record.
                 try:
-                    # LabelName may not exist because not all label are
+                    # LabelName may not exist because not all labels are
                     # trainable
                     label = self.classes.index(line['LabelName'])
                 except ValueError:

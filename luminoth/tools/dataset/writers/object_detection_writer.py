@@ -65,7 +65,8 @@ class ObjectDetectionWriter(BaseWriter):
                                length=self._reader.total) as record_list:
             for record in record_list:
                 tf_record = self._record_to_tf(record)
-                writer.write(tf_record.SerializeToString())
+                if tf_record is not None:
+                    writer.write(tf_record.SerializeToString())
 
             writer.close()
 
