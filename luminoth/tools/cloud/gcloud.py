@@ -154,6 +154,7 @@ def validate_region(region, project_id, credentials):
                     region, project_id))
         elif err.resp.status == 403:
             click.echo('Error: Forbidden access to resources.')
+            click.echo('Raw response:\n{}'.format(err.content))
             click.echo(
                 'Make sure to enable "Cloud Compute API", "ML Engine" and '
                 '"Storage" for project.')
