@@ -46,7 +46,7 @@ INSTALL_REQUIRES = [
     'google-api-python-client>=1.6.2,<2',
     'google-cloud-storage>=1.2.0',
     'Flask>=0.12',
-    'six==1.11.0',
+    'six>=1.11',
 ]
 TEST_REQUIRES = []
 
@@ -58,7 +58,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 
 def read(*parts):
     """
-    Build an absolute path from *parts* and and return the contents of the
+    Build an absolute path from *parts* and return the contents of the
     resulting file.  Assume UTF-8 encoding.
     """
     with codecs.open(os.path.join(HERE, *parts), 'rb', 'utf-8') as f:
