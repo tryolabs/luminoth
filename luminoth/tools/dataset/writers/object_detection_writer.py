@@ -59,6 +59,8 @@ class ObjectDetectionWriter(BaseWriter):
             self._output_dir, '{}.tfrecords'.format(self._split))
         writer = tf.python_io.TFRecordWriter(record_file)
 
+        tf.logging.debug('Found {} images.'.format(self._reader.total))
+
         with click.progressbar(self._reader.iterate(),
                                length=self._reader.total) as record_list:
             for record in record_list:

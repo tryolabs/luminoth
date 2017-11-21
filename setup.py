@@ -46,6 +46,7 @@ INSTALL_REQUIRES = [
     'google-api-python-client>=1.6.2,<2',
     'google-cloud-storage>=1.2.0',
     'Flask>=0.12',
+    'six==1.11.0',
 ]
 TEST_REQUIRES = []
 

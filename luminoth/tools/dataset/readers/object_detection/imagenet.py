@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import six
 import tensorflow as tf
 
 from PIL import Image
@@ -106,11 +107,9 @@ class ImageNetReader(ObjectDetectionReader):
                 # If there's no bounding boxes, we don't want it.
                 continue
 
-            # TODO: consider alternatives to using Pillow here so we don't read
-            # the image twice.
-            with Image.open(image_path) as image_pil:
-                width = image_pil.width
-                height = image_pil.height
+            image_pil = Image.open(six.BytesIO(image))
+            width = image_pil.width
+            height = image_pil.height
 
             gt_boxes = []
             for b in annotation['object']:
