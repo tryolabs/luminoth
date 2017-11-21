@@ -1,16 +1,17 @@
 from .base_reader import BaseReader, InvalidDataDirectory  # noqa
 from .object_detection import ObjectDetectionReader  # noqa
 from .object_detection import (
-    COCOReader, CSVReader, FlatReader, ImageNetReader, PascalVOCReader
+    COCOReader, CSVReader, FlatReader, ImageNetReader, OpenImagesReader,
+    PascalVOCReader,
 )
 
 READERS = {
-    'imagenet': ImageNetReader,
-    'pascal': PascalVOCReader,
-    'voc': PascalVOCReader,
-    'csv': CSVReader,
     'coco': COCOReader,
+    'csv': CSVReader,
     'flat': FlatReader,
+    'imagenet': ImageNetReader,
+    'openimages': OpenImagesReader,
+    'pascal': PascalVOCReader,
 }
 
 
