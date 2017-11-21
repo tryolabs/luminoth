@@ -77,7 +77,7 @@ class ROIPoolingLayer(snt.AbstractModule):
             [self._pooled_width * 2, self._pooled_height * 2], name="crops"
         )
 
-        # Applies max pool with [2,2] kernel to reduce the crops two half the
+        # Applies max pool with [2,2] kernel to reduce the crops to half the
         # size, and thus having the desired output.
         prediction_dict = {
             'roi_pool': tf.nn.max_pool(
