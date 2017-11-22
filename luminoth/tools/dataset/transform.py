@@ -26,7 +26,7 @@ def get_output_subfolder(only_filename, limit_examples, limit_classes):
 @click.option('dataset_reader', '--type', type=click.Choice(READERS.keys()))  # noqa
 @click.option('--data-dir', help='Where to locate the original data.')
 @click.option('--output-dir', help='Where to save the transformed data.')
-@click.option('splits', '--split', multiple=True, help='Which splits to transform.')  # noqa
+@click.option('splits', '--split', required=True, multiple=True, help='Which splits to transform.')  # noqa
 @click.option('--only-filename', help='Create dataset with a single example.')
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
 @click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')  # noqa
