@@ -63,11 +63,14 @@ class ObjectDetectionWriter(BaseWriter):
 
         with click.progressbar(self._reader.iterate(),
                                length=self._reader.total) as record_list:
-            for record in record_list:
+            for record_idx, record in enumerate(record_list):
                 tf_record = self._record_to_tf(record)
                 if tf_record is not None:
                     writer.write(tf_record.SerializeToString())
 
+            if self._output_dir.startswith('gs://'):
+                tf.logging.info('Saving tfrecord to Google Cloud Storage. '
+                                'It may take a while.')
             writer.close()
 
         if self._reader.yielded_records == 0:
