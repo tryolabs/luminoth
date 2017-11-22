@@ -15,7 +15,7 @@ def get_diff():
         return subprocess.check_output(
             ['git', 'diff'], cwd=CURRENT_DIR
         ).strip().decode('utf-8')
-    except OSError:
+    except:
         return None
 
 
@@ -24,7 +24,7 @@ def get_luminoth_version():
         return subprocess.check_output(
             ['git', 'rev-parse', 'HEAD'], cwd=CURRENT_DIR
         ).strip().decode('utf-8')
-    except OSError:
+    except:
         pass
 
     try:
