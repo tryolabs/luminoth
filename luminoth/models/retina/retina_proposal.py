@@ -83,7 +83,7 @@ class RetinaProposal(snt.AbstractModule):
         objects_tf = change_order(proposals)
 
         selected_boxes = []
-        selected_probs = []
+        selected_scores = []
         selected_labels = []
         # For each class we want to filter those objects and apply NMS to them.
         for class_id in range(self._num_classes):
@@ -116,7 +116,7 @@ class RetinaProposal(snt.AbstractModule):
             # We append values to a regular list which will later be transform
             # to a proper Tensor.
             selected_boxes.append(class_objects_tf)
-            selected_probs.append(tf.nn.softmax(this_class_score))
+            selected_scores.append(this_class_score)
             # In the case of the class_id, since it is a loop on classes, we
             # already have a fixed class_id. We use `tf.tile` to create that
             # Tensor with the total number of indices returned by the NMS.
@@ -126,11 +126,16 @@ class RetinaProposal(snt.AbstractModule):
 
         # We use concat (axis=0) to generate a Tensor where the rows are
         # stacked on top of each other
-        objects_tf = tf.concat(selected_boxes, axis=0)
+        objects_tf = tf.concat(selected_boxes, axis=0, name='concat_boxes')
         # Return to the original convention.
         objects = change_order(objects_tf)
-        proposal_label = tf.concat(selected_labels, axis=0)
-        proposal_label_prob = tf.concat(selected_probs, axis=0)
+        proposal_label = tf.concat(
+            selected_labels, axis=0, name='concat_scores'
+        )
+        proposal_label_prob = tf.nn.softmax(
+            tf.concat(selected_scores, axis=0, name='concat_scores'),
+            name='softmax_for_probs'
+        )
 
         # Get topK detections of all classes.
         k = tf.minimum(
@@ -147,8 +152,5 @@ class RetinaProposal(snt.AbstractModule):
             'objects': top_k_objects,
             'proposal_label': top_k_proposal_label,
             'proposal_label_prob': top_k_proposal_label_prob,
-            'proposal_label_score': top_k_score,
-            'selected_boxes': selected_boxes,
-            'selected_probs': selected_probs,
-            'selected_labels': selected_labels,
+            'proposal_label_score': top_k_score
         }

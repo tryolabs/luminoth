@@ -74,8 +74,8 @@ class Retina(snt.AbstractModule):
                 cls_target: If training. (num_preds,)
                 bbox_target: If training. (num_preds, 4)
         """
-        im_shape_int = tf.shape(image)[1:3]
-        im_shape = tf.to_float(im_shape_int)
+        im_shape_int = tf.shape(image, name='im_shape')[:2]
+        im_shape = tf.to_float(im_shape_int, name='im_shape_float')
         fpn_levels = self.fpn(
             tf.expand_dims(image, axis=0), is_training=is_training
         )
@@ -109,8 +109,8 @@ class Retina(snt.AbstractModule):
                     num_anchors=self._num_anchors,
                     num_classes=self._num_classes
                 )
-            level_shape_int = tf.shape(level)[1:3]
-            level_shape = tf.to_float(level_shape_int)
+            level_shape_int = tf.shape(level, name='level_shape')[1:3]
+            level_shape = tf.to_float(level_shape_int, name='level_shape_int')
             anchors = self._generate_anchors(level_shape, im_shape)
             level_bbox_pred_bank = box_subnet(level)
             level_bbox_preds = tf.reshape(
@@ -293,29 +293,29 @@ class Retina(snt.AbstractModule):
             im_height = im_shape[0]
             im_width = im_shape[1]
 
-            shift_x = tf.range(level_width)
-            shift_y = tf.range(level_height)
+            shift_x = tf.range(level_width, name='range_width')
+            shift_y = tf.range(level_height, name='range_height')
             shift_x, shift_y = tf.meshgrid(shift_x, shift_y)
 
-            shift_x = tf.reshape(shift_x, [-1])
-            shift_y = tf.reshape(shift_y, [-1])
+            shift_x = tf.reshape(shift_x, [-1], name='reshape_x')
+            shift_y = tf.reshape(shift_y, [-1], name='reshape_y')
 
             shifts = tf.stack(
                 [shift_x, shift_y, shift_x, shift_y],
-                axis=0
+                axis=0, name='stack_shifts'
             )
 
-            shifts = tf.transpose(shifts)
+            shifts = tf.transpose(shifts, name='transpose_shifts')
             # Shifts now is a (H x W, 4) Tensor
             # Expand dims to use broadcasting sum.
             level_anchors = (
                 np.expand_dims(self._anchor_reference, axis=0) +
-                tf.expand_dims(shifts, axis=1)
+                tf.expand_dims(shifts, axis=1, name='expand_shifts')
             )
 
             # Flatten
             level_anchors = tf.reshape(
-                level_anchors, (-1, 4)
+                level_anchors, (-1, 4), name='reshape_anchors'
             )
             level_anchors = adjust_bboxes(
                 level_anchors,
@@ -350,7 +350,8 @@ class Retina(snt.AbstractModule):
                 tf.nn.relu(new_level_first)
             )
             # Maintaining increasing order for consistency.
-            return [new_level_second, new_level_first] + fpn_levels
+            all_levels = [new_level_second, new_level_first] + fpn_levels
+            return all_levels
 
     @property
     def summary(self):
