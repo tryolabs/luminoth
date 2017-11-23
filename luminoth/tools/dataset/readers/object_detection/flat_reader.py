@@ -26,7 +26,7 @@ class FlatReader(ObjectDetectionReader):
                  default_class=DEFAULT_CLASS, objects_key=DEFAULT_OBJECTS_KEY,
                  x_min_key=X_MIN_KEY, y_min_key=Y_MIN_KEY, x_max_key=X_MAX_KEY,
                  y_max_key=Y_MAX_KEY, **kwargs):
-        super(FlatReader, self).__init__()
+        super(FlatReader, self).__init__(**kwargs)
         self._data_dir = data_dir
         self._split = split
         self._annotation_type = annotation_type
@@ -37,30 +37,21 @@ class FlatReader(ObjectDetectionReader):
         self._x_max_key = x_max_key
         self._y_max_key = y_max_key
 
-        self._total = None
-        self._classes = None
         self._annotated_files = None
         self._annotations = None
 
         self.errors = 0
         self.yielded_records = 0
 
-    @property
-    def total(self):
-        if self._total is None:
-            self._total = len(self.annotated_files)
-        return self._total
+    def get_total(self):
+        return len(self.annotated_files)
 
-    @property
-    def classes(self):
-        if self._classes is None:
-            self._classes = sorted(set([
-                b.get('label', self._default_class)
-                for r in self.annotations
-                for b in r.get(self._objects_key, [])
-            ]))
-
-        return self._classes
+    def get_classes(self):
+        return sorted(set([
+            b.get('label', self._default_class)
+            for r in self.annotations
+            for b in r.get(self._objects_key, [])
+        ]))
 
     @property
     def annotated_files(self):
@@ -87,7 +78,14 @@ class FlatReader(ObjectDetectionReader):
 
     def iterate(self):
         for annotation in self.annotations:
+            if self._stop_iteration():
+                return
+
             image_id = annotation['image_id']
+
+            if not self._is_valid(image_id):
+                continue
+
             try:
                 image_path = self._get_image_path(image_id)
                 image = read_image(image_path)

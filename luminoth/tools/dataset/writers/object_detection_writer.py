@@ -74,12 +74,15 @@ class ObjectDetectionWriter(BaseWriter):
             writer.close()
 
         if self._reader.yielded_records == 0:
-            tf.logging.error('Data is missing. Removing record file.')
+            tf.logging.error(
+                'Data is missing. Removing record file. '
+                '(Use "--debug" flag to display all logs)')
             tf.gfile.Remove(record_file)
             return
         elif self._reader.errors > 0:
             tf.logging.warning(
-                'Failed on {} records.'.format(
+                'Failed on {} records. '
+                '(Use "--debug" flag to display all logs)'.format(
                     self._reader.errors, self._reader.yielded_records
                 )
             )

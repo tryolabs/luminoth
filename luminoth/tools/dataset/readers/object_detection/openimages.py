@@ -28,8 +28,7 @@ class OpenImagesReader(ObjectDetectionReader):
     Before using it you have to request and configure access following the
     instructions here: https://github.com/cvdfoundation/open-images-dataset
     """
-    def __init__(self, data_dir, split, download_threads=25, only_classes=None,
-                 **kwargs):
+    def __init__(self, data_dir, split, download_threads=25, **kwargs):
         """
         Args:
             - data_dir: Path to base directory where to find all the necessary
@@ -42,18 +41,11 @@ class OpenImagesReader(ObjectDetectionReader):
                 all the available classes. If the string contains ',' it will
                 split the string using them.
         """
-        super(OpenImagesReader, self).__init__()
+        super(OpenImagesReader, self).__init__(**kwargs)
         self._data_dir = data_dir
         self._split = split
         self._download_threads = download_threads
 
-        if isinstance(only_classes, six.string_types):
-            # We can get one class as string.
-            only_classes = only_classes.split(',')
-        self._only_classes = only_classes
-
-        self._classes = None
-        self._total = None
         self._image_ids = None
 
         self.yielded_records = 0
@@ -62,49 +54,41 @@ class OpenImagesReader(ObjectDetectionReader):
         # Flag to notify threads if the execution is halted.
         self._alive = True
 
-    @property
-    def classes(self):
-        if self._classes is None:
-            if self._only_classes is not None:
-                # Labels are overrided
-                trainable_labels = set(self._only_classes)
-            else:
-                trainable_labels_file = os.path.join(
-                    self._data_dir, CLASSES_TRAINABLE)
-                trainable_labels = set()
-                try:
-                    with tf.gfile.Open(trainable_labels_file) as tl:
-                        for label in tl:
-                            trainable_labels.add(label.strip())
-                except tf.errors.NotFoundError:
-                    raise InvalidDataDirectory(
-                        'Missing label file "{}" from data_dir'.format(
-                            CLASSES_TRAINABLE))
+    def get_classes(self):
+        trainable_labels_file = os.path.join(
+            self._data_dir, CLASSES_TRAINABLE)
+        trainable_labels = set()
+        try:
+            with tf.gfile.Open(trainable_labels_file) as tl:
+                for label in tl:
+                    trainable_labels.add(label.strip())
+        except tf.errors.NotFoundError:
+            raise InvalidDataDirectory(
+                'Missing label file "{}" from data_dir'.format(
+                    CLASSES_TRAINABLE))
 
-            labels_descriptions_file = os.path.join(
-                self._data_dir, CLASSES_DESC)
-            desc_by_label = {}
-            try:
-                with tf.gfile.Open(labels_descriptions_file) as ld:
-                    reader = csv.reader(ld)
-                    for line in reader:
-                        if line[0] in trainable_labels:
-                            desc_by_label[line[0]] = line[1]
-            except tf.errors.NotFoundError:
-                raise InvalidDataDirectory(
-                    'Missing label description file "{}" from data_dir'.format(
-                        CLASSES_DESC))
+        self.trainable_labels = self._filter_classes(trainable_labels)
 
-            self._classes_id = sorted(trainable_labels)
-            self._classes = [
-                desc for _, desc in
-                sorted(desc_by_label.items(), key=lambda x: x[0])
-            ]
+        labels_descriptions_file = os.path.join(
+            self._data_dir, CLASSES_DESC)
+        desc_by_label = {}
+        try:
+            with tf.gfile.Open(labels_descriptions_file) as ld:
+                reader = csv.reader(ld)
+                for line in reader:
+                    if line[0] in trainable_labels:
+                        desc_by_label[line[0]] = line[1]
+        except tf.errors.NotFoundError:
+            raise InvalidDataDirectory(
+                'Missing label description file "{}" from data_dir'.format(
+                    CLASSES_DESC))
 
-        return self._classes
+        self._classes = [
+            desc for _, desc in
+            sorted(desc_by_label.items(), key=lambda x: x[0])
+        ]
 
-    @property
-    def total(self):
+    def get_total(self):
         return len(self.image_ids)
 
     @property
@@ -139,8 +123,11 @@ class OpenImagesReader(ObjectDetectionReader):
             partial_record = {}
 
             for line in reader:
-                if not self._alive:
+                if self._stop_iteration():
                     break
+
+                if not self._is_valid(line['ImageID']):
+                    continue
 
                 if line['ImageID'] != current_image_id:
                     # Yield if image changes and we have current image.
@@ -165,7 +152,7 @@ class OpenImagesReader(ObjectDetectionReader):
                 try:
                     # LabelName may not exist because not all labels are
                     # trainable
-                    label = self._classes_id.index(line['LabelName'])
+                    label = self.trainable_labels.index(line['LabelName'])
                 except ValueError:
                     continue
 
@@ -193,7 +180,7 @@ class OpenImagesReader(ObjectDetectionReader):
             records_queue.put(None)
 
     def _complete_records(self, input_queue, output_queue):
-        while self._alive:
+        while not self._stop_iteration():
             partial_record = input_queue.get()
 
             if partial_record is None:
@@ -220,7 +207,7 @@ class OpenImagesReader(ObjectDetectionReader):
 
                 output_queue.put(partial_record)
             except Exception as e:
-                tf.logging.warning(
+                tf.logging.error(
                     'Error processing record: {}'.format(partial_record))
                 tf.logging.error(e)
                 self.errors += 1
@@ -259,8 +246,9 @@ class OpenImagesReader(ObjectDetectionReader):
             t.start()
             consumer_threads.append(t)
 
-        while self._alive:
+        while not self._stop_iteration():
             record = self._records_queue.get()
+
             self._records_queue.task_done()
             if record is None:
                 break
@@ -268,14 +256,26 @@ class OpenImagesReader(ObjectDetectionReader):
             self.yielded_records += 1
             yield record
 
-        # Emptying records queue with ending messages.
-        for _ in range(self._download_threads - 1):
-            self._records_queue.get()
-            self._records_queue.task_done()
+        self._empty_queue(self._partial_records_queue)
+        self._empty_queue(self._records_queue)
 
         generator.join()
         for t in consumer_threads:
             t.join()
+
+    def _empty_queue(self, queue_to_empty):
+        while not queue_to_empty.empty():
+            try:
+                queue_to_empty.get(False)
+            except queue.Empty:
+                continue
+            queue_to_empty.task_done()
+
+    def _stop_iteration(self):
+        return (
+            not self._alive or
+            super(OpenImagesReader, self)._stop_iteration()
+        )
 
     def _stop_reading(self, signal, frame):
         self._alive = False

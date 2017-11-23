@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import six
 import tensorflow as tf
 
@@ -16,9 +15,8 @@ WNIDS_FILE = 'data/imagenet_wnids.json'
 
 
 class ImageNetReader(ObjectDetectionReader):
-    def __init__(self, data_dir, split, only_filename=None,
-                 limit_examples=None, limit_classes=None, seed=None, **kwargs):
-        super(ImageNetReader, self).__init__()
+    def __init__(self, data_dir, split, **kwargs):
+        super(ImageNetReader, self).__init__(**kwargs)
         self._split = split
         self._data_dir = data_dir
         self._imagesets_path = os.path.join(self._data_dir, 'ImageSets', 'DET')
@@ -26,15 +24,6 @@ class ImageNetReader(ObjectDetectionReader):
         self._annotations_path = os.path.join(
             self._data_dir, 'Annotations', 'DET'
         )
-
-        self._only_filename = only_filename
-        self._limit_examples = limit_examples
-        self._limit_classes = limit_classes
-        self._seed = seed
-        random.seed(seed)
-
-        self._classes = None
-        self._total = None
 
         self.yielded_records = 0
         self.errors = 0
@@ -50,44 +39,19 @@ class ImageNetReader(ObjectDetectionReader):
         with tf.gfile.GFile(wnids_path) as wnidsjson:
             self._wnids = json.load(wnidsjson)
 
-    @property
-    def total(self):
-        if self._total is None:
-            total_records = sum(1 for _ in self._get_record_names())
+    def get_total(self):
+        return sum(1 for _ in self._get_record_names())
 
-            # Define smaller number of records when limiting examples.
-            if self._only_filename is not None:
-                self._total = 1
-            elif self._limit_examples is not None and self._limit_examples > 0:
-                self._total = min(self._limit_examples, total_records)
-            else:
-                self._total = total_records
-
-        return self._total
-
-    @property
-    def classes(self):
-        if self._classes is None:
-            self._classes = sorted(list(self._wnids.values()))
-
-            # Choose random classes when limiting them
-            if self._limit_classes is not None and self._limit_classes > 0:
-                total_classes = min(len(self._classes), self._limit_classes)
-                self._classes = sorted(
-                    random.sample(self._classes, total_classes)
-                )
-
-        return self._classes
+    def get_classes(self):
+        return sorted(list(self._wnids.values()))
 
     def iterate(self):
         for image_id in self._get_record_names():
-            # Ignore image_id is using only_filename filter and it's different.
-            if self._only_filename and image_id != self._only_filename:
-                continue
-
-            if self.yielded_records == self.total:
-                # Finish iteration based on predefined total.
+            if self._stop_iteration():
                 return
+
+            if not self._is_valid(image_id):
+                continue
 
             try:
                 annotation_path = self._get_image_annotation(image_id)
