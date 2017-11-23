@@ -10,7 +10,7 @@ class InvalidDataDirectory(Exception):
 class BaseReader(object):
     """Base reader for reading different types of data
     """
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(BaseReader, self).__init__()
 
     @property

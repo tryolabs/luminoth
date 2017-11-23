@@ -15,7 +15,7 @@ DEFAULT_YEAR = '2017'
 class COCOReader(ObjectDetectionReader):
     def __init__(self, data_dir, split, year=DEFAULT_YEAR,
                  use_supercategory=False, **kwargs):
-        super(COCOReader, self).__init__()
+        super(COCOReader, self).__init__(**kwargs)
         self._data_dir = data_dir
         self._split = split
         self._year = year
@@ -32,14 +32,14 @@ class COCOReader(ObjectDetectionReader):
                 'Could not find COCO annotations in path'
             )
 
-        self._total = len(annotations_json['images'])
+        self._total_records = len(annotations_json['images'])
 
         category_to_name = {
             c['id']: (c['supercategory'] if use_supercategory else c['name'])
             for c in annotations_json['categories']
         }
 
-        self._classes = sorted(set(category_to_name.values()))
+        self._total_classes = sorted(set(category_to_name.values()))
 
         self._image_to_bboxes = {}
         for annotation in annotations_json['annotations']:
@@ -50,7 +50,7 @@ class COCOReader(ObjectDetectionReader):
                 'ymin': y,
                 'xmax': x + width,
                 'ymax': y + height,
-                'label': self._classes.index(
+                'label': self.classes.index(
                     category_to_name[annotation['category_id']]
                 ),
             })
@@ -68,16 +68,21 @@ class COCOReader(ObjectDetectionReader):
         self.yielded_records = 0
         self.errors = 0
 
-    @property
-    def classes(self):
-        return self._classes
+    def get_total(self):
+        return self._total_records
 
-    @property
-    def total(self):
-        return self._total
+    def get_classes(self):
+        return self._total_classes
 
     def iterate(self):
         for image_id, image_details in self._image_to_details.items():
+
+            if self._stop_iteration():
+                return
+
+            if not self._is_valid(image_id):
+                continue
+
             filename = image_details['file_name']
             width = image_details['width']
             height = image_details['height']
