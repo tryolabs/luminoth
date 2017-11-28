@@ -70,7 +70,6 @@ model:
         # These will be the initial scores (approx) of foregrounds and
         # background.
         foreground: -0.5
-        background: 0.5
       kernel_shape: [3, 3]
       # As a general rule, don't use softmax if you're activating with sigmoid,
       # and use it otherwise.

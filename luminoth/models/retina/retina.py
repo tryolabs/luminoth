@@ -120,7 +120,14 @@ class Retina(snt.AbstractModule):
             level_class_score_bank = class_subnet(level)
             level_class_scores = tf.reshape(
                 level_class_score_bank,
-                shape=[-1, self._num_classes + 1]
+                shape=[-1, self._num_classes]
+            )
+            level_class_scores = tf.concat(
+                [
+                    tf.zeros([tf.shape(level_class_scores)[0], 1]),
+                    level_class_scores
+                ],
+                axis=1,
             )
 
             # Get rid of proposals from anchors outside the image.
