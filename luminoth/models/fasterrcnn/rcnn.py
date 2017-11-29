@@ -43,7 +43,7 @@ class RCNN(snt.AbstractModule):
         # adjusting the bounding box.
         self._layer_sizes = config.layer_sizes
         self._activation = get_activation_function(config.activation_function)
-        self._dropout_keep_prob = config.dropout_keep_prop
+        self._dropout_keep_prob = config.dropout_keep_prob
         self._use_mean = config.use_mean
 
         self.initializer = get_initializer(config.initializer, seed=seed)

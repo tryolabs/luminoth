@@ -46,7 +46,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                 'rcnn': {
                     'enabled': True,
                     'layer_sizes': [4096, 4096],
-                    'dropout_keep_prop': 1.0,
+                    'dropout_keep_prob': 1.0,
                     'activation_function': 'relu6',
                     'l2_regularization_scale': 0.0005,
                     'use_mean': False,
