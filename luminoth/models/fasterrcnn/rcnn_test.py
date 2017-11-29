@@ -22,7 +22,7 @@ class RCNNTest(tf.test.TestCase):
         self._config = EasyDict({
             'enabled': True,
             'layer_sizes': [4096, 4096],
-            'dropout_keep_prop': 1.0,
+            'dropout_keep_prob': 1.0,
             'activation_function': 'relu6',
             'use_mean': False,
             'initializer': {
