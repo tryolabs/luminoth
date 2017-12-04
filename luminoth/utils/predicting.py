@@ -36,7 +36,7 @@ def get_predictions(image_paths, config_files):
     for image_path in image_paths:
         with tf.gfile.Open(image_path, 'rb') as im_file:
             try:
-                image = Image.open(im_file)
+                image = Image.open(im_file).convert('RGB')
             except tf.errors.OutOfRangeError as e:
                 yield {
                     'error': '{}'.format(e),
