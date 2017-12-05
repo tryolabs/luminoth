@@ -85,6 +85,13 @@ ENV/
 # macOS
 .DS_Store
 
+# Ctags
+tags
+
+# pipenv
+Pipfile
+Pipfile.lock
+
 # Luminoth
 /datasets
 /logs
