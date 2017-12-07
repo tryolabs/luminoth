@@ -105,7 +105,7 @@ setup(
     url=find_meta('uri'),
     packages=PACKAGES,
     classifiers=CLASSIFIERS,
-    package_data={'': ['*.yml']},
+    include_package_data=True,
     setup_requires=[
     ],
     install_requires=INSTALL_REQUIRES,
