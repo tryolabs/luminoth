@@ -9,7 +9,6 @@ from luminoth.models.ssd.ssd_target import SSDTarget
 from luminoth.models.ssd.ssd_utils import (
     generate_anchors_reference, adjust_bboxes
 )
-from luminoth.utils.config import get_base_config
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import get_saver
 
@@ -27,8 +26,6 @@ DEFAULT_ENDPOINTS = {
 class SSD(snt.AbstractModule):
     """TODO
     """
-
-    base_config = get_base_config(__file__)
 
     def __init__(self, config, name='ssd'):
         super(SSD, self).__init__(name=name)
@@ -108,6 +105,11 @@ class SSD(snt.AbstractModule):
         """
         if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
+
+        # Set rank and last dimension before using base network
+        # TODO: Why does it loose information when using queue?
+        image.set_shape((None, None, 3))
+        image = tf.expand_dims(image, 0)
 
         # Dictionary with the endpoints from the base network
         base_network_endpoints = self.base_network(
