@@ -237,13 +237,15 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         'args': args,
         'region': region,
         'jobDir': job_dir,
-        'runtimeVersion': RUNTIME_VERSION
+        'runtimeVersion': RUNTIME_VERSION,
     }
 
     if scale_tier == 'CUSTOM':
         training_inputs['masterType'] = master_type
-        training_inputs['workerType'] = worker_type
-        training_inputs['workerCount'] = worker_count
+        if worker_count > 0:
+            training_inputs['workerCount'] = worker_count
+            training_inputs['workerType'] = worker_type
+
         if parameter_server_count > 0:
             training_inputs['parameterServerCount'] = parameter_server_count
             training_inputs['parameterServerType'] = parameter_server_type
