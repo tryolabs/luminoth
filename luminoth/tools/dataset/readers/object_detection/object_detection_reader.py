@@ -79,7 +79,7 @@ class ObjectDetectionReader(BaseReader):
         used.
         """
         # Define smaller number of records when limiting examples.
-        if self._only_images is not None:
+        if self._only_images:  # not none and not empty
             new_total = len(self._only_images)
         elif self._limit_examples is not None and self._limit_examples > 0:
             new_total = min(self._limit_examples, original_total_records)
@@ -91,7 +91,7 @@ class ObjectDetectionReader(BaseReader):
     def _filter_classes(self, original_classes):
         """Filters classes based on reader options used.
         """
-        if self._only_classes is not None:
+        if self._only_classes:  # not None and not empty
             new_classes = sorted(self._only_classes)
         # Choose random classes when limiting them
         elif self._limit_classes is not None and self._limit_classes > 0:
