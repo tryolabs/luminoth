@@ -308,6 +308,6 @@ class RPN(snt.AbstractModule):
                 'foreground_samples', tf.shape(rpn_bbox_target)[0], ['rpn'])
 
             return {
-                'rpn_cls_loss': tf.reduce_sum(ce_per_anchor),
-                'rpn_reg_loss': tf.reduce_sum(reg_loss_per_anchor),
+                'rpn_cls_loss': tf.reduce_mean(ce_per_anchor),
+                'rpn_reg_loss': tf.reduce_mean(reg_loss_per_anchor),
             }
