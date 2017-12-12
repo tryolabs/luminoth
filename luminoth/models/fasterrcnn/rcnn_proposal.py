@@ -151,10 +151,23 @@ class RCNNProposal(snt.AbstractModule):
             total_objects - total_raw_objects, ['rcnn']
         )
 
-        tf.summary.scalar(
-            'valid_proposals_ratio',
+        valid_proposals_ratio = (
             tf.cast(total_proposals, tf.float32) /
-            tf.cast(total_objects, tf.float32), ['rcnn']
+            tf.cast(total_objects, tf.float32)
+        )
+
+        assertion = tf.Assert(
+            tf.logical_not(tf.is_nan(valid_proposals_ratio)),
+            ['RCNN_NAN', proposals, bbox_pred, cls_prob],
+            summarize=10000
+        )
+
+        with tf.control_dependencies([assertion]):
+            objects2 = tf.identity(objects)
+            objects = tf.identity(objects2)
+
+        tf.summary.scalar(
+            'valid_proposals_ratio', valid_proposals_ratio, ['rcnn']
         )
 
         # We have to use the TensorFlow's bounding box convention to use the
