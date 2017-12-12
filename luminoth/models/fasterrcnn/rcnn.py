@@ -189,8 +189,10 @@ class RCNN(snt.AbstractModule):
         for i, layer in enumerate(self._layers):
             # Through FC layer.
             net = layer(net)
-            if self._debug:
-                prediction_dict['_debug']['layer_{}_out'.format(i)] = net
+            if self._config.batch_norm:
+                net = snt.BatchNorm(
+                    update_ops_collection=None
+                )(net, is_training=is_training)
 
             # Apply activation and dropout.
             net = self._activation(net)
