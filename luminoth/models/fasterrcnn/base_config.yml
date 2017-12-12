@@ -112,6 +112,8 @@ model:
     # Use RCNN or just RPN
     with_rcnn: True
 
+  batch_norm: False
+
   base_network:
     # Which type of pretrained network to use
     architecture: vgg_16
@@ -170,6 +172,7 @@ model:
     l2_regularization_scale: 0.0005  # disable using 0
     l1_sigma: 3.0
     activation_function: relu
+    batch_norm: False
 
     proposals:
       # Total proposals to use before running NMS (sorted by score)
@@ -211,6 +214,7 @@ model:
     l2_regularization_scale: 0.0005
     l1_sigma: 3.0
     use_mean: False
+    batch_norm: False
     initializer:
       _replace: True
       type: variance_scaling_initializer
