@@ -122,8 +122,8 @@ class FasterRCNN(snt.AbstractModule):
 
         image_shape = tf.shape(image)[0:2]
 
-        variable_summaries(
-            conv_feature_map, 'conv_feature_map', ['rpn'])
+        # variable_summaries(
+        #     conv_feature_map, 'conv_feature_map', ['rpn'])
 
         # Generate anchors for the image based on the anchor reference.
         all_anchors = self._generate_anchors(tf.shape(conv_feature_map))
