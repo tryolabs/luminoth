@@ -10,6 +10,9 @@ from sonnet.python.modules.conv import Conv2D
 from .rpn_target import RPNTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
+from luminoth.utils.safe_wrappers import (
+    safe_softmax_cross_entropy_with_logits
+)
 from luminoth.utils.vars import (
     get_initializer, layer_summaries, variable_summaries,
     get_activation_function
@@ -257,7 +260,7 @@ class RPN(snt.AbstractModule):
             cls_target = tf.one_hot(labels, depth=2)
 
             # Equivalent to log loss
-            ce_per_anchor = tf.nn.softmax_cross_entropy_with_logits(
+            ce_per_anchor = safe_softmax_cross_entropy_with_logits(
                 labels=cls_target, logits=cls_score
             )
             prediction_dict['cross_entropy_per_anchor'] = ce_per_anchor
