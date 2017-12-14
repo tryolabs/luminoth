@@ -40,7 +40,7 @@ DEFAULT_COLUMNS = [
 class CSVReader(ObjectDetectionReader):
     def __init__(self, data_dir, split, columns=DEFAULT_COLUMNS,
                  field_mapper=FIELD_MAPPER, with_header=False, **kwargs):
-        super(CSVReader, self).__init__()
+        super(CSVReader, self).__init__(**kwargs)
         self._data_dir = data_dir
         self._split = split
         self._labels_filename = self._get_labels_filename()
@@ -51,28 +51,20 @@ class CSVReader(ObjectDetectionReader):
         self._field_mapper = field_mapper
         self._with_header = with_header
 
-        self._total = None
-        self._classes = None
         self._files = None
 
         self.errors = 0
         self.yielded_records = 0
 
-    @property
-    def total(self):
-        if self._total is None:
-            self._total = len(self._get_records())
-        return self._total
+    def get_total(self):
+        return len(self._get_records())
 
-    @property
-    def classes(self):
-        if self._classes is None:
-            self._classes = sorted(set([
-                g['label']
-                for r in self._get_records().values()
-                for g in r
-            ]))
-        return self._classes
+    def get_classes(self):
+        return sorted(set([
+            g['label']
+            for r in self._get_records().values()
+            for g in r
+        ]))
 
     @property
     def files(self):
@@ -84,6 +76,11 @@ class CSVReader(ObjectDetectionReader):
     def iterate(self):
         records = self._get_records()
         for image_id, image_data in records.items():
+            if self._stop_iteration():
+                return
+
+            if not self._is_valid(image_id):
+                continue
 
             image_path = self._get_image_path(image_id)
             if image_path is None:

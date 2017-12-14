@@ -63,20 +63,26 @@ class ObjectDetectionWriter(BaseWriter):
 
         with click.progressbar(self._reader.iterate(),
                                length=self._reader.total) as record_list:
-            for record in record_list:
+            for record_idx, record in enumerate(record_list):
                 tf_record = self._record_to_tf(record)
                 if tf_record is not None:
                     writer.write(tf_record.SerializeToString())
 
+            if self._output_dir.startswith('gs://'):
+                tf.logging.info('Saving tfrecord to Google Cloud Storage. '
+                                'It may take a while.')
             writer.close()
 
         if self._reader.yielded_records == 0:
-            tf.logging.error('Data is missing. Removing record file.')
+            tf.logging.error(
+                'Data is missing. Removing record file. '
+                '(Use "--debug" flag to display all logs)')
             tf.gfile.Remove(record_file)
             return
         elif self._reader.errors > 0:
             tf.logging.warning(
-                'Failed on {} records.'.format(
+                'Failed on {} records. '
+                '(Use "--debug" flag to display all logs)'.format(
                     self._reader.errors, self._reader.yielded_records
                 )
             )
