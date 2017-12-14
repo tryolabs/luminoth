@@ -19,7 +19,7 @@ from luminoth.utils.config import get_config, dump_config
 from luminoth.utils.experiments import save_run
 
 
-RUNTIME_VERSION = '1.2'
+RUNTIME_VERSION = '1.4'
 SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
 MACHINE_TYPES = [
     'standard', 'large_model', 'complex_model_s', 'complex_model_m',
