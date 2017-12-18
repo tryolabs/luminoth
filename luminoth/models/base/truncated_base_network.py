@@ -1,3 +1,7 @@
+import tensorflow as tf
+import tensorflow.contrib.slim as slim
+
+from tensorflow.contrib.slim.nets import resnet_utils, resnet_v1
 from luminoth.models.base import BaseNetwork
 
 
@@ -47,6 +51,32 @@ class TruncatedBaseNetwork(BaseNetwork):
         )
 
         return self._get_endpoint(dict(pred['end_points']))
+
+    def _build_tail(self, inputs):
+        if self._architecture == 'resnet_v1_101':
+            with self._enter_variable_scope():
+                weight_decay = self._config.get('arg_scope', {}).get('weight_decay', 0)
+                with tf.variable_scope(self._architecture, reuse=True):
+                    with slim.arg_scope(
+                        resnet_utils.resnet_arg_scope(
+                            batch_norm_epsilon=1e-5,
+                            batch_norm_scale=True,
+                            weight_decay=weight_decay)):
+                        with slim.arg_scope([slim.batch_norm], is_training=False):
+                            blocks = [
+                                resnet_utils.Block('block4', resnet_v1.bottleneck, [{
+                                    'depth': 2048,
+                                    'depth_bottleneck': 512,
+                                    'stride': 1
+                                }] * 3)
+                            ]
+                            proposal_classifier_features = (
+                                resnet_utils.stack_blocks_dense(inputs, blocks)
+                            )
+        else:
+            proposal_classifier_features = inputs
+
+        return proposal_classifier_features
 
     def get_trainable_vars(self):
         """

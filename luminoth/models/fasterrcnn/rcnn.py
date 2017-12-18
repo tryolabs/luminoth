@@ -102,7 +102,7 @@ class RCNN(snt.AbstractModule):
             self._num_classes, self._config.proposals
         )
 
-    def _build(self, conv_feature_map, proposals, im_shape,
+    def _build(self, conv_feature_map, proposals, im_shape, base_network,
                gt_boxes=None, is_training=False):
         """
         Classifies & refines proposals based on the pooled feature map.
@@ -176,17 +176,18 @@ class RCNN(snt.AbstractModule):
             prediction_dict['_debug']['roi'] = roi_prediction
 
         pooled_features = roi_prediction['roi_pool']
+        features = base_network._build_tail(pooled_features)
 
         if self._use_mean:
             # We avg our height and width dimensions for a more
             # "memory-friendly" Tensor.
             pooled_features = tf.reduce_mean(
-                pooled_features, [1, 2], keep_dims=True
+                features, [1, 2], keep_dims=True
             )
 
         # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
-        flatten_features = tf.contrib.layers.flatten(pooled_features)
+        flatten_features = tf.contrib.layers.flatten(features)
         net = tf.identity(flatten_features)
 
         if self._debug:
