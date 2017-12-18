@@ -309,7 +309,8 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                     'bboxes': ops['pred_objects'],
                     'classes': ops['pred_objects_classes'],
                     'scores': ops['pred_objects_scores'],
-                    'gt_bboxes': ops['train_objects']
+                    'gt_bboxes': ops['train_objects'],
+                    'losses': ops['losses'],
                 }
                 if image_vis is not None:
                     fetches['prediction_dict'] = ops['prediction_dict']
@@ -326,7 +327,7 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 batch_gt_classes = batch_gt_objects[:, 4]
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
-                val_losses = sess.run(ops['losses'])
+                val_losses = batch_fetched['losses']
 
                 if image_vis is not None:
                     filename = batch_fetched['filename'].decode('utf-8')
