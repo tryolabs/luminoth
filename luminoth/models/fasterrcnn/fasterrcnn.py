@@ -150,7 +150,8 @@ class FasterRCNN(snt.AbstractModule):
             proposals = tf.stop_gradient(rpn_prediction['proposals'])
             classification_pred = self._rcnn(
                 conv_feature_map, proposals,
-                image_shape, gt_boxes=gt_boxes, is_training=is_training
+                image_shape, self.base_network,
+                gt_boxes=gt_boxes, is_training=is_training
             )
 
             prediction_dict['classification_prediction'] = classification_pred
