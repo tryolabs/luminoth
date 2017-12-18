@@ -19,8 +19,11 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('--from-global-step', type=int, default=None, help='Consider only checkpoints after this global step')  # noqa
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
+@click.option('--iou-threshold', type=float, default=0.5, help='IoU threshold to use.')  # noqa
+@click.option('--min-probability', type=float, default=0.5, help='Minimum probability to use.')  # noqa
 def evaluate(dataset_split, config_files, job_dir, watch,
-             from_global_step, override_params, files_per_class):
+             from_global_step, override_params, files_per_class,
+             iou_threshold, min_probability):
     """
     Evaluate models using dataset.
     """
@@ -49,6 +52,11 @@ def evaluate(dataset_split, config_files, job_dir, watch,
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
+
+    if config.model.network.with_rcnn:
+        config.model.rcnn.proposals.min_prob_threshold = min_probability
+    else:
+        config.model.rpn.proposals.min_prob_threshold = min_probability
 
     # Seed setup
     if config.train.seed:
@@ -164,7 +172,9 @@ def evaluate(dataset_split, config_files, job_dir, watch,
                     metrics_scope=metrics_scope,
                     image_vis=config.eval.image_vis,
                     files_per_class=files_per_class,
-                    files_to_visualize=files_to_visualize
+                    files_to_visualize=files_to_visualize,
+                    iou_threshold=iou_threshold,
+                    min_probability=min_probability
                 )
                 last_global_step = checkpoint['global_step']
                 tf.logging.info('Evaluated in {:.2f}s'.format(
@@ -251,7 +261,8 @@ def get_checkpoints(config, from_global_step=None):
 
 def evaluate_once(config, writer, saver, ops, checkpoint,
                   metrics_scope='metrics', image_vis=None,
-                  files_per_class=None, files_to_visualize=None):
+                  files_per_class=None, files_to_visualize=None,
+                  iou_threshold=0.5, min_probability=0.5):
     """Run the evaluation once.
 
     Create a new session with the previously-built graph, run it through the
@@ -366,27 +377,42 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
 
             # Save final evaluation stats into summary under the checkpoint's
             # global step.
-            map_0_5, per_class_0_5 = calculate_map(
-                output_per_batch, config.model.network.num_classes, 0.5
+            map_at_iou, per_class_at_iou = calculate_map(
+                output_per_batch, config.model.network.num_classes, iou_threshold
             )
 
             tf.logging.info('Finished evaluation at step {}.'.format(
                 checkpoint['global_step']))
-            tf.logging.info('mAP@0.5 = {:.2f}'.format(map_0_5))
+            tf.logging.info('Evaluated {} images.'.format(total_evaluated))
+            tf.logging.info('mAP@{}@{} = {:.2f}'.format(
+                iou_threshold, min_probability, map_at_iou))
 
             # TODO: Find a way to generate these summaries automatically, or
             # less manually.
             summary = [
                 tf.Summary.Value(
-                    tag='{}/mAP@0.5'.format(metrics_scope),
-                    simple_value=map_0_5
+                    tag='{}/mAP@{}@{}'.format(
+                        metrics_scope, iou_threshold, min_probability
+                    ),
+                    simple_value=map_at_iou
+                ),
+                tf.Summary.Value(
+                    tag='{}/total_evaluated'.format(metrics_scope),
+                    simple_value=total_evaluated
+                ),
+                tf.Summary.Value(
+                    tag='{}/evaluation_time'.format(metrics_scope),
+                    simple_value=time.time() - start_time
                 ),
             ]
 
-            for idx, val in enumerate(per_class_0_5):
-                tf.logging.debug('AP@0.5 for {} = {:.2f}'.format(idx, val))
+            for idx, val in enumerate(per_class_at_iou):
+                tf.logging.debug('AP@{}@{} for {} = {:.2f}'.format(
+                    iou_threshold, min_probability, idx, val))
                 summary.append(tf.Summary.Value(
-                    tag='{}/AP@0.5/{}'.format(metrics_scope, idx),
+                    tag='{}/AP@{}@{}/{}'.format(
+                        metrics_scope, iou_threshold, min_probability, idx
+                    ),
                     simple_value=val
                 ))
 
