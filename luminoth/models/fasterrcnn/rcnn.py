@@ -190,6 +190,8 @@ class RCNN(snt.AbstractModule):
         flatten_features = tf.contrib.layers.flatten(features)
         net = tf.identity(flatten_features)
 
+        net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
+
         if self._debug:
             prediction_dict['_debug']['flatten_net'] = net
 
