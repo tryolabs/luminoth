@@ -286,7 +286,12 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
+        total_evaluated = 0
+        start_time = time.time()
+
         try:
+            track_start = start_time
+            track_count = 0
             while not coord.should_stop():
                 fetches = {
                     'metric_ops': ops['metric_ops'],
@@ -342,6 +347,20 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                             writer.add_summary(
                                 image_summary, checkpoint['global_step']
                             )
+
+                total_evaluated += 1
+                track_count += 1
+
+                track_end = time.time()
+                if track_end - track_start > 20.:
+                    click.echo(
+                        '{} processed in {:.2f}s (global {:.2f} images/s, period {:.2f} images/s)'.format(
+                            total_evaluated, track_end - start_time,
+                            total_evaluated / (track_end - start_time),
+                            track_count / (track_end - track_start)
+                        ))
+                    track_count = 0
+                    track_start = track_end
 
         except tf.errors.OutOfRangeError:
 
