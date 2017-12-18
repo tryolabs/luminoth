@@ -190,7 +190,8 @@ class RCNN(snt.AbstractModule):
         flatten_features = tf.contrib.layers.flatten(features)
         net = tf.identity(flatten_features)
 
-        net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
+        if is_training:
+            net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
         if self._debug:
             prediction_dict['_debug']['flatten_net'] = net
@@ -218,7 +219,8 @@ class RCNN(snt.AbstractModule):
                 prediction_dict['_debug']['layer_{}_out'.format(i)] = net
 
             # variable_summaries(net, 'fc_{}_out'.format(i), ['rcnn'])
-            net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
+            if is_training:
+                net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
         cls_score = self._classifier_layer(net)
         cls_prob = tf.nn.softmax(cls_score, dim=1)
