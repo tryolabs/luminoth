@@ -98,10 +98,13 @@ def get_prediction(image, config, total=None, session=None,
 
             # Restore checkpoint
             if config.train.job_dir:
-                ckpt = tf.train.get_checkpoint_state(config.train.job_dir)
+                job_dir = config.train.job_dir
+                if config.train.run_name:
+                    job_dir = os.path.join(job_dir, config.train.run_name)
+                ckpt = tf.train.get_checkpoint_state(job_dir)
                 if not ckpt or not ckpt.all_model_checkpoint_paths:
                     raise ValueError('Could not find checkpoint in {}.'.format(
-                        config.train.job_dir
+                        job_dir
                     ))
                 ckpt = ckpt.all_model_checkpoint_paths[-1]
                 saver = tf.train.Saver(sharded=True, allow_empty=True)
