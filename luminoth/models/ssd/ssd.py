@@ -152,6 +152,7 @@ class SSD(snt.AbstractModule):
             # Location predictions
             num_loc_pred = num_anchors * 4
             loc_pred = slim.conv2d(inputs, num_loc_pred, [3, 3],
+                                   activation_fn=None,
                                    scope=endpoint + '/conv_loc',
                                    padding='SAME')
 
@@ -163,6 +164,7 @@ class SSD(snt.AbstractModule):
             # Class predictions
             num_cls_pred = num_anchors * (self._num_classes + 1)
             cls_pred = slim.conv2d(inputs, num_cls_pred, [3, 3],
+                                   activation_fn=None,
                                    scope=endpoint + '/conv_cls',
                                    padding='SAME')
             cls_pred = tf.reshape(cls_pred,
