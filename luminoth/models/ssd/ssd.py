@@ -335,13 +335,20 @@ class SSD(snt.AbstractModule):
 
             cls_loss = tf.reduce_sum(cross_entropy_per_proposal)
             bbox_loss = tf.reduce_sum(reg_loss_per_proposal)
-            if tf.cast(tf.shape(bbox_offsets_labeled)[0], tf.int32) == 0:
-                final_loss = 0.0
-            else:
-                final_loss = (
+
+            # Following the paper, set loss to 0. if there are 0 bboxes
+            # assigned as foreground targets.
+            safety_condition = tf.not_equal(
+                tf.shape(bbox_offsets_labeled)[0], 0
+            )
+            final_loss = tf.cond(
+                safety_condition,
+                true_fn=lambda: (
                     (cls_loss + bbox_loss * self._loc_loss_weight) /
                     tf.cast(tf.shape(bbox_offsets_labeled)[0], tf.float32)
-                )
+                ),
+                false_fn=lambda: 0.0
+            )
             tf.losses.add_loss(final_loss)
             total_loss = tf.losses.get_total_loss()
 
