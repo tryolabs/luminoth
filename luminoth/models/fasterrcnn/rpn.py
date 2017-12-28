@@ -55,6 +55,8 @@ class RPN(snt.AbstractModule):
             scale=config.l2_regularization_scale
         )
 
+        self._l1_sigma = config.l1_sigma
+
         # We could use normal relu without any problems.
         self._rpn_activation = get_activation_function(
             config.activation_function
@@ -276,7 +278,7 @@ class RPN(snt.AbstractModule):
 
             # We apply smooth l1 loss as described by the Fast R-CNN paper.
             reg_loss_per_anchor = smooth_l1_loss(
-                rpn_bbox_pred, rpn_bbox_target
+                rpn_bbox_pred, rpn_bbox_target, sigma=self._l1_sigma
             )
 
             prediction_dict['reg_loss_per_anchor'] = reg_loss_per_anchor
