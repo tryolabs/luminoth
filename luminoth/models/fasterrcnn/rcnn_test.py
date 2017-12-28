@@ -32,6 +32,7 @@ class RCNNTest(tf.test.TestCase):
                 'mode': 'FAN_AVG',
             },
             'l2_regularization_scale': 0.0005,
+            'l1_sigma': 3.0,
             'roi': {
                 'pooling_mode': 'crop',
                 'pooled_width': 7,

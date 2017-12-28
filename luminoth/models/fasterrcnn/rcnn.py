@@ -50,6 +50,8 @@ class RCNN(snt.AbstractModule):
         self.regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale)
 
+        self._l1_sigma = config.l1_sigma
+
         # Debug mode makes the module return more detailed Tensors which can be
         # useful for debugging.
         self._debug = debug
@@ -364,7 +366,9 @@ class RCNN(snt.AbstractModule):
             # offsets (that means, the useful results) and the labeled
             # targets.
             reg_loss_per_proposal = smooth_l1_loss(
-                bbox_offset_cleaned, bbox_offsets_target_labeled)
+                bbox_offset_cleaned, bbox_offsets_target_labeled,
+                sigma=self._l1_sigma
+            )
 
             tf.summary.scalar(
                 'rcnn_foreground_samples',

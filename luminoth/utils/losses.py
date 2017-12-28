@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def smooth_l1_loss(bbox_prediction, bbox_target, sigma=1.0):
+def smooth_l1_loss(bbox_prediction, bbox_target, sigma=3.0):
     """
     Return Smooth L1 Loss for bounding box prediction.
 
@@ -24,8 +24,9 @@ def smooth_l1_loss(bbox_prediction, bbox_target, sigma=1.0):
     abs_diff_lt_sigma2 = tf.less(abs_diff, 1.0 / sigma2)
     bbox_loss = tf.reduce_sum(
         tf.where(
-            abs_diff_lt_sigma2, 0.5 * tf.square(abs_diff),
-            abs_diff - 0.5
+            abs_diff_lt_sigma2,
+            0.5 * sigma2 * tf.square(abs_diff),
+            abs_diff - 0.5 / sigma2
         ), [1]
     )
     return bbox_loss

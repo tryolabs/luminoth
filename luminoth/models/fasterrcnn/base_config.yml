@@ -168,6 +168,7 @@ model:
       mean: 0.0
       stddev: 0.01
     l2_regularization_scale: 0.0005  # disable using 0
+    l1_sigma: 3.0
     activation_function: relu
 
     proposals:
@@ -208,6 +209,7 @@ model:
     dropout_keep_prob: 1.0
     activation_function: relu
     l2_regularization_scale: 0.0005
+    l1_sigma: 3.0
     use_mean: False
     initializer:
       _replace: True
