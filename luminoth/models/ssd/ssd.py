@@ -3,7 +3,7 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from luminoth.models.base import FullyConvolutionalNetwork
+from luminoth.models.base import SSDFeatureExtractor
 from luminoth.models.ssd.ssd_proposal import SSDProposal
 from luminoth.models.ssd.ssd_target import SSDTarget
 from luminoth.models.ssd.ssd_utils import (
@@ -49,12 +49,7 @@ class SSD(snt.AbstractModule):
         self._anchor_min_scale = config.model.anchors.min_scale
         self._anchor_ratios = np.array(config.model.anchors.ratios)
 
-        # Name of endpoints from the base network, the fully convolutional
-        # base network and the '4' default endpoints of ssd architecture
-        self._endpoints = (config.model.base_network.endpoints +
-                           config.model.base_network.fc_endpoints +
-                           ['ssd_1'] + ['ssd_2'] + ['ssd_3'] + ['ssd_4'])
-
+        # TODO: Fix this
         # Outputs of the endpoints
         self._endpoints_outputs = (
             config.model.base_network.endpoints_output +
@@ -67,14 +62,15 @@ class SSD(snt.AbstractModule):
         self._anchors_per_point = config.model.anchors.anchors_per_point
 
         # Calculate the anchors for each endpoint (feature map)
-        self.anchors = self.generate_anchors_per_endpoint()
+        # self.anchors = self.generate_anchors_per_endpoint()
 
         # Weight for the localization loss
         self._loc_loss_weight = config.model.loss.localization_loss_weight
+        # TODO: why not use the default LOSSES collection?
         self._losses_collections = ['ssd_losses']
 
         # We want the pretrained model to be outside the ssd name scope.
-        self.base_network = FullyConvolutionalNetwork(
+        self.feature_extractor = SSDFeatureExtractor(
             config.model.base_network, parent_name=self.module_name
         )
 
@@ -84,7 +80,7 @@ class SSD(snt.AbstractModule):
 
         Args:
             image: A tensor with the image.
-                Its shape should be `(1, height, width, 3)`.
+                Its shape should be `(height, width, 3)`.
             gt_boxes: A tensor with all the ground truth boxes of that image.
                 Its shape should be `(num_gt_boxes, 5)`
                 Where for each gt box we have (x1, y1, x2, y2, label),
@@ -106,44 +102,11 @@ class SSD(snt.AbstractModule):
         if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
 
-        # Set rank and last dimension before using base network
-        # TODO: Why does it loose information when using queue?
-        image.set_shape((None, None, 3))
-        image = tf.expand_dims(image, 0)
+        image.set_shape((300, 300, 3))
+        image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
+        feature_maps = self.feature_extractor(image, is_training=is_training)
 
-        # Dictionary with the endpoints from the base network
-        base_network_endpoints = self.base_network(
-            image, is_training=is_training)['end_points']
-
-        net = base_network_endpoints[
-            self._config.model.base_network.hook_endpoint]
-
-        with tf.variable_scope('ssd_1'):
-            net = slim.conv2d(net, 256, [1, 1], scope='conv1x1')
-            paddings = [[0, 0], [1, 1], [1, 1], [0, 0]]
-            net = tf.pad(net, paddings, mode='CONSTANT')
-            net = slim.conv2d(net, 512, [3, 3], stride=2, scope='conv3x3',
-                              padding='VALID')
-            base_network_endpoints['ssd_1'] = net
-        with tf.variable_scope('ssd_2'):
-            net = slim.conv2d(net, 128, [1, 1], scope='conv1x1')
-            paddings = [[0, 0], [1, 1], [1, 1], [0, 0]]
-            net = tf.pad(net, paddings, mode='CONSTANT')
-            net = slim.conv2d(net, 256, [3, 3], stride=2, scope='conv3x3',
-                              padding='VALID')
-            base_network_endpoints['ssd_2'] = net
-        with tf.variable_scope('ssd_3'):
-            net = slim.conv2d(net, 128, [1, 1], scope='conv1x1')
-            net = slim.conv2d(net, 256, [3, 3], scope='conv3x3',
-                              padding='VALID')
-            base_network_endpoints['ssd_3'] = net
-        with tf.variable_scope('ssd_4'):
-            net = slim.conv2d(net, 128, [1, 1], scope='conv1x1')
-            net = slim.conv2d(net, 256, [3, 3], scope='conv3x3',
-                              padding='VALID')
-            base_network_endpoints['ssd_4'] = net
-
-        # Do the predictions for each feature map
+        # Build a MultiBox predictor on top of each feature layer
         predictions = {}
         for ind, endpoint in enumerate(self._endpoints):
             inputs = base_network_endpoints[endpoint]
