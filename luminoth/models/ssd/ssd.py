@@ -49,20 +49,8 @@ class SSD(snt.AbstractModule):
         self._anchor_min_scale = config.model.anchors.min_scale
         self._anchor_ratios = np.array(config.model.anchors.ratios)
 
-        # TODO: Fix this
-        # Outputs of the endpoints
-        self._endpoints_outputs = (
-            config.model.base_network.endpoints_output +
-            config.model.base_network.fc_endpoints_output +
-            [DEFAULT_ENDPOINTS['ssd_1']] + [DEFAULT_ENDPOINTS['ssd_2']] +
-            [DEFAULT_ENDPOINTS['ssd_3']] + [DEFAULT_ENDPOINTS['ssd_4']]
-        )
-
         # Total number of anchors per point, per endpoint.
         self._anchors_per_point = config.model.anchors.anchors_per_point
-
-        # Calculate the anchors for each endpoint (feature map)
-        # self.anchors = self.generate_anchors_per_endpoint()
 
         # Weight for the localization loss
         self._loc_loss_weight = config.model.loss.localization_loss_weight
@@ -102,7 +90,8 @@ class SSD(snt.AbstractModule):
         if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
 
-        image.set_shape((300, 300, 3))
+        image_shape = (300, 300)  # TODO: get this from config
+        image.set_shape((image_shape[0], image_shape[1], 3))
         image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
         feature_maps = self.feature_extractor(image, is_training=is_training)
 
