@@ -97,45 +97,40 @@ class SSD(snt.AbstractModule):
 
         # Build a MultiBox predictor on top of each feature layer
         predictions = {}
-        for ind, endpoint in enumerate(self._endpoints):
-            inputs = base_network_endpoints[endpoint]
+        for i, (feature_map_name, feature_map) in enumerate(feature_maps.items()):
+            num_anchors = self._anchors_per_point[i]
 
-            num_anchors = self._anchors_per_point[ind]
             # Location predictions
             num_loc_pred = num_anchors * 4
-            loc_pred = slim.conv2d(inputs, num_loc_pred, [3, 3],
+            loc_pred = slim.conv2d(feature_map, num_loc_pred, [3, 3],
                                    activation_fn=None,
-                                   scope=endpoint + '/conv_loc',
+                                   scope=feature_map_name + '/conv_loc',
                                    padding='SAME')
-
-            loc_pred = tf.reshape(loc_pred,
-                                  [self._endpoints_outputs[ind][0] *
-                                   self._endpoints_outputs[ind][1] *
-                                   num_anchors, 4])
+            loc_pred = tf.reshape(loc_pred, [-1, 4])
 
             # Class predictions
             num_cls_pred = num_anchors * (self._num_classes + 1)
-            cls_pred = slim.conv2d(inputs, num_cls_pred, [3, 3],
+            cls_pred = slim.conv2d(feature_map, num_cls_pred, [3, 3],
                                    activation_fn=None,
-                                   scope=endpoint + '/conv_cls',
+                                   scope=feature_map_name + '/conv_cls',
                                    padding='SAME')
-            cls_pred = tf.reshape(cls_pred,
-                                  [self._endpoints_outputs[ind][0] *
-                                   self._endpoints_outputs[ind][1] *
-                                   num_anchors, (self._num_classes + 1)])
+            cls_pred = tf.reshape(cls_pred, [-1, self._num_classes + 1])
 
-            predictions[endpoint] = {}
+            predictions[feature_map_name] = {}
+            predictions[feature_map_name]['loc_pred'] = loc_pred
+            predictions[feature_map_name]['cls_pred'] = cls_pred
+            predictions[feature_map_name]['prob'] = slim.softmax(cls_pred)
 
-            predictions[endpoint]['loc_pred'] = loc_pred
-            predictions[endpoint]['cls_pred'] = cls_pred
-            predictions[endpoint]['prob'] = slim.softmax(cls_pred)
+
+        self.anchors = self.generate_anchors(feature_maps)
 
         # Get all_anchors from each endpoint
         all_anchors_list = []
         loc_pred_list = []
         cls_pred_list = []
         cls_prob_list = []
-        for ind, endpoint in enumerate(self._endpoints):
+        # for ind, endpoint in enumerate(self._endpoints):
+        for i, (layer_name, layer) in enumerate(feature_maps.items):
             adjusted_bboxes = adjust_bboxes(
                 self.anchors[endpoint],
                 tf.cast(self._endpoints_outputs[ind][0], tf.float32),
@@ -282,6 +277,8 @@ class SSD(snt.AbstractModule):
 
             # Calculate the smooth l1 loss between the flatten bboxes
             # offsets  and the labeled targets.
+            # TODO: reg loss can be confused between regularization and
+            #       regression, rename
             reg_loss_per_proposal = smooth_l1_loss(
                 bbox_offsets_labeled, bbox_offsets_target_labeled)
 
