@@ -221,10 +221,14 @@ def get_checkpoints(config, from_global_step=None):
     # The latest checkpoint file should be the last item of
     # `all_model_checkpoint_paths`, according to the CheckpointState protobuf
     # definition.
-    ckpt = tf.train.get_checkpoint_state(config.train.job_dir)
+    job_dir = config.train.job_dir
+    if config.train.run_name:
+        job_dir = os.path.join(job_dir, config.train.run_name)
+
+    ckpt = tf.train.get_checkpoint_state(job_dir)
     if not ckpt or not ckpt.all_model_checkpoint_paths:
         raise ValueError('Could not find checkpoint in {}.'.format(
-            config.train.job_dir
+            job_dir
         ))
 
     # TODO: Any other way to get the global_step?
