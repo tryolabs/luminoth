@@ -38,6 +38,18 @@
     </style>
     <script type="text/javascript">
 
+      const FILL_COLORS = [
+        'rgba(230, 25, 75, 0.2)',
+        'rgba(60, 180, 75, 0.2)',
+        'rgba(0, 130, 200, 0.2)',
+        'rgba(245, 130, 48, 0.2)',
+        'rgba(145, 30, 180, 0.2)',
+        'rgba(210, 245, 60, 0.2)',
+        'rgba(230, 190, 255, 0.2)',
+        'rgba(128, 0, 0, 0.2)',
+        'rgba(170, 255, 195, 0.2)',
+      ];
+
       function Shape(x, y, w, h, fill) {
         this.x = x || 0;
         this.y = y || 0;
@@ -56,7 +68,11 @@
         ctx.strokeRect(this.x, this.y, this.w, this.h);
       }
 
-      function drawCanvas(canvas, imageFile, objects) {
+      function rand(min, max) {
+        return Math.floor(Math.random() * (max - min + 1) + min);
+      }
+
+      function drawCanvas(canvas, imageFile, objects, probs, labels, minProb) {
         ctx = canvas.getContext('2d');
 
         image = new Image();
@@ -75,12 +91,28 @@
             image.height
           );
 
+          var labelColors = {};
+          for (var i = 0; i < labels.length; i++) {
+            var label = labels[i];
+            if (!(label in labelColors)) {
+              labelColors[label] = FILL_COLORS[Object.keys(labelColors).length % Object.keys(FILL_COLORS).length];
+            }
+          }
+
           for (var i = 0; i < objects.length; i++) {
-            ctx.fillStyle = 'rgba(20, 220, 20, 0.15)';
+            var prob = probs[i];
+            if (prob < minProb) {
+                continue;
+            }
+            var label = labels[i];
             var x = objects[i][0]
             var y = objects[i][1];
             var width = objects[i][2] - objects[i][0];
             var height = objects[i][3] - objects[i][1];
+            ctx.font = '10px serif';
+            ctx.fillStyle = 'rgba(30, 30, 30, 1.0)';
+            ctx.fillText(label, x, y - 3);
+            ctx.fillStyle = labelColors[label];
             ctx.fillRect(x, y, width, height);
             ctx.strokeStyle = 'rgba(230, 20, 20, 0.55)';
             ctx.lineWidth = 1;
@@ -98,6 +130,7 @@
 
           var modelType = document.getElementById('modelField').value;
           var total = document.getElementById('totalField').value;
+          var minProb = document.getElementById('minField').value;
           var resultsDiv = document.getElementById('results-row');
           var jsonDiv = document.getElementById('results');
           var imageCanvas = document.getElementById('image-canvas');
@@ -121,7 +154,8 @@
               drawCanvas(
                 imageCanvas,
                 formdata.getAll('image')[0],
-                response.objects
+                response.objects, response.objects_labels_prob,
+                response.objects_labels, minProb
               );
             }
           }
@@ -161,6 +195,12 @@
                 <div class="12u">
                   <label for="totalField">Total predictions</label>
                   <input name="total" type="text" id="totalField" />
+                </div>
+              </div>
+              <div class="row">
+                <div class="12u">
+                  <label for="minField">Minimum probability</label>
+                  <input name="min" type="text" id="minField" />
                 </div>
               </div>
               <div class="row">
