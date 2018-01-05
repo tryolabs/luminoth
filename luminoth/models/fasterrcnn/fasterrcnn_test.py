@@ -164,7 +164,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
         gt_boxes = tf.placeholder(
             tf.float32, shape=self.gt_boxes.shape)
         model = FasterRCNN(config)
-        model(image, gt_boxes)
+        model(image, gt_boxes, is_training=True)
         all_losses = model.loss(prediction_dict, return_all=True)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())

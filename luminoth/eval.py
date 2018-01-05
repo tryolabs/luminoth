@@ -77,9 +77,7 @@ def evaluate(dataset_split, config_files, job_dir, watch,
 
     # Build the graph of the model to evaluate, retrieving required
     # intermediate tensors.
-    prediction_dict = model(
-        train_image, train_objects
-    )
+    prediction_dict = model(train_image, train_objects)
 
     if config.model.network.with_rcnn:
         pred = prediction_dict['classification_prediction']

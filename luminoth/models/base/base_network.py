@@ -60,7 +60,7 @@ class BaseNetwork(snt.AbstractModule):
             self._config.get('architecture')
         ))
 
-    def network(self, is_training=True):
+    def network(self, is_training=False):
         if self.vgg_type:
             return functools.partial(
                 getattr(vgg, self._architecture),
@@ -106,7 +106,7 @@ class BaseNetwork(snt.AbstractModule):
         if self.resnet_v2_type:
             return resnet_v2.resnet_v2.default_image_size
 
-    def _build(self, inputs, is_training=True):
+    def _build(self, inputs, is_training=False):
         inputs = self.preprocess(inputs)
         with slim.arg_scope(self.arg_scope):
             net, end_points = self.network(is_training=is_training)(inputs)
