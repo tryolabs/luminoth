@@ -67,7 +67,7 @@ class FasterRCNN(snt.AbstractModule):
         # We want the pretrained model to be outside the FasterRCNN name scope.
         self.base_network = TruncatedBaseNetwork(config.model.base_network)
 
-    def _build(self, image, gt_boxes=None, is_training=True):
+    def _build(self, image, gt_boxes=None, is_training=False):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -103,9 +103,7 @@ class FasterRCNN(snt.AbstractModule):
         )
 
         if self._config.model.batch_norm:
-            conv_feature_map = snt.BatchNorm(
-                update_ops_collection=None
-            )(conv_feature_map, is_training)
+            conv_feature_map = snt.BatchNorm()(conv_feature_map, is_training)
 
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(
@@ -143,7 +141,8 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['anchor_reference'] = tf.convert_to_tensor(
                 self._anchor_reference
             )
-            prediction_dict['gt_boxes'] = gt_boxes
+            if gt_boxes:
+                prediction_dict['gt_boxes'] = gt_boxes
             prediction_dict['conv_feature_map'] = conv_feature_map
 
         if self._with_rcnn:

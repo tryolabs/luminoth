@@ -35,7 +35,7 @@ class TruncatedBaseNetwork(BaseNetwork):
             self.module_name, config.architecture, self._endpoint
         )
 
-    def _build(self, inputs, is_training=True):
+    def _build(self, inputs, is_training=False):
         """
         Args:
             inputs: A Tensor of shape `(batch_size, height, width, channels)`.
@@ -52,7 +52,7 @@ class TruncatedBaseNetwork(BaseNetwork):
 
         return self._get_endpoint(dict(pred['end_points']))
 
-    def _build_tail(self, inputs):
+    def _build_tail(self, inputs, is_training=False):
         if self._architecture == 'resnet_v1_101':
             with self._enter_variable_scope():
                 weight_decay = self._config.get('arg_scope', {}).get('weight_decay', 0)
@@ -62,7 +62,7 @@ class TruncatedBaseNetwork(BaseNetwork):
                             batch_norm_epsilon=1e-5,
                             batch_norm_scale=True,
                             weight_decay=weight_decay)):
-                        with slim.arg_scope([slim.batch_norm], is_training=False):
+                        with slim.arg_scope([slim.batch_norm], is_training=is_training):
                             blocks = [
                                 resnet_utils.Block('block4', resnet_v1.bottleneck, [{
                                     'depth': 2048,

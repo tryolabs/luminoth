@@ -176,7 +176,9 @@ class RCNN(snt.AbstractModule):
             prediction_dict['_debug']['roi'] = roi_prediction
 
         pooled_features = roi_prediction['roi_pool']
-        features = base_network._build_tail(pooled_features)
+        features = base_network._build_tail(
+            pooled_features, is_training=is_training
+        )
 
         if self._use_mean:
             # We avg our height and width dimensions for a more
@@ -203,9 +205,7 @@ class RCNN(snt.AbstractModule):
             # Through FC layer.
             net = layer(net)
             if self._config.batch_norm:
-                net = snt.BatchNorm(
-                    update_ops_collection=None
-                )(net, is_training=is_training)
+                net = snt.BatchNorm()(net, is_training=is_training)
 
             # Apply activation and dropout.
             # variable_summaries(net, 'fc_{}_preactivationout'.format(i), ['rcnn'])

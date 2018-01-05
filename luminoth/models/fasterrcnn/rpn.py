@@ -147,9 +147,7 @@ class RPN(snt.AbstractModule):
         # can be set to empty.
         rpn_conv_feature = self._rpn(conv_feature_map)
         if self._config.batch_norm:
-            rpn_conv_feature = snt.BatchNorm(
-                update_ops_collection=None
-            )(rpn_conv_feature, is_training)
+            rpn_conv_feature = snt.BatchNorm()(rpn_conv_feature, is_training)
         rpn_feature = self._rpn_activation(rpn_conv_feature)
 
         # Then we apply separate conv layers for classification and regression.
