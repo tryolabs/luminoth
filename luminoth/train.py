@@ -220,9 +220,9 @@ def train(config_files, job_dir, override_params):
     """
     Parse TF_CONFIG to cluster_spec and call run() function
     """
-    # TF_CONFIG environment variable is available when running using
-    # gcloud either locally or on cloud. It has all the information required
-    # to create a ClusterSpec which is important for running distributed code.
+    # TF_CONFIG environment variable is available when running using gcloud
+    # either locally or on cloud. It has all the information required to create
+    # a ClusterSpec which is important for running distributed code.
     tf_config_val = os.environ.get('TF_CONFIG')
 
     if tf_config_val:
