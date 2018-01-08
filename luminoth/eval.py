@@ -20,8 +20,8 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 @click.option('--iou-threshold', type=float, default=0.5, help='IoU threshold to use.')  # noqa
 @click.option('--min-probability', type=float, default=0.5, help='Minimum probability to use.')  # noqa
-def evaluate(dataset_split, config_files, watch, from_global_step,
-             override_params, files_per_class, iou_threshold, min_probability):
+def eval(dataset_split, config_files, watch, from_global_step,
+         override_params, files_per_class, iou_threshold, min_probability):
     """Evaluate models using dataset."""
 
     # If the config file is empty, our config will be the base_config for the
@@ -589,7 +589,3 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     mean_ap = np.mean(ap_per_class)
 
     return mean_ap, ap_per_class
-
-
-if __name__ == '__main__':
-    evaluate()
