@@ -97,33 +97,34 @@ class SSD(snt.AbstractModule):
 
         # Build a MultiBox predictor on top of each feature layer
         predictions = {}
-        for i, (feature_map_name, feature_map) in enumerate(feature_maps.items()):
+        for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
             num_anchors = self._anchors_per_point[i]
 
             # Location predictions
             num_loc_pred = num_anchors * 4
-            loc_pred = slim.conv2d(feature_map, num_loc_pred, [3, 3],
+            loc_pred = slim.conv2d(feat_map, num_loc_pred, [3, 3],
                                    activation_fn=None,
-                                   scope=feature_map_name + '/conv_loc',
+                                   scope=feat_map_name + '/conv_loc',
                                    padding='SAME')
             loc_pred = tf.reshape(loc_pred, [-1, 4])
 
             # Class predictions
             num_cls_pred = num_anchors * (self._num_classes + 1)
-            cls_pred = slim.conv2d(feature_map, num_cls_pred, [3, 3],
+            cls_pred = slim.conv2d(feat_map, num_cls_pred, [3, 3],
                                    activation_fn=None,
-                                   scope=feature_map_name + '/conv_cls',
+                                   scope=feat_map_name + '/conv_cls',
                                    padding='SAME')
             cls_pred = tf.reshape(cls_pred, [-1, self._num_classes + 1])
 
-            predictions[feature_map_name] = {}
-            predictions[feature_map_name]['loc_pred'] = loc_pred
-            predictions[feature_map_name]['cls_pred'] = cls_pred
-            predictions[feature_map_name]['prob'] = slim.softmax(cls_pred)
+            predictions[feat_map_name] = {}
+            predictions[feat_map_name]['loc_pred'] = loc_pred
+            predictions[feat_map_name]['cls_pred'] = cls_pred
+            predictions[feat_map_name]['prob'] = slim.softmax(cls_pred)
 
         self.anchors = self.generate_all_anchors(feature_maps)
 
         # Get all_anchors from each endpoint
+        # TODO: Are all these lists necessary?
         all_anchors_list = []
         loc_pred_list = []
         cls_pred_list = []
@@ -404,7 +405,9 @@ class SSD(snt.AbstractModule):
         """
         trainable_vars = snt.get_variables_in_module(self)
         if self._config.model.base_network.trainable:
-            pretrained_trainable_vars = self.base_network.get_trainable_vars()
+            pretrained_trainable_vars = (
+                self.feature_extractor.get_trainable_vars()
+            )
             tf.logging.info('Training {} vars from pretrained module.'.format(
                 len(pretrained_trainable_vars)))
             trainable_vars += pretrained_trainable_vars
@@ -416,11 +419,12 @@ class SSD(snt.AbstractModule):
     def get_saver(self, ignore_scope=None):
         """Get an instance of tf.train.Saver for all modules and submodules.
         """
-        return get_saver((self, self.base_network), ignore_scope=ignore_scope)
+        return get_saver((self, self.feature_extractor),
+                         ignore_scope=ignore_scope)
 
     def load_pretrained_weights(self):
         """Get operation to load pretrained weights from file.
         """
         with tf.control_dependencies([tf.global_variables_initializer()]):
-            res = self.base_network.load_weights()
+            res = self.feature_extractor.load_weights()
         return res
