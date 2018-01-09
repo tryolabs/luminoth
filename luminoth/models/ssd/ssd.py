@@ -121,20 +121,24 @@ class SSD(snt.AbstractModule):
             predictions[feature_map_name]['cls_pred'] = cls_pred
             predictions[feature_map_name]['prob'] = slim.softmax(cls_pred)
 
-
-        self.anchors = self.generate_anchors(feature_maps)
+        self.anchors = self.generate_all_anchors(feature_maps)
 
         # Get all_anchors from each endpoint
         all_anchors_list = []
         loc_pred_list = []
         cls_pred_list = []
         cls_prob_list = []
-        # for ind, endpoint in enumerate(self._endpoints):
-        for i, (layer_name, layer) in enumerate(feature_maps.items):
+
+        for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
+            # TODO: We should create them in image size from the start instead
+            #       of scaling them to their feature map size.
+            #       This probably creates problems with the later SSD layers
+            #       as they are 3x3 and 1x1, and we upscale them to 300x300.
+            feat_map_shape = feat_map.get_shape().as_list()[1:3]
             adjusted_bboxes = adjust_bboxes(
-                self.anchors[endpoint],
-                tf.cast(self._endpoints_outputs[ind][0], tf.float32),
-                tf.cast(self._endpoints_outputs[ind][1], tf.float32),
+                self.anchors[feat_map_name],
+                tf.cast(feat_map_shape[0], tf.float32),
+                tf.cast(feat_map_shape[1], tf.float32),
                 tf.cast(tf.shape(image)[1], tf.float32),
                 tf.cast(tf.shape(image)[2], tf.float32)
             )
@@ -142,10 +146,10 @@ class SSD(snt.AbstractModule):
             adjusted_bboxes = clip_boxes(
                 adjusted_bboxes, tf.cast(tf.shape(image)[1:3], tf.int32))
             all_anchors_list.append(adjusted_bboxes)
-            loc_pred_list.append(predictions[endpoint]['loc_pred'])
+            loc_pred_list.append(predictions[feat_map_name]['loc_pred'])
             cls_prob_list.append(
-                slim.softmax(predictions[endpoint]['cls_pred']))
-            cls_pred_list.append(predictions[endpoint]['cls_pred'])
+                slim.softmax(predictions[feat_map_name]['cls_pred']))
+            cls_pred_list.append(predictions[feat_map_name]['cls_pred'])
         all_anchors = tf.concat(all_anchors_list, axis=0)
         loc_pred = tf.concat(loc_pred_list, axis=0)
         cls_pred = tf.concat(cls_pred_list, axis=0)
@@ -308,37 +312,29 @@ class SSD(snt.AbstractModule):
 
             return total_loss
 
-    def generate_anchors_per_endpoint(self):
+    def generate_all_anchors(self, feature_maps):
         """
-        Returns a dictionary containing the anchors per endpoint.
+        Returns a dictionary containing the anchors per feature map.
 
         Returns:
-        anchors: A dictionary with `endpoints` as keys and an array of anchors
+        anchors: A dictionary with feature maps as keys and an array of anchors
             as values ('[[x_min, y_min, x_max, y_max], ...]') with shape
             (anchors_per_point[i] * endpoints_outputs[i][0]
              * endpoints_outputs[i][1], 4)
         """
-        # Calculate the scales (usign scale min/max and number of endpoints).
-        num_endpoints = len(self._endpoints)
-        scales = np.zeros([num_endpoints])
-        for endpoint in range(num_endpoints):
-            scales[endpoint] = (
-                self._anchor_min_scale +
-                (self._anchor_max_scale - self._anchor_min_scale) *
-                (endpoint) / (num_endpoints - 1)
-            )
+        # We interpolate the scales of the anchors from a min and a max scale
+        scales = np.linspace(self._anchor_min_scale, self._anchor_max_scale,
+                             len(feature_maps))
 
-        # For each endpoint calculate the anchors with the appropiate size.
         anchors = {}
-        for ind, endpoint in enumerate(self._endpoints):
-            # Get the anchors reference for this endpoint
+        for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
+            feat_map_shape = feat_map.get_shape().as_list()[1:3]
             anchor_reference = generate_anchors_reference(
-                self._anchor_ratios, scales[ind: ind + 2],
-                self._anchors_per_point[ind],
-                self._endpoints_outputs[ind]
+                self._anchor_ratios, scales[i: i + 2],
+                self._anchors_per_point[i], feat_map_shape
             )
-            anchors[endpoint] = self._generate_anchors(
-                self._endpoints_outputs[ind], anchor_reference)
+            anchors[feat_map_name] = self._generate_anchors(
+                feat_map_shape, anchor_reference)
 
         return anchors
 

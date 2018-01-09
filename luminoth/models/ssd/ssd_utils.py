@@ -33,7 +33,7 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
     return tf.stack([x_min, y_min, x_max, y_max], axis=1)
 
 
-def generate_anchors_reference(ratios, scales, num_anchors, endpoint_output):
+def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):
     """
     For each ratio we will get an anchor TODO
     Args: TODO
@@ -46,13 +46,13 @@ def generate_anchors_reference(ratios, scales, num_anchors, endpoint_output):
     # `num_anchors` - 1 ratios to generate the anchors
     if scales.shape[0] > 1:
         widths[0] = heights[0] = (np.sqrt(scales[0] * scales[1]) *
-                                  endpoint_output[0])
+                                  feature_map_shape[0])
     # The last endpoint
     else:
         widths[0] = heights[0] = scales[0]
     ratios = ratios[:num_anchors - 1]
-    heights[1:] = scales[0] / np.sqrt(ratios) * endpoint_output[0]
-    widths[1:] = scales[0] * np.sqrt(ratios) * endpoint_output[1]
+    heights[1:] = scales[0] / np.sqrt(ratios) * feature_map_shape[0]
+    widths[1:] = scales[0] * np.sqrt(ratios) * feature_map_shape[1]
 
     # Center point has the same X, Y value.
     center_xy = 0

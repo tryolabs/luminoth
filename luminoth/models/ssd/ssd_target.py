@@ -48,6 +48,7 @@ class SSDTarget(snt.AbstractModule):
                 The shape of the Tensor is (num_proposals, 4).
         """
 
+        # Proposals = all_anchors
         proposals = tf.cast(proposals, tf.float32)
         gt_boxes = tf.cast(gt_boxes, tf.float32)
 
