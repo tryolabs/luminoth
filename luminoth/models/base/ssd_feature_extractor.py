@@ -45,17 +45,13 @@ class SSDFeatureExtractor(BaseNetwork):
         # The original SSD paper uses a modified version of the vgg16 network,
         # which we'll build here
         if self.vgg_type:
-            # TODO: there is a problem with the scope, so I hardcoded this
-            #       in the meantime, check bottom of this file [1] for more info
             base_network_truncation_endpoint = base_net_endpoints[
-                'ssd_feature_extractor/vgg_16/conv5/conv5_3']
+                scope + '/vgg_16/conv5/conv5_3']
 
-            # TODO: there is a problem with the scope, so I hardcoded this
-            #       in the meantime, check bottom of this file [1] for more info
             # We'll add the feature maps to a collection. In the paper they use
             # one of vgg16's layers as a feature map, so we start by adding it.
             tf.add_to_collection('FEATURE_MAPS', base_net_endpoints[
-                'ssd_feature_extractor/vgg_16/conv4/conv4_3']
+                scope + '/vgg_16/conv4/conv4_3']
             )
 
             # TODO: check that the usage of `padding='VALID'` is correct
@@ -76,35 +72,16 @@ class SSDFeatureExtractor(BaseNetwork):
                                   outputs_collections='FEATURE_MAPS')
                 net = slim.conv2d(net, 128, [1, 1], scope='conv10_1')
                 net = slim.conv2d(net, 256, [3, 3], scope='conv10_2',
-                                  padding='VALID', outputs_collections='FEATURE_MAPS')
+                                  padding='VALID',
+                                  outputs_collections='FEATURE_MAPS')
                 net = slim.conv2d(net, 128, [1, 1], scope='conv11_1')
-                # import ipdb; ipdb.set_trace()
                 net = slim.conv2d(net, 256, [3, 3], scope='conv11_2',
-                                  padding='VALID', outputs_collections='FEATURE_MAPS')
+                                  padding='VALID',
+                                  outputs_collections='FEATURE_MAPS')
+
+            # This parameter determines onto which variables we try to load the
+            # pretrained weights
+            self.pretrained_weights_scope = 'ssd_feature_extractor/vgg_16'
 
         # Its actually an ordered dict
         return utils.convert_collection_to_dict('FEATURE_MAPS')
-
-# [1]:
-# ipdb> for k in base_net_endpoints.keys(): print(k)
-# ssd_feature_extractor/vgg_16/conv1/conv1_1
-# ssd_feature_extractor/vgg_16/conv1/conv1_2
-# ssd/ssd_feature_extractor/vgg_16/pool1
-# ssd_feature_extractor/vgg_16/conv2/conv2_1
-# ssd_feature_extractor/vgg_16/conv2/conv2_2
-# ssd/ssd_feature_extractor/vgg_16/pool2
-# ssd_feature_extractor/vgg_16/conv3/conv3_1
-# ssd_feature_extractor/vgg_16/conv3/conv3_2
-# ssd_feature_extractor/vgg_16/conv3/conv3_3
-# ssd/ssd_feature_extractor/vgg_16/pool3
-# ssd_feature_extractor/vgg_16/conv4/conv4_1
-# ssd_feature_extractor/vgg_16/conv4/conv4_2
-# ssd_feature_extractor/vgg_16/conv4/conv4_3
-# ssd/ssd_feature_extractor/vgg_16/pool4
-# ssd_feature_extractor/vgg_16/conv5/conv5_1
-# ssd_feature_extractor/vgg_16/conv5/conv5_2
-# ssd_feature_extractor/vgg_16/conv5/conv5_3
-# ssd/ssd_feature_extractor/vgg_16/pool5
-# ssd_feature_extractor/vgg_16/fc6
-# ssd_feature_extractor/vgg_16/fc7
-# ssd_feature_extractor/vgg_16/fc8
