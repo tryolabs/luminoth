@@ -183,11 +183,20 @@ class BaseNetwork(snt.AbstractModule):
             # config file.
             # Weights are downloaded by default to the $LUMI_HOME folder if
             # running locally, or to the job bucket if running in Google Cloud.
+
+            # TODO: Shouldn't _config['weights'] be called weights_path or
+            # something similar?
             self._config['weights'] = get_checkpoint_file(self._architecture)
 
-        module_variables = snt.get_variables_in_module(
-            self, tf.GraphKeys.MODEL_VARIABLES
-        )
+        if self.pretrained_weights_scope:
+            module_variables = tf.get_collection(
+                tf.GraphKeys.MODEL_VARIABLES,
+                scope=self.pretrained_weights_scope
+            )
+        else:
+            module_variables = snt.get_variables_in_module(
+                self, tf.GraphKeys.MODEL_VARIABLES
+            )
         assert len(module_variables) > 0
 
         load_variables = []

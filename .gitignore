@@ -92,7 +92,11 @@ tags
 Pipfile
 Pipfile.lock
 
+# Flake8
+.flake8
+
 # Luminoth
 /datasets
 /logs
 /models
+/jobs
