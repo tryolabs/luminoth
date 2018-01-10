@@ -44,25 +44,35 @@ def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):
     # Because the ratio of 1 we will use the scale sqrt(scale[i] * scale[i+1])
     #  or sqrt(scale[i_max] * scale[i_max]). So we will have to use just
     # `num_anchors` - 1 ratios to generate the anchors
-    if scales.shape[0] > 1:
+    if len(scales) > 1:
         widths[0] = heights[0] = (np.sqrt(scales[0] * scales[1]) *
                                   feature_map_shape[0])
     # The last endpoint
     else:
-        widths[0] = heights[0] = scales[0]
+        # The scale of the last layer is 0.99, so the extra scale
+        # I'll try here will actually be smaller. This is not
+        # detailed in the paper and is very hacky, but it makes
+        # sense. So it works as a temporary measure.
+        heights[0] = scales[0] * feature_map_shape[0] * 0.8
+        widths[0] = scales[0] * feature_map_shape[1] * 0.8
+
     ratios = ratios[:num_anchors - 1]
     heights[1:] = scales[0] / np.sqrt(ratios) * feature_map_shape[0]
     widths[1:] = scales[0] * np.sqrt(ratios) * feature_map_shape[1]
 
-    # Center point has the same X, Y value.
-    center_xy = 0
+    # Each feature layer forms a grid on image space, so we
+    # calculate the center point on the first cell of this grid.
+    # Which we'll use as the center for our anchor reference.
+    # The center will be the midpoint of the top left cell,
+    # given that each cell is of 1x1 size, its center will be 0.5x0.5
+    x_center = y_center = 0.5
 
     # Create anchor reference.
     anchors = np.column_stack([
-        center_xy - (widths - 1) / 2,
-        center_xy - (heights - 1) / 2,
-        center_xy + (widths - 1) / 2,
-        center_xy + (heights - 1) / 2,
+        x_center - widths / 2,
+        y_center - heights / 2,
+        x_center + widths / 2,
+        y_center + heights / 2,
     ])
 
     return anchors

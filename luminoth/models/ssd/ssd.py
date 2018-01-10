@@ -359,10 +359,8 @@ class SSD(snt.AbstractModule):
                 using the (x1, y1, x2, y2) convention.
         """
         with tf.variable_scope('generate_anchors'):
-            grid_width = feature_map_shape[1]  # width
-            grid_height = feature_map_shape[0]  # height
-            shift_x = tf.range(grid_width)
-            shift_y = tf.range(grid_height)
+            shift_x = tf.range(feature_map_shape[1])
+            shift_y = tf.range(feature_map_shape[0])
             shift_x, shift_y = tf.meshgrid(shift_x, shift_y)
 
             shift_x = tf.reshape(shift_x, [-1])
