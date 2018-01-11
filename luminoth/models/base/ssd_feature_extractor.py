@@ -1,8 +1,12 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
+from tensorflow.contrib.layers.python.layers import initializers, utils
+from tensorflow.contrib.framework.python.ops import variables
+from tensorflow.python.ops import init_ops
+
 from luminoth.models.base import BaseNetwork
-from tensorflow.contrib.layers.python.layers import utils
+
 
 VALID_ARCHITECTURES = set([
     'vgg_16',
@@ -31,7 +35,6 @@ class SSDFeatureExtractor(BaseNetwork):
         Returns:
             A dict of feature maps to be consumed by an SSD network
         """
-
         # TODO: Is there a better way to manage scoping in these cases?
         scope = self.module_name
         if self.parent_name:
@@ -50,9 +53,34 @@ class SSDFeatureExtractor(BaseNetwork):
 
             # We'll add the feature maps to a collection. In the paper they use
             # one of vgg16's layers as a feature map, so we start by adding it.
-            tf.add_to_collection('FEATURE_MAPS', base_net_endpoints[
-                scope + '/vgg_16/conv4/conv4_3']
-            )
+            vgg_conv4_3_name = scope + '/vgg_16/conv4/conv4_3'
+            vgg_conv4_3 = base_net_endpoints[vgg_conv4_3_name]
+
+            # As it is pointed out in SSD and ParseNet papers, `conv4_3` has a
+            # different features scale compared to other layers, to adjust it
+            # we need to add a spatial normalization before adding the
+            # predictors.
+            with tf.variable_scope(vgg_conv4_3_name + '_norm'):
+                inputs_shape = vgg_conv4_3.get_shape()
+                inputs_rank = inputs_shape.ndims
+                dtype = vgg_conv4_3.dtype.base_dtype
+
+                norm_dim = tf.range(inputs_rank - 1, inputs_rank)
+                params_shape = inputs_shape[-1:]
+
+                vgg_conv4_3_norm = tf.nn.l2_normalize(
+                    vgg_conv4_3, norm_dim, epsilon=1e-12
+                )
+
+                # Post scaling.
+                scale = variables.model_variable(
+                    'gamma', shape=params_shape, dtype=dtype,
+                    initializer=init_ops.ones_initializer()
+                )
+
+                vgg_conv4_3_norm = tf.multiply(vgg_conv4_3_norm, scale)
+
+            tf.add_to_collection('FEATURE_MAPS', vgg_conv4_3_norm)
 
             # TODO: check that the usage of `padding='VALID'` is correct
             # TODO: check that the 1x1 convs actually use relu
