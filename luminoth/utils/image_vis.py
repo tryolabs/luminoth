@@ -94,6 +94,23 @@ summaries_fn = {
                 'draw_object_prediction': None
             }
         },
+    },
+    'ssd': {
+        'train': {
+            'proposal': {
+                'draw_object_prediction': None
+            }
+        },
+        'eval': {
+            'proposal': {
+                'draw_object_prediction': None
+            }
+        },
+        'debug': {
+            'proposal': {
+                'draw_object_prediction': None
+            }
+        }
     }
 }
 
@@ -131,25 +148,36 @@ def get_image_summaries(summaries_fn, pred_dict, image,
     return summaries
 
 
-def image_vis_summaries(pred_dict, with_rcnn=True, extra_tag=None,
+def image_vis_summaries(pred_dict, config=None, extra_tag=None,
                         image_visualization_mode=None, image=None,
                         gt_bboxes=None):
     summaries = []
-    summaries.extend(
-        get_image_summaries(
-            summaries_fn[
-                'fasterrcnn'][image_visualization_mode]['rpn'],
-            pred_dict, image, gt_bboxes,
-            extra_tag=extra_tag
-        )
-    )
-    if with_rcnn and summaries_fn[
-            'fasterrcnn'][image_visualization_mode].get('rcnn'):
+    if config.type == 'fasterrcnn':
         summaries.extend(
             get_image_summaries(
                 summaries_fn[
-                    'fasterrcnn'][image_visualization_mode]['rcnn'],
-                pred_dict, image, gt_bboxes, extra_tag=extra_tag
+                    'fasterrcnn'][image_visualization_mode]['rpn'],
+                pred_dict, image, gt_bboxes,
+                extra_tag=extra_tag
+            )
+        )
+
+        if config.network.with_rcnn and summaries_fn[
+                'fasterrcnn'][image_visualization_mode].get('rcnn'):
+            summaries.extend(
+                get_image_summaries(
+                    summaries_fn[
+                        'fasterrcnn'][image_visualization_mode]['rcnn'],
+                    pred_dict, image, gt_bboxes, extra_tag=extra_tag
+                )
+            )
+    elif config.type == 'ssd':
+        summaries.extend(
+            get_image_summaries(
+                summaries_fn[
+                    'ssd'][image_visualization_mode]['proposal'],
+                pred_dict, image, gt_bboxes,
+                extra_tag=extra_tag
             )
         )
 
