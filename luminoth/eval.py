@@ -295,6 +295,8 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
         try:
             track_start = start_time
             track_count = 0
+            period_detected_count = 0
+            period_detected_max = 0
             while not coord.should_stop():
                 fetches = {
                     'metric_ops': ops['metric_ops'],
@@ -320,6 +322,12 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = batch_fetched['losses']
+
+                num_detected = len(batch_fetched['scores'])
+                period_detected_count += num_detected
+                period_detected_max = max(period_detected_max, num_detected)
+                if period_detected_max == len(batch_fetched['scores']):
+                    period_max_img = batch_fetched['filename']
 
                 if image_vis is not None:
                     filename = batch_fetched['filename'].decode('utf-8')
@@ -358,20 +366,27 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 track_end = time.time()
                 if track_end - track_start > 20.:
                     click.echo(
-                        '{} processed in {:.2f}s (global {:.2f} images/s, period {:.2f} images/s)'.format(
+                        '{} processed in {:.2f}s (global {:.2f} images/s, '
+                        'period {:.2f} images/s, avg {:.2f}, '
+                        'max {} on {})'.format(
                             total_evaluated, track_end - start_time,
                             total_evaluated / (track_end - start_time),
-                            track_count / (track_end - track_start)
+                            track_count / (track_end - track_start),
+                            period_detected_count / track_count,
+                            period_detected_max, period_max_img
                         ))
                     track_count = 0
                     track_start = track_end
+                    period_detected_count = 0
+                    period_detected_max = 0
 
         except tf.errors.OutOfRangeError:
 
             # Save final evaluation stats into summary under the checkpoint's
             # global step.
             map_at_iou, per_class_at_iou = calculate_map(
-                output_per_batch, config.model.network.num_classes, iou_threshold
+                output_per_batch, config.model.network.num_classes,
+                iou_threshold
             )
 
             tf.logging.info('Finished evaluation at step {}.'.format(
