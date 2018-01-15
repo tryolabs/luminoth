@@ -6,12 +6,12 @@ from luminoth.models.base import BaseNetwork
 
 
 DEFAULT_ENDPOINTS = {
-    'resnet_v1_50': 'block3/unit_5/bottleneck_v1/conv3',
-    'resnet_v1_101': 'block3/unit_22/bottleneck_v1/conv3',
-    'resnet_v1_152': 'block3/unit_35/bottleneck_v1/conv3',
-    'resnet_v2_50': 'block3/unit_5/bottleneck_v2/conv3',
-    'resnet_v2_101': 'block3/unit_22/bottleneck_v2/conv3',
-    'resnet_v2_152': 'block3/unit_35/bottleneck_v2/conv3',
+    'resnet_v1_50': 'block3',
+    'resnet_v1_101': 'block3',
+    'resnet_v1_152': 'block3',
+    'resnet_v2_50': 'block3',
+    'resnet_v2_101': 'block3',
+    'resnet_v2_152': 'block3',
     'vgg_16': 'conv5/conv5_3',
     'vgg_19': 'conv5/conv5_4',
 }
