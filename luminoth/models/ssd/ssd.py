@@ -217,6 +217,7 @@ class SSD(snt.AbstractModule):
             prediction_dict['all_anchors'] = all_anchors
             prediction_dict['all_anchors_target'] = all_anchors_target
             prediction_dict['cls_prob'] = cls_prob
+            prediction_dict['gt_boxes'] = gt_boxes
 
         return prediction_dict
 
