@@ -196,5 +196,6 @@ class SSDProposal(snt.AbstractModule):
         return {
             'objects': top_k_proposals,
             'labels': top_k_proposal_label,
-            'probs': top_k_proposal_label_prob
+            'probs': top_k_proposal_label_prob,
+            'raw_proposals': raw_proposals,
         }

@@ -97,19 +97,14 @@ summaries_fn = {
     },
     'ssd': {
         'train': {
-            'proposal': {
-                'draw_object_prediction': None
-            }
+            'draw_object_prediction': None,
         },
         'eval': {
-            'proposal': {
-                'draw_object_prediction': None
-            }
+            'draw_object_prediction': None,
         },
         'debug': {
-            'proposal': {
-                'draw_object_prediction': None
-            }
+            'draw_object_prediction': None,
+            'draw_ssd_raw_proposals': None,
         }
     }
 }
@@ -174,8 +169,7 @@ def image_vis_summaries(pred_dict, config=None, extra_tag=None,
     elif config.type == 'ssd':
         summaries.extend(
             get_image_summaries(
-                summaries_fn[
-                    'ssd'][image_visualization_mode]['proposal'],
+                summaries_fn['ssd'][image_visualization_mode],
                 pred_dict, image, gt_bboxes,
                 extra_tag=extra_tag
             )
@@ -1223,5 +1217,32 @@ def draw_rcnn_input_proposals(pred_dict, image):
             tuple([proposal[0], proposal[1]]),
             text='{:.2f}'.format(overlap)[1:],
             font=font, fill=(0, 0, 0, 255))
+
+    return image_pil
+
+
+def draw_ssd_raw_proposals(pred_dict, image):
+    image_pil, draw = get_image_draw(image)
+
+    fill_alpha = 70
+
+    raw_proposals = pred_dict['proposal_prediction']['raw_proposals']
+    for proposal in raw_proposals:
+        bbox = list(proposal)
+        if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
+            logger.debug('Proposal has negative area: {}'.format(bbox))
+            continue
+
+        draw.rectangle(
+            bbox, fill=(0, 255, 0, fill_alpha), outline=(0, 255, 0, 50)
+        )
+
+        fill_alpha -= 5
+
+    gt_bboxes = pred_dict['gt_bboxes']
+    for gt_box in gt_bboxes:
+        draw.rectangle(
+            list(gt_box[:4]), fill=(0, 0, 255, 60),
+        outline=(0, 0, 255, 150))
 
     return image_pil
