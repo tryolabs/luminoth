@@ -6,7 +6,7 @@ from luminoth.models.fasterrcnn.rcnn_target import RCNNTarget
 from luminoth.models.fasterrcnn.roi_pool import ROIPoolingLayer
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import (
-    get_initializer, # layer_summaries, # variable_summaries,
+    get_initializer, layer_summaries, variable_summaries,
     get_activation_function
 )
 
@@ -197,17 +197,18 @@ class RCNN(snt.AbstractModule):
                 net = snt.BatchNorm()(net, is_training=is_training)
 
             # Apply activation and dropout.
-            # variable_summaries(net, 'fc_{}_preactivationout'.format(i), ['rcnn'])
+            variable_summaries(
+                net, 'fc_{}_preactivationout'.format(i), 'reduced'
+            )
             net = self._activation(net)
             if self._debug:
-
                 # pos = tf.range(1, tf.add(tf.shape(net)[1], 1), dtype=tf.int32)
                 # var = tf.multiply(tf.round(tf.minimum(net, 1.)), tf.to_float(pos))
                 # tf.summary.histogram('fc_{}_relustate'.format(i), var, ['rcnn'])
 
                 prediction_dict['_debug']['layer_{}_out'.format(i)] = net
 
-            # variable_summaries(net, 'fc_{}_out'.format(i), ['rcnn'])
+            variable_summaries(net, 'fc_{}_out'.format(i), 'reduced')
             if is_training:
                 net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
@@ -236,15 +237,13 @@ class RCNN(snt.AbstractModule):
             prediction_dict['_debug']['proposal'] = proposals_pred
 
         # Calculate summaries for results
-        # variable_summaries(cls_prob, 'cls_prob', ['rcnn'])
-        # variable_summaries(bbox_offsets, 'bbox_offsets', ['rcnn'])
+        variable_summaries(cls_prob, 'cls_prob', 'reduced')
+        variable_summaries(bbox_offsets, 'bbox_offsets', 'reduced')
 
         if self._debug:
-            # variable_summaries(pooled_features, 'pooled_features', ['rcnn'])
-
-            # layer_summaries(self._classifier_layer, ['rcnn'])
-            # layer_summaries(self._bbox_layer, ['rcnn'])
-            pass
+            variable_summaries(pooled_features, 'pooled_features', 'full')
+            layer_summaries(self._classifier_layer, 'full')
+            layer_summaries(self._bbox_layer, 'full')
 
         return prediction_dict
 
