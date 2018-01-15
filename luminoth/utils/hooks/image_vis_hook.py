@@ -29,6 +29,10 @@ class ImageVisHook(tf.train.SessionRunHook):
         self._image = image
         self._gt_bboxes = gt_bboxes
 
+        tf.logging.info('ImageVisHook was created with mode = "{}"'.format(
+            image_visualization_mode
+        ))
+
     def begin(self):
         if self._summary_writer is None and self._output_dir:
             self._summary_writer = SummaryWriterCache.get(self._output_dir)
