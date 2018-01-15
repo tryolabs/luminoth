@@ -55,20 +55,29 @@ class TruncatedBaseNetwork(BaseNetwork):
     def _build_tail(self, inputs, is_training=False):
         if self._architecture == 'resnet_v1_101':
             with self._enter_variable_scope():
-                weight_decay = self._config.get('arg_scope', {}).get('weight_decay', 0)
+                weight_decay = (
+                    self._config.get('arg_scope', {}).get('weight_decay', 0)
+                )
                 with tf.variable_scope(self._architecture, reuse=True):
-                    with slim.arg_scope(
-                        resnet_utils.resnet_arg_scope(
+                    resnet_arg_scope = resnet_utils.resnet_arg_scope(
                             batch_norm_epsilon=1e-5,
                             batch_norm_scale=True,
-                            weight_decay=weight_decay)):
-                        with slim.arg_scope([slim.batch_norm], is_training=is_training):
+                            weight_decay=weight_decay
+                        )
+                    with slim.arg_scope(resnet_arg_scope):
+                        with slim.arg_scope(
+                            [slim.batch_norm], is_training=is_training
+                        ):
                             blocks = [
-                                resnet_utils.Block('block4', resnet_v1.bottleneck, [{
-                                    'depth': 2048,
-                                    'depth_bottleneck': 512,
-                                    'stride': 1
-                                }] * 3)
+                                resnet_utils.Block(
+                                    'block4',
+                                    resnet_v1.bottleneck,
+                                    [{
+                                        'depth': 2048,
+                                        'depth_bottleneck': 512,
+                                        'stride': 1
+                                    }] * 3
+                                )
                             ]
                             proposal_classifier_features = (
                                 resnet_utils.stack_blocks_dense(inputs, blocks)
@@ -83,7 +92,7 @@ class TruncatedBaseNetwork(BaseNetwork):
         Returns a list of the variables that are trainable.
 
         Returns:
-            trainable_variables: a list of `tf.Variable`.
+            trainable_variables: a tuple of `tf.Variable`.
         """
         all_trainable = super(TruncatedBaseNetwork, self).get_trainable_vars()
 
@@ -103,12 +112,28 @@ class TruncatedBaseNetwork(BaseNetwork):
             pass
 
         if index is None:
-            raise ValueError(
-                '"{}" is an invalid value of endpoint for this '
-                'architecture.'.format(self._endpoint)
-            )
+            # Resulting `trainable_vars` is empty, possibly due to the
+            # `fine_tune_from` starting after the endpoint.
+            trainable_vars = tuple()
+        else:
+            trainable_vars = all_trainable[:index + 1]
 
-        return all_trainable[:index + 1]
+        if self._architecture == 'resnet_v1_101':
+            # Retrieve the trainable vars out of the tail.
+            # TODO: Tail should be configurable too, to avoid hard-coding
+            # the trainable portion to `block4` and allow using something in
+            # block4 as endpoint.
+            var_iter = enumerate(v.name for v in all_trainable)
+            try:
+                index = next(i for i, name in var_iter if 'block4' in name)
+            except StopIteration:
+                raise ValueError(
+                    '"block4" not present in the trainable vars retrieved '
+                    'from base network.'
+                )
+            trainable_vars += all_trainable[index:]
+
+        return trainable_vars
 
     def _get_endpoint(self, endpoints):
         """

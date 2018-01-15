@@ -334,8 +334,17 @@ class FasterRCNN(snt.AbstractModule):
         trainable_vars = snt.get_variables_in_module(self)
         if self._config.model.base_network.trainable:
             pretrained_trainable_vars = self.base_network.get_trainable_vars()
-            tf.logging.info('Training {} vars from pretrained module.'.format(
-                len(pretrained_trainable_vars)))
+            if len(pretrained_trainable_vars):
+                tf.logging.info(
+                    'Training {} vars from pretrained module; '
+                    'from "{}" to "{}".'.format(
+                        len(pretrained_trainable_vars),
+                        pretrained_trainable_vars[0].name,
+                        pretrained_trainable_vars[-1].name,
+                    )
+                )
+            else:
+                tf.logging.info('No vars from pretrained module to train.')
             trainable_vars += pretrained_trainable_vars
         else:
             tf.logging.info('Not training variables from pretrained module')

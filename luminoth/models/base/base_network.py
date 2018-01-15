@@ -216,7 +216,7 @@ class BaseNetwork(snt.AbstractModule):
         If `fine_tune_from` is None, then all the variables will be trainable.
 
         Returns:
-            trainable_variables: a list of `tf.Variable`.
+            trainable_variables: a tuple of `tf.Variable`.
         """
         all_variables = snt.get_variables_in_module(self)
 
