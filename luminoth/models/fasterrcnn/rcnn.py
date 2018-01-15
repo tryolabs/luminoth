@@ -183,9 +183,7 @@ class RCNN(snt.AbstractModule):
         if self._use_mean:
             # We avg our height and width dimensions for a more
             # "memory-friendly" Tensor.
-            pooled_features = tf.reduce_mean(
-                features, [1, 2], keep_dims=True
-            )
+            features = tf.reduce_mean(features, [1, 2])
 
         # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
