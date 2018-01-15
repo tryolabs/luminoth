@@ -160,15 +160,6 @@ class RCNN(snt.AbstractModule):
                 'bbox_offsets': bbox_offsets_target,
             }
 
-        # assertion = tf.Assert(
-        #     tf.greater(tf.shape(proposals)[0], 0),
-        #     [
-        #         'RCNN_ERROR', proposals, gt_boxes, im_shape,
-        #         proposals_target, bbox_offsets_target
-        #     ], summarize=10000)
-        # with tf.control_dependencies([assertion]):
-        #     proposals = tf.identity(proposals)
-
         roi_prediction = self._roi_pool(proposals, conv_feature_map, im_shape)
 
         if self._debug:
