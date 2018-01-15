@@ -54,6 +54,9 @@ class TruncatedBaseNetwork(BaseNetwork):
 
     def _build_tail(self, inputs, is_training=False):
         if self._architecture == 'resnet_v1_101':
+            train_batch_norm = (
+                is_training and self._config.get('train_batch_norm')
+            )
             with self._enter_variable_scope():
                 weight_decay = (
                     self._config.get('arg_scope', {}).get('weight_decay', 0)
@@ -66,7 +69,7 @@ class TruncatedBaseNetwork(BaseNetwork):
                         )
                     with slim.arg_scope(resnet_arg_scope):
                         with slim.arg_scope(
-                            [slim.batch_norm], is_training=is_training
+                            [slim.batch_norm], is_training=train_batch_norm
                         ):
                             blocks = [
                                 resnet_utils.Block(
