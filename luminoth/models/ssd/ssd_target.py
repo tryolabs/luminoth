@@ -58,7 +58,7 @@ class SSDTarget(snt.AbstractModule):
         proposals_label_shape = tf.gather(tf.shape(proposals), [0])
         proposals_label = tf.fill(
             dims=proposals_label_shape,
-            value=-2.
+            value=-1.
         )
 
         overlaps = bbox_overlap_tf(proposals, gt_boxes[:, :4])
@@ -147,27 +147,46 @@ class SSDTarget(snt.AbstractModule):
         # Disable some backgrounds according to hard minning ratio.
         num_fg_mask = tf.greater(proposals_label, 0.0)
         num_fg = tf.cast(tf.count_nonzero(num_fg_mask), tf.float32)
+
         # Use the worst backgrounds (the bgs which probability of being fg is
-        # the greatest)
-        probs_no_bg = probs[:, 1:]
-        max_probs = tf.reduce_max(probs_no_bg, axis=1)
+        # the greatest).
+
+        # Transform to one-hot vector.
+        cls_target_one_hot = tf.one_hot(
+            tf.cast(best_proposals_gt_labels, tf.int32), depth=self._num_classes + 1,
+            name='cls_target_one_hot'
+        )
+
+        # We get cross entropy loss of each proposal.
+        cross_entropy_per_proposal = (
+            tf.nn.softmax_cross_entropy_with_logits(
+                labels=cls_target_one_hot, logits=probs
+            )
+        )
+
+        proposals_label = tf.where(
+            condition=num_fg_mask,
+            x=proposals_label,
+            y=tf.fill(dims=proposals_label_shape, value=-1.)
+        )
+
         # We calculate up to how many backgrounds we desire based on the
         # final number of foregrounds and the hard minning ratio.
         num_bg = tf.cast(num_fg * self._foreground_fraction, tf.int32)
-        top_k_bg = tf.nn.top_k(max_probs, k=num_bg)
+        top_k_bg = tf.nn.top_k(cross_entropy_per_proposal, k=num_bg)
 
         set_bg = tf.sparse_to_dense(
-                sparse_indices=top_k_bg.indices,
-                sparse_values=True, default_value=False,
-                output_shape=proposals_label_shape,
-                validate_indices=False
-            )
+            sparse_indices=top_k_bg.indices,
+            sparse_values=True, default_value=False,
+            output_shape=proposals_label_shape,
+            validate_indices=False
+        )
 
         proposals_label = tf.where(
-                condition=set_bg,
-                x=tf.fill(dims=proposals_label_shape, value=0.),
-                y=proposals_label
-            )
+            condition=set_bg,
+            x=tf.fill(dims=proposals_label_shape, value=0.),
+            y=proposals_label
+        )
 
         """
         Next step is to calculate the proper targets for the proposals labeled
