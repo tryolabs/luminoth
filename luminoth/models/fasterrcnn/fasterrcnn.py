@@ -141,7 +141,7 @@ class FasterRCNN(snt.AbstractModule):
             prediction_dict['anchor_reference'] = tf.convert_to_tensor(
                 self._anchor_reference
             )
-            if gt_boxes:
+            if gt_boxes is not None:
                 prediction_dict['gt_boxes'] = gt_boxes
             prediction_dict['conv_feature_map'] = conv_feature_map
 
