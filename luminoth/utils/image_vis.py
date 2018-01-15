@@ -445,7 +445,7 @@ def draw_bbox(image, bbox):
 def draw_top_proposals(pred_dict, image, min_score=0.8, max_display=20,
                        top_k=True, used_in_batch=False):
     tf.logging.debug(
-        'Top proposals (blue = matches target in batch,'
+        'Top proposals (blue = matches target in batch, '
         'green = matches background in batch, red = ignored in batch)')
     proposal_prediction = pred_dict['rpn_prediction']['proposal_prediction']
     if top_k:
@@ -639,8 +639,7 @@ def draw_top_nms_proposals(pred_dict, image, min_score=0.8, draw_gt=False):
 def draw_rpn_cls_loss(pred_dict, image, foreground=True, topn=10,
                       worst=True):
     """
-    For each bounding box labeled object. We wan't to display
-    the softmax score.
+    For each bounding box labeled object. We want to display the softmax score.
 
     We display the anchors, and not the adjusted bounding boxes.
     """
@@ -738,8 +737,7 @@ def draw_rpn_pred_combined_loss(pred_dict, image, top_k=10):
 
 def draw_rpn_bbox_pred(pred_dict, image, top_k=5):
     """
-    For each bounding box labeled object. We wan't to display the
-    bbox_reg_error.
+    For each bounding box labeled object. We want to display bbox_reg_error.
 
     We display the final bounding box and the anchor. Drawing lines between the
     corners.
@@ -877,23 +875,17 @@ def draw_rpn_bbox_pred_with_target(pred_dict, image, worst=True):
 
 def draw_rcnn_cls_batch(pred_dict, image, foreground=True, background=True):
     logger.debug(
-        'Show the bboxes used for training classifier. '
+        'Show the proposals used for training classifier. '
         '(GT labels are -1 from cls targets)')
     logger.debug('blue => GT, green => foreground, red => background')
 
     proposals = pred_dict['rpn_prediction']['proposals']
     cls_targets = pred_dict['classification_prediction']['target']['cls']
-    bbox_offsets_targets = pred_dict[
-        'classification_prediction']['target']['bbox_offsets']
     gt_bboxes = pred_dict['gt_bboxes']
 
     batch_idx = np.where(cls_targets != -1)[0]
-
-    proposals = proposals[batch_idx]
+    bboxes = proposals[batch_idx]
     cls_targets = cls_targets[batch_idx]
-    bbox_offsets_targets = bbox_offsets_targets[batch_idx]
-
-    bboxes = decode(proposals, bbox_offsets_targets)
 
     image_pil, draw = get_image_draw(image)
 
