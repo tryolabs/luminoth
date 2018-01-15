@@ -156,16 +156,6 @@ class RCNNProposal(snt.AbstractModule):
             tf.cast(total_objects, tf.float32)
         )
 
-        assertion = tf.Assert(
-            tf.logical_not(tf.is_nan(valid_proposals_ratio)),
-            ['RCNN_NAN', proposals, bbox_pred, cls_prob],
-            summarize=10000
-        )
-
-        with tf.control_dependencies([assertion]):
-            objects2 = tf.identity(objects)
-            objects = tf.identity(objects2)
-
         tf.summary.scalar(
             'valid_proposals_ratio', valid_proposals_ratio, ['rcnn']
         )
