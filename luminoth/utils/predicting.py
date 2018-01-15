@@ -141,6 +141,10 @@ def get_prediction(image, config, total=None, session=None,
                 'scale_factor': process_meta['scale_factor']
             }
 
+            # If in debug mode, return the full prediction dictionary.
+            if config.train.debug:
+                fetches['_debug'] = pred_dict
+
     elif session is None or fetches is None or image_tensor is None:
         raise ValueError(
             'Either all `session`, `fetches` and `image_tensor` are None, '
