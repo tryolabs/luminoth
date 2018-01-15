@@ -6,7 +6,7 @@ from luminoth.models.fasterrcnn.rcnn import RCNN
 from luminoth.models.fasterrcnn.rpn import RPN
 from luminoth.models.base import TruncatedBaseNetwork
 from luminoth.utils.anchors import generate_anchors_reference
-from luminoth.utils.vars import variable_summaries, get_saver
+from luminoth.utils.vars import VAR_LOG_LEVELS, variable_summaries, get_saver
 
 
 class FasterRCNN(snt.AbstractModule):
@@ -120,8 +120,9 @@ class FasterRCNN(snt.AbstractModule):
 
         image_shape = tf.shape(image)[0:2]
 
-        # variable_summaries(
-        #     conv_feature_map, 'conv_feature_map', ['rpn'])
+        variable_summaries(
+            conv_feature_map, 'conv_feature_map', 'reduced'
+        )
 
         # Generate anchors for the image based on the anchor reference.
         all_anchors = self._generate_anchors(tf.shape(conv_feature_map))
@@ -327,6 +328,14 @@ class FasterRCNN(snt.AbstractModule):
             summaries.append(tf.summary.merge_all(key='rcnn'))
 
         return tf.summary.merge(summaries)
+
+    @property
+    def vars_summary(self):
+        return {
+            key: tf.summary.merge_all(key=collection)
+            for key, collections in VAR_LOG_LEVELS.items()
+            for collection in collections
+        }
 
     def get_trainable_vars(self):
         """Get trainable vars included in the module.

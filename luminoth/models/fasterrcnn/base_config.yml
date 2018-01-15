@@ -65,9 +65,11 @@ train:
   # Number of epochs (complete dataset batches) to run.
   num_epochs: 1000
 
-  # Image visualization mode, options = train, eval, debug,
-  # (empty). Default=(empty).
+  # Image visualization mode, options = train, eval, debug, (empty).
+  # Default=(empty).
   image_vis: train
+  # Variable summary visualization mode, options = full, reduced, (empty).
+  var_vis:
 
 eval:
   # Image visualization mode, options = train, eval, debug,

@@ -11,7 +11,7 @@ from luminoth.datasets import get_dataset
 from luminoth.datasets.exceptions import InvalidDataDirectory
 from luminoth.models import get_model
 from luminoth.utils.config import get_config
-from luminoth.utils.hooks import ImageVisHook
+from luminoth.utils.hooks import ImageVisHook, VarVisHook
 from luminoth.utils.training import get_optimizer, clip_gradients_by_norm
 from luminoth.utils.experiments import save_run
 
@@ -22,6 +22,7 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
     model_class = get_model_fn(config.model.type)
 
     image_vis = config.train.get('image_vis')
+    var_vis = config.train.get('var_vis')
 
     if config.train.get('seed') is not None:
         tf.set_random_seed(config.train.seed)
@@ -140,11 +141,15 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
     else:
         checkpoint_dir = config.train.job_dir
 
-    if (config.train.display_every_steps or config.train.display_every_secs and
-            image_vis is not None and checkpoint_dir is not None):
+    should_add_hooks = (
+        config.train.display_every_steps
+        or config.train.display_every_secs
+        and checkpoint_dir is not None
+    )
+    if should_add_hooks:
         if not config.train.debug and image_vis == 'debug':
             tf.logging.warning('ImageVisHook will not run without debug mode.')
-        else:
+        elif image_vis is not None:
             # ImageVis only runs on the chief.
             chief_only_hooks.append(
                 ImageVisHook(
@@ -156,6 +161,18 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
                     every_n_steps=config.train.display_every_steps,
                     every_n_secs=config.train.display_every_secs,
                     image_visualization_mode=image_vis
+                )
+            )
+
+        if var_vis is not None:
+            # VarVis only runs on the chief.
+            chief_only_hooks.append(
+                VarVisHook(
+                    every_n_steps=config.train.display_every_steps,
+                    every_n_secs=config.train.display_every_secs,
+                    mode=var_vis,
+                    output_dir=checkpoint_dir,
+                    vars_summary=model.vars_summary,
                 )
             )
 

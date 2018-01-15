@@ -82,12 +82,15 @@ def get_optimizer(train_config, global_step=None):
 
 
 def clip_gradients_by_norm(grads_and_vars, add_to_summary=True):
-    # if add_to_summary:
-    #     for grad, var in grads_and_vars:
-    #         if grad is not None:
-    #             # variable_summaries(grad, 'grad/{}'.format(var.name[:-2]))
-    #             # variable_summaries(
-    #             #     tf.abs(grad), 'grad/abs/{}'.format(var.name[:-2]))
+    if add_to_summary:
+        for grad, var in grads_and_vars:
+            if grad is not None:
+                variable_summaries(
+                    grad, 'grad/{}'.format(var.name[:-2]), 'full'
+                )
+                variable_summaries(
+                    tf.abs(grad), 'grad/abs/{}'.format(var.name[:-2]), 'full'
+                )
 
     # Clip by norm. Grad can be null when not training some modules.
     with tf.name_scope('clip_gradients_by_norm'):
@@ -102,12 +105,16 @@ def clip_gradients_by_norm(grads_and_vars, add_to_summary=True):
             for gv in grads_and_vars
         ]
 
-    # if add_to_summary:
-    #     for grad, var in grads_and_vars:
-    #         if grad is not None:
-    #             variable_summaries(
-    #                 grad, 'clipped_grad/{}'.format(var.name[:-2]))
-    #             variable_summaries(
-    #                 tf.abs(grad), 'clipped_grad/{}'.format(var.name[:-2]))
+    if add_to_summary:
+        for grad, var in grads_and_vars:
+            if grad is not None:
+                variable_summaries(
+                    grad, 'clipped_grad/{}'.format(var.name[:-2]), 'full'
+                )
+                variable_summaries(
+                    tf.abs(grad),
+                    'clipped_grad/{}'.format(var.name[:-2]),
+                    'full'
+                )
 
     return grads_and_vars

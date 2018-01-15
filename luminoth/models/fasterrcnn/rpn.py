@@ -11,7 +11,7 @@ from .rpn_target import RPNTarget
 from .rpn_proposal import RPNProposal
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import (
-    get_initializer, # layer_summaries, # variable_summaries,
+    get_initializer, layer_summaries, variable_summaries,
     get_activation_function
 )
 
@@ -197,26 +197,24 @@ class RPN(snt.AbstractModule):
 
             if self._debug:
                 prediction_dict['rpn_max_overlap'] = rpn_max_overlap
-                # variable_summaries(rpn_bbox_target, 'rpn_bbox_target', ['rpn'])
+                variable_summaries(rpn_bbox_target, 'rpn_bbox_target', 'full')
 
         # Variables summaries.
-        # variable_summaries(prediction_dict['scores'], 'rpn_scores', ['rpn'])
-        # variable_summaries(rpn_cls_prob, 'rpn_cls_prob', ['rpn'])
-        # variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', ['rpn'])
+        variable_summaries(prediction_dict['scores'], 'rpn_scores', 'reduced')
+        variable_summaries(rpn_cls_prob, 'rpn_cls_prob', 'reduced')
+        variable_summaries(rpn_bbox_pred, 'rpn_bbox_pred', 'reduced')
 
         if self._debug:
-            # variable_summaries(rpn_feature, 'rpn_feature', ['rpn'])
-            # variable_summaries(
-            #    rpn_cls_score_original, 'rpn_cls_score_original', ['rpn'])
-            # variable_summaries(
-            #    rpn_bbox_pred_original, 'rpn_bbox_pred_original', ['rpn'])
+            variable_summaries(rpn_feature, 'rpn_feature', 'full')
+            variable_summaries(
+               rpn_cls_score_original, 'rpn_cls_score_original', 'full')
+            variable_summaries(
+               rpn_bbox_pred_original, 'rpn_bbox_pred_original', 'full')
 
             # Layer summaries.
-            # layer_summaries(self._rpn, ['rpn'])
-            # layer_summaries(self._rpn_cls, ['rpn'])
-            # layer_summaries(self._rpn_bbox, ['rpn'])
-
-            pass
+            layer_summaries(self._rpn, 'full')
+            layer_summaries(self._rpn_cls, 'full')
+            layer_summaries(self._rpn_bbox, 'full')
 
         return prediction_dict
 
