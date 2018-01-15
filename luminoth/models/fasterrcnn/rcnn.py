@@ -167,9 +167,13 @@ class RCNN(snt.AbstractModule):
             prediction_dict['_debug']['roi'] = roi_prediction
 
         pooled_features = roi_prediction['roi_pool']
-        features = base_network._build_tail(
-            pooled_features, is_training=is_training
-        )
+
+        if self._config.use_tail:
+            features = base_network._build_tail(
+                pooled_features, is_training=is_training
+            )
+        else:
+            features = pooled_features
 
         if self._use_mean:
             # We avg our height and width dimensions for a more

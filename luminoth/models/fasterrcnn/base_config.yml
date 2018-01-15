@@ -221,6 +221,9 @@ model:
     activation_function: relu
     l2_regularization_scale: 0.0005
     l1_sigma: 3.0
+    # TODO: Move to `network` or `base_network`?
+    # Whether to use the base_network's tail in the RCNN.
+    use_tail: False
     use_mean: False
     batch_norm: False
     initializer:
