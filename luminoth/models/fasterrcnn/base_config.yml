@@ -137,6 +137,8 @@ model:
     # trainable. If not specified, then all the variables in the network will be
     # trainable.
     fine_tune_from:
+    # Whether to train the ResNet's batch norm layers.
+    train_batch_norm: True
     arg_scope:
       # Regularization.
       weight_decay: 0.0005
