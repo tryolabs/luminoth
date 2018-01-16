@@ -139,6 +139,10 @@ model:
     fine_tune_from:
     # Whether to train the ResNet's batch norm layers.
     train_batch_norm: True
+    # Whether to use the base network's tail in the RCNN.
+    use_tail: False
+    # Whether to freeze the base network's tail.
+    freeze_tail: False
     arg_scope:
       # Regularization.
       weight_decay: 0.0005
@@ -223,9 +227,6 @@ model:
     activation_function: relu
     l2_regularization_scale: 0.0005
     l1_sigma: 3.0
-    # TODO: Move to `network` or `base_network`?
-    # Whether to use the base_network's tail in the RCNN.
-    use_tail: False
     use_mean: False
     batch_norm: False
     initializer:

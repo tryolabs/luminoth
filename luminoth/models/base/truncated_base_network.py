@@ -34,6 +34,8 @@ class TruncatedBaseNetwork(BaseNetwork):
         self._scope_endpoint = '{}/{}/{}'.format(
             self.module_name, config.architecture, self._endpoint
         )
+        self._freeze_tail = config.freeze_tail
+        self._use_tail = config.use_tail
 
     def _build(self, inputs, is_training=False):
         """
@@ -53,6 +55,9 @@ class TruncatedBaseNetwork(BaseNetwork):
         return self._get_endpoint(dict(pred['end_points']))
 
     def _build_tail(self, inputs, is_training=False):
+        if not self._use_tail:
+            return inputs
+
         if self._architecture == 'resnet_v1_101':
             train_batch_norm = (
                 is_training and self._config.get('train_batch_norm')
@@ -121,20 +126,21 @@ class TruncatedBaseNetwork(BaseNetwork):
         else:
             trainable_vars = all_trainable[:index + 1]
 
-        if self._architecture == 'resnet_v1_101':
-            # Retrieve the trainable vars out of the tail.
-            # TODO: Tail should be configurable too, to avoid hard-coding
-            # the trainable portion to `block4` and allow using something in
-            # block4 as endpoint.
-            var_iter = enumerate(v.name for v in all_trainable)
-            try:
-                index = next(i for i, name in var_iter if 'block4' in name)
-            except StopIteration:
-                raise ValueError(
-                    '"block4" not present in the trainable vars retrieved '
-                    'from base network.'
-                )
-            trainable_vars += all_trainable[index:]
+        if self._use_tail and not self._freeze_tail:
+            if self._architecture == 'resnet_v1_101':
+                # Retrieve the trainable vars out of the tail.
+                # TODO: Tail should be configurable too, to avoid hard-coding
+                # the trainable portion to `block4` and allow using something
+                # in block4 as endpoint.
+                var_iter = enumerate(v.name for v in all_trainable)
+                try:
+                    index = next(i for i, name in var_iter if 'block4' in name)
+                except StopIteration:
+                    raise ValueError(
+                        '"block4" not present in the trainable vars retrieved '
+                        'from base network.'
+                    )
+                trainable_vars += all_trainable[index:]
 
         return trainable_vars
 
