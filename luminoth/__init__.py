@@ -12,4 +12,4 @@ __author__ = 'Tryolabs'
 __email__ = 'luminoth@tryolabs.com'
 
 __license__ = 'BSD 3-Clause License'
-__copyright__ = 'Copyright (c) 2017 Tryolabs S.A.'
+__copyright__ = 'Copyright (c) 2018 Tryolabs S.A.'
