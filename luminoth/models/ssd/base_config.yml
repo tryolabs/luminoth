@@ -11,12 +11,12 @@ train:
   # after each Session.run
   tf_debug: False
   # Run name is used for better checkpoint and log hierarchy
-  run_name: cavani
+  run_name: ssd_1
   # Disables logging and saving checkpoints
   no_log: False
   # Displays debugging images with results every N steps. Debug mode must be
   # enabled
-  display_every_steps:
+  display_every_steps: 100
   # Display debugging images every N seconds.
   display_every_secs:
   # Shuffle the dataset. It should only be disabled when trying to reproduce
@@ -61,14 +61,13 @@ train:
 dataset:
   type: tfrecord
   # From which directory to read the dataset
-  dir: 'datasets/cavani/tf'
+  dir: datasets/voc/tf
   # Which split of tfrecords to look for
   split: train
   # Resize image according to min_size and max_size of if fixed_size is True
   # resize the image to height_size and width_size
+  # TODO: fix this redundancy
   image_preprocessing:
-    min_size: 300
-    max_size: 300
     fixed_resize: True
     height_size: 300
     width_size: 300
@@ -80,30 +79,17 @@ model:
   type: ssd
   network:
     # Total number of classes to predict
-    num_classes: 2
+    num_classes: 20
 
   base_network:
     # Which type of pretrained network to use
     architecture: vgg_16
-    # Which endpoints should we use of the fully convolutional base network
-    fc_endpoints: ['vgg_16/fc7']
-    # Outputs of the fc_endpoints
-    fc_endpoints_output: [[19, 19]]
-    # Which endpoint should we use to construct the ssd architecture
-    hook_endpoint: 'vgg_16/fc7'
     # Should we train the pretrained network
     trainable: True
     # From which file to load the weights
     weights:
     # Should we download weights if not available
     download: True
-    endpoint:  # Delete this TODO
-    # Which endpoint layer to use as feature map for network
-    endpoints: ['vgg_16/conv4/conv4_3']
-    # Outputs of the endpoints
-    endpoints_output: [[38, 38]]
-    # Is trainable, how many layers from the endpoint are we training
-    finetune_num_layers:
     arg_scope:
       # Regularization
       weight_decay: 0.0005
@@ -121,14 +107,14 @@ model:
     # By now, the ratio of 1 must always be at the begin of the array
     ratios: [1, 0.5, 2, 0.3, 3]
     # Minimum and maximum scale of anchors
-    min_scale: 0.2
+    min_scale: 0.15
     max_scale: 0.99
 
   target:
     # The ratio of positives-negatives will be 1:`hard_negative_ratio`
     hard_negative_ratio: 3.
     # Threshold with GT to be considered positive
-    foreground_threshold: 0.55
+    foreground_threshold: 0.6
     # High and low threshold with GT to be considered negative
     background_threshold_high: 0.4
     background_threshold_low: 0.0
@@ -143,6 +129,6 @@ model:
     # Maximum total detections for an image (sorted by score)
     total_max_detections: 300
     # Minimum prob to be used as proposed object
-    min_prob_threshold: 0.5
+    min_prob_threshold: 0.05
     # Filter proposals from anchors partially outside the image.
     filter_outside_anchors: True

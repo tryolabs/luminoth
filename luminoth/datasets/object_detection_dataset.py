@@ -60,8 +60,8 @@ class ObjectDetectionDataset(BaseDataset):
             config: Config object with all the session properties.
         """
         super(ObjectDetectionDataset, self).__init__(config, **kwargs)
-        self._image_min_size = config.dataset.image_preprocessing.min_size
-        self._image_max_size = config.dataset.image_preprocessing.max_size
+        self._image_min_size = config.dataset.image_preprocessing.get('min_size')
+        self._image_max_size = config.dataset.image_preprocessing.get('max_size')
         # In case no keys are defined, default to empty list.
         self._data_augmentation = config.dataset.data_augmentation or []
 
