@@ -144,36 +144,29 @@ class SSDTarget(snt.AbstractModule):
             name="update_labels_for_bestbox_proposals"
         )
 
-        # Disable some backgrounds according to hard minning ratio.
-        num_fg_mask = tf.greater(proposals_label, 0.0)
-        num_fg = tf.cast(tf.count_nonzero(num_fg_mask), tf.float32)
-
         # Use the worst backgrounds (the bgs which probability of being fg is
         # the greatest).
+        cls_probs = probs[:, 1:]
+        max_cls_probs = tf.reduce_max(cls_probs, axis=1)
 
-        # Transform to one-hot vector.
-        cls_target_one_hot = tf.one_hot(
-            tf.cast(best_proposals_gt_labels, tf.int32), depth=self._num_classes + 1,
-            name='cls_target_one_hot'
+        # Exclude boxes with IOU > `background_threshold_high` with any GT.
+        bg_overlaps_filter = tf.less_equal(
+            max_overlaps, self._background_threshold_high
         )
 
-        # We get cross entropy loss of each proposal.
-        cross_entropy_per_proposal = (
-            tf.nn.softmax_cross_entropy_with_logits(
-                labels=cls_target_one_hot, logits=probs
-            )
-        )
-
-        proposals_label = tf.where(
-            condition=num_fg_mask,
-            x=proposals_label,
-            y=tf.fill(dims=proposals_label_shape, value=-1.)
+        max_cls_probs = tf.where(
+            condition=bg_overlaps_filter,
+            x=max_cls_probs,
+            y=tf.fill(dims=proposals_label_shape, value=-1.),
         )
 
         # We calculate up to how many backgrounds we desire based on the
         # final number of foregrounds and the hard minning ratio.
+        num_fg_mask = tf.greater(proposals_label, 0.0)
+        num_fg = tf.cast(tf.count_nonzero(num_fg_mask), tf.float32)
+
         num_bg = tf.cast(num_fg * self._foreground_fraction, tf.int32)
-        top_k_bg = tf.nn.top_k(cross_entropy_per_proposal, k=num_bg)
+        top_k_bg = tf.nn.top_k(max_cls_probs, k=num_bg)
 
         set_bg = tf.sparse_to_dense(
             sparse_indices=top_k_bg.indices,
