@@ -104,7 +104,7 @@ summaries_fn = {
         },
         'debug': {
             'draw_object_prediction': None,
-            'draw_ssd_raw_proposals': None,
+            'draw_ssd_target_proposals': None,
         }
     }
 }
@@ -1221,21 +1221,36 @@ def draw_rcnn_input_proposals(pred_dict, image):
     return image_pil
 
 
-def draw_ssd_raw_proposals(pred_dict, image):
+def draw_ssd_target_proposals(pred_dict, image):
     image_pil, draw = get_image_draw(image)
+
+    all_anchors = pred_dict['target']['all_anchors']
+    bbox_pred = pred_dict['loc_pred']
+    bbox_targets = pred_dict['target']['cls']
+
+    bboxes = decode(all_anchors, bbox_pred)
 
     fill_alpha = 70
 
-    raw_proposals = pred_dict['proposal_prediction']['raw_proposals']
-    for proposal in raw_proposals:
+    for proposal, target in zip(bboxes, bbox_targets):
         bbox = list(proposal)
         if (bbox[2] - bbox[0] <= 0) or (bbox[3] - bbox[1] <= 0):
             logger.debug('Proposal has negative area: {}'.format(bbox))
             continue
 
-        draw.rectangle(
-            bbox, fill=(0, 255, 0, fill_alpha), outline=(0, 255, 0, 50)
-        )
+        if target == 0:
+            # Background.
+            fill = (255, 0, 0, fill_alpha)
+            outline = (255, 0, 0, 100)
+        elif target > 0:
+            # Foreground.
+            fill = (0, 255, 0, fill_alpha)
+            outline = (0, 255, 0, 100)
+        else:
+            # Unknown.
+            continue
+
+        draw.rectangle(bbox, fill=fill, outline=outline)
 
         fill_alpha -= 5
 
