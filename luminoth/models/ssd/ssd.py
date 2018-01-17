@@ -308,11 +308,22 @@ class SSD(snt.AbstractModule):
             total_loss = tf.losses.get_total_loss()
 
             tf.summary.scalar(
+                'cls_loss', cls_loss,
+                collections=self._losses_collections
+            )
+
+            tf.summary.scalar(
+                'bbox_loss', bbox_loss,
+                collections=self._losses_collections
+            )
+
+            tf.summary.scalar(
                 'total_loss', total_loss,
                 collections=self._losses_collections
             )
 
             return total_loss
+
 
     def generate_all_anchors(self, feature_maps):
         """
