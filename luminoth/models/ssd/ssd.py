@@ -190,6 +190,7 @@ class SSD(snt.AbstractModule):
             prediction_dict['target'] = {
                 'cls': proposals_label_target,
                 'bbox_offsets': bbox_offsets_target,
+                'all_anchors': all_anchors_target,
             }
 
         # Get the proposals and save the result
