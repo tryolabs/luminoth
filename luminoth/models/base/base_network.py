@@ -68,13 +68,16 @@ class BaseNetwork(snt.AbstractModule):
                 spatial_squeeze=self._config.get('spatial_squeeze', False)
             )
         elif self.resnet_v1_type:
+            output_stride = self._config.get('output_stride')
             train_batch_norm = (
                 is_training and self._config.get('train_batch_norm')
             )
             return functools.partial(
                 getattr(resnet_v1, self._architecture),
                 is_training=train_batch_norm,
-                num_classes=self._config.get('num_classes')
+                num_classes=None,
+                global_pool=False,
+                output_stride=output_stride
             )
         elif self.resnet_v2_type:
             return functools.partial(

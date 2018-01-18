@@ -143,6 +143,8 @@ model:
     use_tail: False
     # Whether to freeze the base network's tail.
     freeze_tail: False
+    # Output stride for ResNet.
+    output_stride:
     arg_scope:
       # Regularization.
       weight_decay: 0.0005
