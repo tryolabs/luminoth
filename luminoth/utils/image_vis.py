@@ -51,7 +51,7 @@ summaries_fn = {
                 ],
                 'draw_top_nms_proposals': [
                     None, {'min_score': 0.9},
-                    {'min_score': 0.75}, {'min_score': 0}
+                    {'min_score': 0.75}, {'min_score': 0.05}
                 ],
                 'draw_batch_proposals': [
                     {'display': 'anchor'}, {'display': 'proposal'},
