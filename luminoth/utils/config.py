@@ -120,9 +120,6 @@ def merge_into(new_config, base_config, overwrite=False, warn_overwrite=False):
         return
 
     for key, value in new_config.items():
-        if value is None and base_config.get(key) is not None:
-            continue
-
         # Since we already have the values of base_config we check against them
         if not types_compatible(value, base_config.get(key)):
             raise ValueError(
