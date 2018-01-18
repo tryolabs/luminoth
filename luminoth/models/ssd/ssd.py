@@ -308,6 +308,8 @@ class SSD(snt.AbstractModule):
             tf.losses.add_loss(final_loss)
             total_loss = tf.losses.get_total_loss()
 
+            prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+
             tf.summary.scalar(
                 'cls_loss', cls_loss,
                 collections=self._losses_collections
