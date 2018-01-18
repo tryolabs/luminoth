@@ -105,6 +105,9 @@ summaries_fn = {
         'debug': {
             'draw_object_prediction': None,
             'draw_ssd_target_proposals': None,
+            'draw_ssd_bbox_pred': [
+                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}
+            ],
         }
     }
 }
@@ -1259,5 +1262,59 @@ def draw_ssd_target_proposals(pred_dict, image):
         draw.rectangle(
             list(gt_box[:4]), fill=(0, 0, 255, 60),
         outline=(0, 0, 255, 150))
+
+    return image_pil
+
+
+def draw_ssd_bbox_pred(pred_dict, image, top_k=5):
+    """
+    For each bounding box labeled object.
+
+    We display the final bounding box and the anchor. Drawing lines between the
+    corners.
+    """
+
+    target = pred_dict['target']['cls']
+    all_anchors = pred_dict['target']['all_anchors']
+    bbox_pred = pred_dict['loc_pred']
+    # Get anchors with positive label.
+    positive_indices = target > 0
+
+    bbox_pred = bbox_pred[positive_indices]
+    all_anchors = all_anchors[positive_indices]
+
+    loss_per_proposal = pred_dict['reg_loss_per_proposal']
+
+    top_losses_idx = np.argsort(loss_per_proposal)[::-1][:top_k]
+
+    loss_per_proposal = loss_per_proposal[top_losses_idx]
+    bbox_pred = bbox_pred[top_losses_idx]
+    all_anchors = all_anchors[top_losses_idx]
+
+    bbox_final = decode(all_anchors, bbox_pred)
+
+    image_pil, draw = get_image_draw(image)
+
+    for anchor, bbox, loss in zip(all_anchors, bbox_final, loss_per_proposal):
+        anchor = list(anchor)
+        bbox = list(bbox)
+        draw.rectangle(anchor, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+        draw.rectangle(
+            bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
+        draw.text(
+            tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(loss),
+            font=font, fill=(0, 0, 0, 255))
+        draw.line(
+            [(anchor[0], anchor[1]), (bbox[0], bbox[1])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[2], anchor[1]), (bbox[2], bbox[1])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[2], anchor[3]), (bbox[2], bbox[3])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[0], anchor[3]), (bbox[0], bbox[3])],
+            fill=(0, 0, 0, 170), width=1)
 
     return image_pil
