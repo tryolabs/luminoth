@@ -32,7 +32,9 @@ def encode(proposals, gt_boxes):
 
     Returns:
         targets: Numpy array of shape (total_proposals, 4) with the different
-            values needed to transform the proposal to the gt_boxes.
+            deltas needed to transform the proposal to the gt_boxes. These
+            deltas are with regards to the center, width and height of the
+            two boxes.
     """
 
     (proposal_widths, proposal_heights,

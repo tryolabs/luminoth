@@ -84,8 +84,8 @@ class SSD(snt.AbstractModule):
                 proposals_label: A tensor with the label for each proposal.
                 proposals_label_prob: A tensor with the softmax probability
                     for the label of each proposal.
-            loc_pred: A tensor with the localization predictions
-            cls_pred: A tensor with the classes predictions
+            bbox_offsets: A tensor with the predicted bbox_offsets
+            class_scores: A tensor with the predicted classes scores
         """
         if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
@@ -95,46 +95,41 @@ class SSD(snt.AbstractModule):
         image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
         feature_maps = self.feature_extractor(image, is_training=is_training)
 
-        # Build a MultiBox predictor on top of each feature layer
-        predictions = {}
+        # Build a MultiBox predictor on top of each feature layer and collect
+        # the bounding box offsets and the category score logits they produce
+        bbox_offsets_list = []
+        class_scores_list = []
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
             num_anchors = self._anchors_per_point[i]
 
-            # Location predictions
-            num_loc_pred = num_anchors * 4
-            loc_pred = slim.conv2d(feat_map, num_loc_pred, [3, 3],
-                                   activation_fn=None,
-                                   scope=feat_map_name + '/conv_loc',
-                                   padding='SAME')
-            loc_pred = tf.reshape(loc_pred, [-1, 4])
+            # Predict bbox offsets
+            bbox_offsets_layer = slim.conv2d(
+                feat_map, num_anchors * 4, [3, 3], activation_fn=None,
+                scope=feat_map_name + '/conv_loc', padding='SAME'
+            )
+            bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
+            bbox_offsets_list.append(bbox_offsets_flattened)
 
-            # Class predictions
-            num_cls_pred = num_anchors * (self._num_classes + 1)
-            cls_pred = slim.conv2d(feat_map, num_cls_pred, [3, 3],
-                                   activation_fn=None,
-                                   scope=feat_map_name + '/conv_cls',
-                                   padding='SAME')
-            cls_pred = tf.reshape(cls_pred, [-1, self._num_classes + 1])
+            # Predict class scores
+            class_scores_layer = slim.conv2d(
+                feat_map, num_anchors * (self._num_classes + 1), [3, 3],
+                activation_fn=None, scope=feat_map_name + '/conv_cls',
+                padding='SAME'
+            )
+            class_scores_flattened = tf.reshape(class_scores_layer,
+                                                [-1, self._num_classes + 1])
+            class_scores_list.append(class_scores_flattened)
+        bbox_offsets = tf.concat(bbox_offsets_list, axis=0)
+        class_scores = tf.concat(class_scores_list, axis=0)
+        class_probabilities = slim.softmax(class_scores)
 
-            predictions[feat_map_name] = {}
-            predictions[feat_map_name]['loc_pred'] = loc_pred
-            predictions[feat_map_name]['cls_pred'] = cls_pred
-            predictions[feat_map_name]['prob'] = slim.softmax(cls_pred)
-
+        # Generate anchors
         self.anchors = self.generate_all_anchors(feature_maps)
-
-        # Get all_anchors from each endpoint
-        # TODO: Are all these lists necessary?
         all_anchors_list = []
-        loc_pred_list = []
-        cls_pred_list = []
-        cls_prob_list = []
-
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
-            # TODO: We should create them in image size from the start instead
-            #       of scaling them to their feature map size.
-            #       This probably creates problems with the later SSD layers
-            #       as they are 3x3 and 1x1, and we upscale them to 300x300.
+            # TODO: Anchor generation should be simpler. We should create
+            #       them in image scale from the start instead of scaling
+            #       them to their feature map size.
             feat_map_shape = feat_map.get_shape().as_list()[1:3]
             adjusted_bboxes = adjust_bboxes(
                 self.anchors[feat_map_name],
@@ -147,68 +142,60 @@ class SSD(snt.AbstractModule):
             adjusted_bboxes = clip_boxes(
                 adjusted_bboxes, tf.cast(tf.shape(image)[1:3], tf.int32))
             all_anchors_list.append(adjusted_bboxes)
-            loc_pred_list.append(predictions[feat_map_name]['loc_pred'])
-            cls_prob_list.append(
-                slim.softmax(predictions[feat_map_name]['cls_pred']))
-            cls_pred_list.append(predictions[feat_map_name]['cls_pred'])
         all_anchors = tf.concat(all_anchors_list, axis=0)
-        loc_pred = tf.concat(loc_pred_list, axis=0)
-        cls_pred = tf.concat(cls_pred_list, axis=0)
-        cls_prob = tf.concat(cls_prob_list, axis=0)
 
         prediction_dict = {}
-        all_anchors_target = all_anchors
         if gt_boxes is not None:
-            # Get the targets and returns it
-            self._target = SSDTarget(self._num_classes, all_anchors.shape[0],
-                                     self._config.model.target)
-
-            proposals_label_target, bbox_offsets_target = self._target(
-                cls_prob, all_anchors, gt_boxes,
+            # Generate targets
+            target_creator = SSDTarget(self._num_classes, all_anchors.shape[0],
+                                       self._config.model.target)
+            class_targets, bbox_offsets_targets = target_creator(
+                class_probabilities, all_anchors, gt_boxes,
                 tf.cast(tf.shape(image), tf.float32)
             )
 
+            # Filter the predictions and targets that we will ignore
+            # during training due to hard negative mining.
+            # We use class_targets to know which ones to ignore (they
+            # are marked as -1 if they are to be ignored)
             if is_training:
                 with tf.name_scope('prepare_batch'):
-                    # We flatten to set shape, but it is already a flat Tensor.
-                    in_batch_proposals = tf.reshape(
-                        tf.greater_equal(proposals_label_target, 0), [-1]
-                    )
-                    all_anchors_target = tf.boolean_mask(
-                        all_anchors, in_batch_proposals)
-                    bbox_offsets_target = tf.boolean_mask(
-                        bbox_offsets_target, in_batch_proposals)
-                    proposals_label_target = tf.boolean_mask(
-                        proposals_label_target, in_batch_proposals)
-                    cls_pred = tf.boolean_mask(
-                        cls_pred, in_batch_proposals)
-                    cls_prob = tf.boolean_mask(
-                        cls_prob, in_batch_proposals)
-                    loc_pred = tf.boolean_mask(
-                        loc_pred, in_batch_proposals)
+                    predictions_filter = tf.greater_equal(class_targets, 0)
+
+                    all_anchors = tf.boolean_mask(
+                        all_anchors, predictions_filter)
+                    bbox_offsets_targets = tf.boolean_mask(
+                        bbox_offsets_targets, predictions_filter)
+                    class_targets = tf.boolean_mask(
+                        class_targets, predictions_filter)
+                    class_scores = tf.boolean_mask(
+                        class_scores, predictions_filter)
+                    class_probabilities = tf.boolean_mask(
+                        class_probabilities, predictions_filter)
+                    bbox_offsets = tf.boolean_mask(
+                        bbox_offsets, predictions_filter)
 
             prediction_dict['target'] = {
-                'cls': proposals_label_target,
-                'bbox_offsets': bbox_offsets_target,
-                'all_anchors': all_anchors_target,
+                'cls': class_targets,
+                'bbox_offsets': bbox_offsets_targets,
+                'all_anchors': all_anchors
             }
 
         # Get the proposals and save the result
-        self._proposal = SSDProposal(all_anchors_target.shape[0],
-                                     self._num_classes,
-                                     self._config.model.proposals,
-                                     debug=self._debug)
-        proposal_prediction = self._proposal(
-            cls_prob, loc_pred, all_anchors_target,
+        proposals_creator = SSDProposal(all_anchors.shape[0],
+                                        self._num_classes,
+                                        self._config.model.proposals,
+                                        debug=self._debug)
+        proposal_prediction = proposals_creator(
+            class_probabilities, bbox_offsets, all_anchors,
             tf.cast(tf.shape(image)[1:3], tf.float32)
         )
 
         prediction_dict.update({
-            'predictions': predictions,
-            'proposal_prediction': proposal_prediction,
-            'classification_prediction': proposal_prediction,
-            'cls_pred': cls_pred,
-            'loc_pred': loc_pred
+            'proposal_prediction': proposal_prediction,  # Is this used?
+            'classification_prediction': proposal_prediction,  # Is this used?
+            'cls_pred': class_scores,
+            'loc_pred': bbox_offsets
         })
 
         # TODO add variable summaries
@@ -216,8 +203,8 @@ class SSD(snt.AbstractModule):
         if self._debug:
             prediction_dict['anchors'] = self.anchors
             prediction_dict['all_anchors'] = all_anchors
-            prediction_dict['all_anchors_target'] = all_anchors_target
-            prediction_dict['cls_prob'] = cls_prob
+            prediction_dict['all_anchors_target'] = all_anchors
+            prediction_dict['cls_prob'] = class_probabilities
             prediction_dict['gt_boxes'] = gt_boxes
 
         return prediction_dict
@@ -261,25 +248,28 @@ class SSD(snt.AbstractModule):
             )
 
             # We get cross entropy loss of each proposal.
+            # TODO: Optimization opportunity: We calculate the probabilities
+            #       earlier in the program, so if we used those instead of the
+            #       logits we would not have the need to do softmax here too.
             cross_entropy_per_proposal = (
                 tf.nn.softmax_cross_entropy_with_logits(
                     labels=cls_target_one_hot, logits=cls_pred_labeled
                 )
             )
             # Second we need to calculate the smooth l1 loss between
-            # `bbox_offsets` and `bbox_offsets_target`.
+            # `bbox_offsets` and `bbox_offsets_targets`.
             bbox_offsets = prediction_dict['loc_pred']
-            bbox_offsets_target = (
+            bbox_offsets_targets = (
                 prediction_dict['target']['bbox_offsets']
             )
 
             # We only want the non-background labels bounding boxes.
             not_ignored = tf.reshape(tf.greater(cls_target, 0), [-1])
-            bbox_offsets_labeled = tf.boolean_mask(
-                bbox_offsets, not_ignored, name='bbox_offsets_labeled')
-            bbox_offsets_target_labeled = tf.boolean_mask(
-                bbox_offsets_target, not_ignored,
-                name='bbox_offsets_target_labeled'
+            bbox_offsets_positives = tf.boolean_mask(
+                bbox_offsets, not_ignored, name='bbox_offsets_positives')
+            bbox_offsets_target_positives = tf.boolean_mask(
+                bbox_offsets_targets, not_ignored,
+                name='bbox_offsets_target_positives'
             )
 
             # Calculate the smooth l1 loss between the flatten bboxes
@@ -287,7 +277,7 @@ class SSD(snt.AbstractModule):
             # TODO: reg loss can be confused between regularization and
             #       regression, rename
             reg_loss_per_proposal = smooth_l1_loss(
-                bbox_offsets_labeled, bbox_offsets_target_labeled)
+                bbox_offsets_positives, bbox_offsets_target_positives)
 
             cls_loss = tf.reduce_sum(cross_entropy_per_proposal)
             bbox_loss = tf.reduce_sum(reg_loss_per_proposal)
@@ -295,13 +285,13 @@ class SSD(snt.AbstractModule):
             # Following the paper, set loss to 0. if there are 0 bboxes
             # assigned as foreground targets.
             safety_condition = tf.not_equal(
-                tf.shape(bbox_offsets_labeled)[0], 0
+                tf.shape(bbox_offsets_positives)[0], 0
             )
             final_loss = tf.cond(
                 safety_condition,
                 true_fn=lambda: (
                     (cls_loss + bbox_loss * self._loc_loss_weight) /
-                    tf.cast(tf.shape(bbox_offsets_labeled)[0], tf.float32)
+                    tf.cast(tf.shape(bbox_offsets_positives)[0], tf.float32)
                 ),
                 false_fn=lambda: 0.0
             )
@@ -326,7 +316,6 @@ class SSD(snt.AbstractModule):
             )
 
             return total_loss
-
 
     def generate_all_anchors(self, feature_maps):
         """
