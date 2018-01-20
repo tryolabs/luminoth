@@ -64,13 +64,10 @@ dataset:
   dir: datasets/voc/tf
   # Which split of tfrecords to look for
   split: train
-  # Resize image according to min_size and max_size of if fixed_size is True
-  # resize the image to height_size and width_size
-  # TODO: fix this redundancy
   image_preprocessing:
-    fixed_resize: True
-    height_size: 300
-    width_size: 300
+    # Resize the input image to fixed_height and fixed_width
+    fixed_height: 300
+    fixed_width: 300
 
   # Data augmentation techniques
   data_augmentation:

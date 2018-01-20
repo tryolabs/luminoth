@@ -16,14 +16,15 @@ class BaseDataset(snt.AbstractModule):
         self._seed = config.train.seed
 
         self._fixed_resize = (
-            config.dataset.image_preprocessing.get('fixed_resize', False)
+            'fixed_height' in config.dataset.image_preprocessing and
+            'fixed_width' in config.dataset.image_preprocessing
         )
         if self._fixed_resize:
-            self._image_height_size = (
-                config.dataset.image_preprocessing.height_size
+            self._image_fixed_height = (
+                config.dataset.image_preprocessing.fixed_height
             )
-            self._image_width_size = (
-                config.dataset.image_preprocessing.width_size
+            self._image_fixed_width = (
+                config.dataset.image_preprocessing.fixed_width
             )
 
         self._total_queue_ops = 20

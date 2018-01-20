@@ -49,6 +49,10 @@ class SSD(snt.AbstractModule):
         self._anchor_min_scale = config.model.anchors.min_scale
         self._anchor_ratios = np.array(config.model.anchors.ratios)
 
+        # Image shape (SSD has a fixed image shape)
+        self.image_shape = [config.dataset.image_preprocessing.fixed_height,
+                            config.dataset.image_preprocessing.fixed_width]
+
         # Total number of anchors per point, per endpoint.
         self._anchors_per_point = config.model.anchors.anchors_per_point
 
@@ -90,8 +94,8 @@ class SSD(snt.AbstractModule):
         if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
 
-        image_shape = (300, 300)  # TODO: get this from config
-        image.set_shape((image_shape[0], image_shape[1], 3))
+        self.image_shape.append(3)  # Add channels to shape
+        image.set_shape(self.image_shape)
         image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
         feature_maps = self.feature_extractor(image, is_training=is_training)
 
@@ -333,7 +337,7 @@ class SSD(snt.AbstractModule):
 
         anchors = {}
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
-            feat_map_shape = feat_map.get_shape().as_list()[1:3]
+            feat_map_shape = feat_map.shape.as_list()[1:3]
             anchor_reference = generate_anchors_reference(
                 self._anchor_ratios, scales[i: i + 2],
                 self._anchors_per_point[i], feat_map_shape
