@@ -62,7 +62,7 @@ class SSDFeatureExtractor(BaseNetwork):
             # we need to add a spatial normalization before adding the
             # predictors.
             with tf.variable_scope(vgg_conv4_3_name + '_norm'):
-                inputs_shape = vgg_conv4_3.get_shape()
+                inputs_shape = vgg_conv4_3.shape
                 inputs_rank = inputs_shape.ndims
                 dtype = vgg_conv4_3.dtype.base_dtype
 

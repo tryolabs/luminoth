@@ -219,7 +219,7 @@ class ObjectDetectionDataset(BaseDataset):
         """
         if self._fixed_resize:
             resized = resize_image_fixed(
-                image, self._image_height_size, self._image_width_size,
+                image, self._image_fixed_height, self._image_fixed_width,
                 bboxes=bboxes
             )
         else:
