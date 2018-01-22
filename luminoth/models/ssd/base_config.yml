@@ -93,6 +93,7 @@ model:
     arg_scope:
       # Regularization
       weight_decay: 0.0005
+    dropout_keep_prob: 1.0
 
   loss:
     # Loss weights for calculating the total loss

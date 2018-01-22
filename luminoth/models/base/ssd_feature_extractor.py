@@ -26,6 +26,7 @@ class SSDFeatureExtractor(BaseNetwork):
         self._architecture = config.get('architecture')
         self._config = config
         self.parent_name = parent_name
+        self._dropout_keep_prob = config.dropout_keep_prob
 
     def _build(self, inputs, is_training=True):
         """
@@ -90,8 +91,10 @@ class SSDFeatureExtractor(BaseNetwork):
                                       padding='SAME', stride=1, scope='pool5')
                 # TODO: or is it rate=12?
                 net = slim.conv2d(net, 1024, [3, 3], rate=6, scope='conv6')
+                net = slim.dropout(net, self._dropout_keep_prob)
                 net = slim.conv2d(net, 1024, [1, 1], scope='conv7',
                                   outputs_collections='FEATURE_MAPS')
+                net = slim.dropout(net, self._dropout_keep_prob)
                 net = slim.conv2d(net, 256, [1, 1], scope='conv8_1')
                 net = slim.conv2d(net, 512, [3, 3], stride=2, scope='conv8_2',
                                   outputs_collections='FEATURE_MAPS')
