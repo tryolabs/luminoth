@@ -299,6 +299,9 @@ class SSD(snt.AbstractModule):
             total_loss = tf.losses.get_total_loss()
 
             prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+            prediction_dict['cls_loss_per_proposal'] = (
+                cross_entropy_per_proposal
+            )
 
             tf.summary.scalar(
                 'cls_loss', cls_loss,

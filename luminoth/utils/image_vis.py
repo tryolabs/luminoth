@@ -106,8 +106,15 @@ summaries_fn = {
             'draw_object_prediction': None,
             'draw_ssd_target_proposals': None,
             'draw_ssd_bbox_pred': [
-                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}
+                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 50}
             ],
+            'draw_ssd_cls_loss': [
+                {'foreground': True, 'topn': 10, 'worst': True},
+                {'foreground': True, 'topn': 10, 'worst': False},
+                {'foreground': False, 'topn': 10, 'worst': True},
+                {'foreground': False, 'topn': 10, 'worst': False},
+            ],
+            'draw_ssd_final_pred_anchors': None,
         }
     }
 }
@@ -816,6 +823,60 @@ def draw_rpn_bbox_pred(pred_dict, image, top_k=5):
     return image_pil
 
 
+def draw_ssd_cls_loss(pred_dict, image, foreground=True, topn=10, worst=True):
+    """
+    For each bounding box labeled object. We want to display the softmax score.
+
+    We display the anchors, and not the adjusted bounding boxes.
+    """
+    loss = pred_dict['cls_loss_per_proposal']
+
+    prob = pred_dict['cls_prob']
+    target = pred_dict['target']['cls']
+    anchors = pred_dict['target']['all_anchors']
+    gt_bboxes = pred_dict['gt_bboxes']
+
+    non_ignored_indices = target >= 0
+    target = target[non_ignored_indices]
+    prob = prob[non_ignored_indices]
+    anchors = anchors[non_ignored_indices]
+
+    # Get anchors with positive label.
+    if foreground:
+        positive_indices = np.nonzero(target > 0)[0]
+    else:
+        positive_indices = np.nonzero(target == 0)[0]
+
+    loss = loss[positive_indices]
+    prob = prob[positive_indices]
+    anchors = anchors[positive_indices]
+
+    sorted_idx = loss.argsort()
+    if worst:
+        sorted_idx = sorted_idx[::-1]
+
+    sorted_idx = sorted_idx[:topn]
+
+    loss = loss[sorted_idx]
+    prob = prob[sorted_idx]
+    anchors = anchors[sorted_idx]
+
+    image_pil, draw = get_image_draw(image)
+
+    for anchor_prob, anchor, anchor_loss in zip(prob, anchors, loss):
+        anchor = list(anchor)
+        draw.rectangle(anchor, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+        draw.text(
+            tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(anchor_loss),
+            font=font, fill=(0, 0, 0, 255))
+
+    for gt_box in gt_bboxes:
+        draw.rectangle(
+            list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
+
+    return image_pil
+
+
 def draw_rpn_bbox_targets(pred_dict, image):
     target = pred_dict['rpn_prediction']['rpn_cls_target']
     bbox_target = pred_dict['rpn_prediction']['rpn_bbox_target']
@@ -1260,8 +1321,7 @@ def draw_ssd_target_proposals(pred_dict, image):
     gt_bboxes = pred_dict['gt_bboxes']
     for gt_box in gt_bboxes:
         draw.rectangle(
-            list(gt_box[:4]), fill=(0, 0, 255, 60),
-        outline=(0, 0, 255, 150))
+            list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
 
     return image_pil
 
@@ -1303,6 +1363,48 @@ def draw_ssd_bbox_pred(pred_dict, image, top_k=5):
             bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
         draw.text(
             tuple([anchor[0], anchor[1]]), text='{:.2f}'.format(loss),
+            font=font, fill=(0, 0, 0, 255))
+        draw.line(
+            [(anchor[0], anchor[1]), (bbox[0], bbox[1])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[2], anchor[1]), (bbox[2], bbox[1])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[2], anchor[3]), (bbox[2], bbox[3])],
+            fill=(0, 0, 0, 170), width=1)
+        draw.line(
+            [(anchor[0], anchor[3]), (bbox[0], bbox[3])],
+            fill=(0, 0, 0, 170), width=1)
+
+    return image_pil
+
+
+def draw_ssd_final_pred_anchors(pred_dict, image):
+    """
+    Draw the anchors used for the final prediction.
+    """
+
+    objects = pred_dict['classification_prediction']['objects']
+    objects_labels = pred_dict['classification_prediction']['labels']
+    objects_labels_prob = pred_dict['classification_prediction']['probs']
+    objects_anchors = pred_dict['classification_prediction']['anchors']
+
+    if len(objects_labels) == 0:
+        logger.debug(
+            'No objects detected. Probably all classified as background.')
+
+    image_pil, draw = get_image_draw(image)
+
+    for num_object, (object_, label, prob, anchor) in enumerate(zip(
+            objects, objects_labels, objects_labels_prob, objects_anchors)):
+        anchor = list(anchor)
+        bbox = list(object_)
+        draw.rectangle(anchor, fill=(0, 255, 0, 20), outline=(0, 255, 0, 100))
+        draw.rectangle(
+            bbox, fill=(255, 0, 255, 20), outline=(255, 0, 255, 100))
+        draw.text(
+            tuple([bbox[0], bbox[1]]), text='{} - {:.2f}'.format(label, prob),
             font=font, fill=(0, 0, 0, 255))
         draw.line(
             [(anchor[0], anchor[1]), (bbox[0], bbox[1])],

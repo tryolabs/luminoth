@@ -124,6 +124,8 @@ class SSDProposal(snt.AbstractModule):
             proposal_label, proposal_filter)
         proposal_label_prob = tf.boolean_mask(
             proposal_label_prob, proposal_filter)
+        proposal_anchors = tf.boolean_mask(
+            all_anchors, proposal_filter)
 
         total_proposals = tf.shape(proposals)[0]
 
@@ -192,10 +194,12 @@ class SSDProposal(snt.AbstractModule):
         top_k_proposal_label_prob = top_k.values
         top_k_proposals = tf.gather(proposals, top_k.indices)
         top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
+        top_k_proposal_anchors = tf.gather(proposal_anchors, top_k.indices)
 
         return {
             'objects': top_k_proposals,
             'labels': top_k_proposal_label,
             'probs': top_k_proposal_label_prob,
             'raw_proposals': raw_proposals,
+            'anchors': top_k_proposal_anchors,
         }
