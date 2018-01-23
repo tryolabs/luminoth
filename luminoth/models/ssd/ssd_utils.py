@@ -14,23 +14,21 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
     Returns:
         Tensor with shape (num_bboxes, 4), with the adjusted bboxes.
     """
-    # We normalize bounding boxes points.
-    bboxes_float = tf.to_float(bboxes)
-    x_min, y_min, x_max, y_max = tf.unstack(bboxes_float, axis=1)
-
-    x_min = x_min / old_width
-    y_min = y_min / old_height
-    x_max = x_max / old_width
-    y_max = y_max / old_height
+    # x_min, y_min, x_max, y_max = np.split(bboxes, 4, axis=1)
+    # import ipdb; ipdb.set_trace()
+    x_min = bboxes[:, 0] / old_width
+    y_min = bboxes[:, 1] / old_height
+    x_max = bboxes[:, 2] / old_width
+    y_max = bboxes[:, 3] / old_height
 
     # Use new size to scale back the bboxes points to absolute values.
-    x_min = tf.to_int32(x_min * new_width)
-    y_min = tf.to_int32(y_min * new_height)
-    x_max = tf.to_int32(x_max * new_width)
-    y_max = tf.to_int32(y_max * new_height)
+    x_min = x_min * new_width
+    y_min = y_min * new_height
+    x_max = x_max * new_width
+    y_max = y_max * new_height
 
     # Concat points and label to return a [num_bboxes, 4] tensor.
-    return tf.stack([x_min, y_min, x_max, y_max], axis=1)
+    return np.stack([x_min, y_min, x_max, y_max], axis=1)
 
 
 def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):

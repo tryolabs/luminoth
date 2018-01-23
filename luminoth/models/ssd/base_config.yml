@@ -58,6 +58,13 @@ train:
   # Number of epochs (complete dataset batches) to run
   num_epochs: 10000
 
+  # Image visualization mode, options = train, eval, debug, (empty). Default=(empty)
+  image_vis: debug
+
+eval:
+  # Image visualization mode, options = train, eval, debug, (empty). Default=(empty)
+  image_vis: eval
+
 dataset:
   type: tfrecord
   # From which directory to read the dataset

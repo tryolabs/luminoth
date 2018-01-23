@@ -12,7 +12,7 @@ from luminoth.models.ssd.ssd_utils import (
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import get_saver
 
-from luminoth.utils.bbox_transform_tf import clip_boxes
+from luminoth.utils.bbox_transform import clip_boxes
 
 
 DEFAULT_ENDPOINTS = {
@@ -128,25 +128,22 @@ class SSD(snt.AbstractModule):
         class_probabilities = slim.softmax(class_scores)
 
         # Generate anchors
-        self.anchors = self.generate_all_anchors(feature_maps)
+        raw_anchors_per_featmap = self.generate_raw_anchors(feature_maps)
         all_anchors_list = []
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
             # TODO: Anchor generation should be simpler. We should create
             #       them in image scale from the start instead of scaling
             #       them to their feature map size.
-            feat_map_shape = feat_map.get_shape().as_list()[1:3]
-            adjusted_bboxes = adjust_bboxes(
-                self.anchors[feat_map_name],
-                tf.cast(feat_map_shape[0], tf.float32),
-                tf.cast(feat_map_shape[1], tf.float32),
-                tf.cast(tf.shape(image)[1], tf.float32),
-                tf.cast(tf.shape(image)[2], tf.float32)
+            feat_map_shape = feat_map.shape.as_list()[1:3]
+            scaled_bboxes = adjust_bboxes(
+                raw_anchors_per_featmap[feat_map_name], feat_map_shape[0],
+                feat_map_shape[1], self.image_shape[0], self.image_shape[1]
             )
-            # Clip anchors to the image.
-            adjusted_bboxes = clip_boxes(
-                adjusted_bboxes, tf.cast(tf.shape(image)[1:3], tf.int32))
-            all_anchors_list.append(adjusted_bboxes)
-        all_anchors = tf.concat(all_anchors_list, axis=0)
+            clipped_bboxes = clip_boxes(scaled_bboxes, self.image_shape)
+            all_anchors_list.append(clipped_bboxes)
+        all_anchors = np.concatenate(all_anchors_list, axis=0)
+        # They were using float64, is all this precision necesary?
+        all_anchors = tf.convert_to_tensor(all_anchors, dtype=tf.float64)
 
         prediction_dict = {}
         if gt_boxes is not None:
@@ -205,7 +202,6 @@ class SSD(snt.AbstractModule):
         # TODO add variable summaries
 
         if self._debug:
-            prediction_dict['anchors'] = self.anchors
             prediction_dict['all_anchors'] = all_anchors
             prediction_dict['all_anchors_target'] = all_anchors
             prediction_dict['cls_prob'] = class_probabilities
@@ -321,7 +317,7 @@ class SSD(snt.AbstractModule):
 
             return total_loss
 
-    def generate_all_anchors(self, feature_maps):
+    def generate_raw_anchors(self, feature_maps):
         """
         Returns a dictionary containing the anchors per feature map.
 
@@ -367,32 +363,28 @@ class SSD(snt.AbstractModule):
                 using the (x1, y1, x2, y2) convention.
         """
         with tf.variable_scope('generate_anchors'):
-            shift_x = tf.range(feature_map_shape[1])
-            shift_y = tf.range(feature_map_shape[0])
-            shift_x, shift_y = tf.meshgrid(shift_x, shift_y)
+            shift_x = np.arange(feature_map_shape[1])
+            shift_y = np.arange(feature_map_shape[0])
+            shift_x, shift_y = np.meshgrid(shift_x, shift_y)
 
-            shift_x = tf.reshape(shift_x, [-1])
-            shift_y = tf.reshape(shift_y, [-1])
+            shift_x = np.reshape(shift_x, [-1])
+            shift_y = np.reshape(shift_y, [-1])
 
-            shifts = tf.stack(
+            shifts = np.stack(
                 [shift_x, shift_y, shift_x, shift_y],
                 axis=0
             )
 
-            shifts = tf.transpose(shifts)
+            shifts = np.transpose(shifts)
             # Shifts now is a (H x W, 4) Tensor
 
             # Expand dims to use broadcasting sum.
             all_anchors = (
-                tf.expand_dims(anchor_reference, axis=0) +
-                tf.cast(tf.expand_dims(shifts, axis=1), tf.float64)
+                np.expand_dims(anchor_reference, axis=0) +
+                np.expand_dims(shifts, axis=1)
             )
-
             # Flatten
-            all_anchors = tf.reshape(
-                all_anchors, (-1, 4)
-            )
-            return all_anchors
+            return np.reshape(all_anchors, (-1, 4))
 
     @property
     def summary(self):
