@@ -105,9 +105,6 @@ summaries_fn = {
         'debug': {
             'draw_object_prediction': None,
             'draw_ssd_target_proposals': None,
-            'draw_ssd_bbox_pred': [
-                {'top_k': 1}, {'top_k': 5}, {'top_k': 10}, {'top_k': 50}
-            ],
             'draw_ssd_cls_loss': [
                 {'foreground': True, 'topn': 10, 'worst': True},
                 {'foreground': True, 'topn': 10, 'worst': False},
@@ -115,6 +112,8 @@ summaries_fn = {
                 {'foreground': False, 'topn': 10, 'worst': False},
             ],
             'draw_ssd_final_pred_anchors': None,
+            'draw_ssd_bbox_pred': [{'top_k': 1}, {'top_k': 5}, {'top_k': 10}],
+            'draw_ssd_top_k_anchors_per_gt': None
         }
     }
 }
@@ -1419,4 +1418,47 @@ def draw_ssd_final_pred_anchors(pred_dict, image):
             [(anchor[0], anchor[3]), (bbox[0], bbox[3])],
             fill=(0, 0, 0, 170), width=1)
 
+    return image_pil
+
+
+def draw_ssd_top_k_anchors_per_gt(pred_dict, image, top_k=5):
+    """Generates the top_k anchors for each gt_bbox according to iou"""
+    image_pil, draw = get_image_draw(image)
+    anchors = pred_dict['all_anchors']
+    gt_bboxes = pred_dict['gt_bboxes']
+    overlaps = bbox_overlap(anchors, gt_bboxes[:, :4])
+
+    # We iterate over the columns (gt_boxes) of overlaps, thats why we transpose
+    for overlaps_per_gt_box, gt_box in zip(overlaps.T, gt_bboxes):
+        # Draw gt box
+        draw.rectangle(
+            list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150)
+        )
+
+        # Get indices of the top_k anchors
+        partition_edge = top_k * -1
+        top_k_anchors_idx = np.argpartition(
+            overlaps_per_gt_box, partition_edge
+        )[partition_edge:]
+        
+        # Get top_k anchors
+        top_k_anchors = anchors[top_k_anchors_idx]
+
+        # Get the iou for the top_k anchors
+        top_k_overlaps = overlaps_per_gt_box[top_k_anchors_idx]
+
+        # Draw best k anchors with regards to overlap (iou)
+        for anchor, iou in zip(top_k_anchors, top_k_overlaps):
+            # TODO: We should get the iou tresholds from the configfile
+            iou_treshold = 0.5
+            rectangle_outline = (0, 255, 0, 100) if iou > iou_treshold else (255, 0, 0, 100)
+            draw.rectangle(
+                list(anchor), fill=(0, 0, 0, 0), outline=rectangle_outline
+            )
+            x, y = anchor[:2]
+            x = max(x, 0)
+            y = max(y, 0)
+            text_fill = (30, 30, 30, 100) if iou > iou_treshold else (255, 0, 0, 100)
+            draw.text(tuple([x, y]), text=str(iou)[:4], font=font,
+                      fill=text_fill)
     return image_pil
