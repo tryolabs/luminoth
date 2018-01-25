@@ -15,14 +15,6 @@ from luminoth.utils.vars import get_saver
 from luminoth.utils.bbox_transform import clip_boxes
 
 
-DEFAULT_ENDPOINTS = {
-    'ssd_1': (10, 10),
-    'ssd_2': (5, 5),
-    'ssd_3': (3, 3),
-    'ssd_4': (1, 1),
-}
-
-
 class SSD(snt.AbstractModule):
     """TODO
     """
@@ -127,7 +119,7 @@ class SSD(snt.AbstractModule):
         class_scores = tf.concat(class_scores_list, axis=0)
         class_probabilities = slim.softmax(class_scores)
 
-        # Generate anchors
+        # Generate anchors (generated only once, therefore we use numpy)
         raw_anchors_per_featmap = self.generate_raw_anchors(feature_maps)
         all_anchors_list = []
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
