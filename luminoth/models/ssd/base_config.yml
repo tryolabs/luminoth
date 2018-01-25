@@ -112,7 +112,7 @@ model:
     # By now, the ratio of 1 must always be at the begin of the array
     ratios: [1, 0.5, 2, 0.3, 3]
     # Minimum and maximum scale of anchors
-    min_scale: 0.15
+    min_scale: 0.10
     max_scale: 0.99
 
   target:
