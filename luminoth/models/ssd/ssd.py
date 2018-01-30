@@ -222,19 +222,9 @@ class SSD(snt.AbstractModule):
             cls_target = tf.cast(
                 prediction_dict['target']['cls'], tf.int32
             )
-
-            # We only care for the targets that are >= 0
-            not_ignored = tf.reshape(tf.greater_equal(
-                cls_target, 0), [-1], name='not_ignored')
-            # We apply boolean mask to score and target.
-            cls_pred_labeled = tf.boolean_mask(
-                cls_pred, not_ignored, name='cls_pred_labeled')
-            cls_target_labeled = tf.boolean_mask(
-                cls_target, not_ignored, name='cls_target_labeled')
-
             # Transform to one-hot vector
             cls_target_one_hot = tf.one_hot(
-                cls_target_labeled, depth=self._num_classes + 1,
+                cls_target, depth=self._num_classes + 1,
                 name='cls_target_one_hot'
             )
 
@@ -244,7 +234,7 @@ class SSD(snt.AbstractModule):
             #       logits we would not have the need to do softmax here too.
             cross_entropy_per_proposal = (
                 tf.nn.softmax_cross_entropy_with_logits(
-                    labels=cls_target_one_hot, logits=cls_pred_labeled
+                    labels=cls_target_one_hot, logits=cls_pred
                 )
             )
             # Second we need to calculate the smooth l1 loss between
@@ -263,17 +253,15 @@ class SSD(snt.AbstractModule):
                 name='bbox_offsets_target_positives'
             )
 
-            # Calculate the smooth l1 loss between the flatten bboxes
+            # Calculate the smooth l1 regression loss between the flatten bboxes
             # offsets  and the labeled targets.
-            # TODO: reg loss can be confused between regularization and
-            #       regression, rename
             reg_loss_per_proposal = smooth_l1_loss(
                 bbox_offsets_positives, bbox_offsets_target_positives)
 
             cls_loss = tf.reduce_sum(cross_entropy_per_proposal)
             bbox_loss = tf.reduce_sum(reg_loss_per_proposal)
 
-            # Following the paper, set loss to 0. if there are 0 bboxes
+            # Following the paper, set loss to 0 if there are 0 bboxes
             # assigned as foreground targets.
             safety_condition = tf.not_equal(
                 tf.shape(bbox_offsets_positives)[0], 0
