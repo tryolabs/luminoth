@@ -65,38 +65,31 @@ class SSDProposal(snt.AbstractModule):
                 proposal_label: It's shape is (final_num_proposals,)
                 proposal_label_prob: It's shape is (final_num_proposals,)
         """
-        # First we want get the most probable label for each anchor
+        # First we want to get the most probable label for each anchor
         # We still have the background on idx 0 so we substract 1 to the idxs,
         # so the background label now is -1.
         proposal_label = tf.argmax(cls_prob, axis=1) - 1
         # Get the probability for the selected label for each proposal.
         proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
-
         # We are going to use only the non-background anchors.
         non_background_filter = tf.greater_equal(proposal_label, 0)
         # Filter anchors with less than threshold probability.
         min_prob_filter = tf.greater_equal(
-            proposal_label_prob, self._min_prob_threshold
-        )
-        proposal_filter = tf.logical_and(
-            non_background_filter, min_prob_filter
-        )
+            proposal_label_prob, self._min_prob_threshold)
+        # Join the previous 2 filters
+        proposal_filter = tf.logical_and(non_background_filter, min_prob_filter)
 
         total_anchors = tf.shape(all_anchors)[0]
-
         equal_shapes = tf.assert_equal(
-            tf.shape(all_anchors)[0], tf.shape(loc_pred)[0]
-        )
+            tf.shape(all_anchors)[0], tf.shape(loc_pred)[0])
+
         with tf.control_dependencies([equal_shapes]):
             # Filter all tensors for getting all non-background anchors.
-            all_anchors = tf.boolean_mask(
-                all_anchors, proposal_filter)
-            proposal_label = tf.boolean_mask(
-                proposal_label, proposal_filter)
+            all_anchors = tf.boolean_mask(all_anchors, proposal_filter)
+            proposal_label = tf.boolean_mask(proposal_label, proposal_filter)
             proposal_label_prob = tf.boolean_mask(
                 proposal_label_prob, proposal_filter)
-            loc_pred = tf.boolean_mask(
-                loc_pred, proposal_filter)
+            loc_pred = tf.boolean_mask(loc_pred, proposal_filter)
 
         filtered_anchors = tf.shape(all_anchors)[0]
         tf.summary.scalar(
@@ -166,7 +159,7 @@ class SSDProposal(snt.AbstractModule):
                 class_proposal_tf, class_selected_idx)
             class_prob = tf.gather(class_prob, class_selected_idx)
 
-            # We append values to a regular list which will later be transform
+            # We append values to a regular list which will later be transformed
             # to a proper Tensor.
             selected_boxes.append(class_proposal_tf)
             selected_probs.append(class_prob)
