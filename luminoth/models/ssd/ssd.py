@@ -155,7 +155,7 @@ class SSD(snt.AbstractModule):
                 with tf.name_scope('prepare_batch'):
                     predictions_filter = tf.greater_equal(class_targets, 0)
 
-                    all_anchors = tf.boolean_mask(
+                    target_anchors = tf.boolean_mask(
                         all_anchors, predictions_filter)
                     bbox_offsets_targets = tf.boolean_mask(
                         bbox_offsets_targets, predictions_filter)
@@ -171,16 +171,16 @@ class SSD(snt.AbstractModule):
             prediction_dict['target'] = {
                 'cls': class_targets,
                 'bbox_offsets': bbox_offsets_targets,
-                'all_anchors': all_anchors
+                'anchors': target_anchors
             }
 
         # Get the proposals and save the result
-        proposals_creator = SSDProposal(all_anchors.shape[0],
+        proposals_creator = SSDProposal(target_anchors.shape[0],
                                         self._num_classes,
                                         self._config.model.proposals,
                                         debug=self._debug)
         proposal_prediction = proposals_creator(
-            class_probabilities, bbox_offsets, all_anchors,
+            class_probabilities, bbox_offsets, target_anchors,
             tf.cast(tf.shape(image)[1:3], tf.float32)
         )
 
@@ -195,7 +195,6 @@ class SSD(snt.AbstractModule):
 
         if self._debug:
             prediction_dict['all_anchors'] = all_anchors
-            prediction_dict['all_anchors_target'] = all_anchors
             prediction_dict['cls_prob'] = class_probabilities
             prediction_dict['gt_boxes'] = gt_boxes
 

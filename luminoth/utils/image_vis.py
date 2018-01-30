@@ -832,7 +832,7 @@ def draw_ssd_cls_loss(pred_dict, image, foreground=True, topn=10, worst=True):
 
     prob = pred_dict['cls_prob']
     target = pred_dict['target']['cls']
-    anchors = pred_dict['target']['all_anchors']
+    anchors = pred_dict['target']['anchors']
     gt_bboxes = pred_dict['gt_bboxes']
 
     non_ignored_indices = target >= 0
@@ -1287,7 +1287,7 @@ def draw_rcnn_input_proposals(pred_dict, image):
 def draw_ssd_target_proposals(pred_dict, image):
     image_pil, draw = get_image_draw(image)
 
-    all_anchors = pred_dict['target']['all_anchors']
+    all_anchors = pred_dict['target']['anchors']
     bbox_pred = pred_dict['loc_pred']
     bbox_targets = pred_dict['target']['cls']
 
@@ -1334,7 +1334,7 @@ def draw_ssd_bbox_pred(pred_dict, image, top_k=5):
     """
 
     target = pred_dict['target']['cls']
-    all_anchors = pred_dict['target']['all_anchors']
+    all_anchors = pred_dict['target']['anchors']
     bbox_pred = pred_dict['loc_pred']
     # Get anchors with positive label.
     positive_indices = target > 0
