@@ -47,12 +47,12 @@ def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):
                                   feature_map_shape[0])
     # The last endpoint
     else:
-        # The scale of the last layer is 0.99, so the extra scale
-        # I'll try here will actually be smaller. This is not
-        # detailed in the paper and is very hacky, but it makes
-        # sense. So it works as a temporary measure.
-        heights[0] = scales[0] * feature_map_shape[0] * 0.8
-        widths[0] = scales[0] * feature_map_shape[1] * 0.8
+        # The last layer doesn't have a subsequent layer with which
+        # to generate the second scale from their geometric mean,
+        # so we hard code it to 0.99.
+        # We should add this parameter to the config eventually.
+        heights[0] = scales[0] * feature_map_shape[0] * 0.99
+        widths[0] = scales[0] * feature_map_shape[1] * 0.99
 
     ratios = ratios[:num_anchors - 1]
     heights[1:] = scales[0] / np.sqrt(ratios) * feature_map_shape[0]

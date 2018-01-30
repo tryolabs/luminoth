@@ -16,7 +16,7 @@ train:
   no_log: False
   # Displays debugging images with results every N steps. Debug mode must be
   # enabled
-  display_every_steps: 100
+  display_every_steps: 500
   # Display debugging images every N seconds.
   display_every_secs:
   # Shuffle the dataset. It should only be disabled when trying to reproduce
@@ -43,7 +43,7 @@ train:
     # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
     # You can define different decay methods using `decay_method` and defining all the necessary arguments.
     decay_method:
-    learning_rate: 0.01
+    learning_rate: 0.001
 
   # Optimizer config
   optimizer:
@@ -95,7 +95,7 @@ model:
     # Should we download weights if not available
     download: True
     arg_scope:
-      # Regularization
+      # The l2 regularization coefficient.
       weight_decay: 0.0005
     dropout_keep_prob: 1.0
 
@@ -106,34 +106,37 @@ model:
   anchors:
     # Number of anchors per point in each feature map. This anchors must be in order
     # and they must match with the number of total endpoints
-    anchors_per_point: [4, 6, 6, 6, 6, 4]
+    anchors_per_point: [4, 6, 6, 6, 4, 4]
     # Aspect ratios used for generating anchors. If there is more ratios than
     # anchors per point, it will be used only the firsts to calculate the sclaes.
     # By now, the ratio of 1 must always be at the begin of the array
-    ratios: [1, 0.5, 2, 0.3, 3]
+    ratios: [1, 0.5, 2, 0.333, 3]
     # Minimum and maximum scale of anchors
     min_scale: 0.10
-    max_scale: 0.99
+    max_scale: 0.88
 
   target:
     # The ratio of positives-negatives will be 1:`hard_negative_ratio`
     hard_negative_ratio: 3.
     # Threshold with GT to be considered positive
-    foreground_threshold: 0.6
+    foreground_threshold: 0.5
     # High and low threshold with GT to be considered negative
-    background_threshold_high: 0.4
-    background_threshold_low: 0.0
+    background_threshold_high: 0.2
+    background_threshold_low: 0.0  # Not used at the moment
 
   proposals:
-    # NMS threshold used when removing "almost duplicates"
-    nms_threshold: 0.6
-    # Maximum number of detections for each class
-    class_max_detections: 100
-    # NMS threshold used to remove "almost duplicate" of the same class
-    class_nms_threshold: 0.6
     # Maximum total detections for an image (sorted by score)
-    total_max_detections: 300
+    total_max_detections: 200
+    # Maximum number of detections for each class
+    # Not used in paper, so I set class_max_detections = total_max_detections
+    class_max_detections: 200
+    # NMS threshold used to remove "almost duplicate" of the same class
+    class_nms_threshold: 0.45
     # Minimum prob to be used as proposed object
-    min_prob_threshold: 0.05
+    # Setting it to 0.01 is for precision-recall scoring purposes though,
+    # in order to get some usable final predictions, the confidence
+    # threshold must be set higher, e.g. to 0.5.
+    # ( Acording to: https://github.com/pierluigiferrari/ssd_keras/blob/d1b4e7e218af7d31314b9927c08e735e54f5af30/ssd300_training.ipynb#L548 )
+    min_prob_threshold: 0.01
     # Filter proposals from anchors partially outside the image.
     filter_outside_anchors: True
