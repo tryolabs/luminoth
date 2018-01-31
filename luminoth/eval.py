@@ -155,8 +155,8 @@ def eval(dataset_split, config_files, watch, from_global_step,
                 raise e
 
             tf.logging.warning(
-                'Missing checkpoint; Checking again in a minute')
-            time.sleep(60)
+                'Missing checkpoint; Checking again in a moment')
+            time.sleep(5)
             continue
 
         for checkpoint in checkpoints:
@@ -186,20 +186,20 @@ def eval(dataset_split, config_files, watch, from_global_step,
                 # checkpoints file, but it still hasn't been completely saved.
                 tf.logging.info(
                     'Checkpoint {} is not ready yet. '
-                    'Checking again in a minute.'.format(
+                    'Checking again in a moment.'.format(
                         checkpoint['file']
                     )
                 )
-                time.sleep(60)
+                time.sleep(5)
                 continue
 
         # If no watching was requested, finish the execution.
         if not watch:
             return
 
-        # Sleep for a minute and check for new checkpoints.
-        tf.logging.info('All checkpoints evaluated; sleeping for a minute')
-        time.sleep(60)
+        # Sleep for a moment and check for new checkpoints.
+        tf.logging.info('All checkpoints evaluated; sleeping for a moment')
+        time.sleep(5)
 
 
 def get_checkpoints(run_dir, from_global_step=None):
