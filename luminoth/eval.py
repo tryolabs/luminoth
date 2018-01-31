@@ -305,10 +305,10 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                     'scores': ops['pred_objects_scores'],
                     'gt_bboxes': ops['train_objects'],
                     'losses': ops['losses'],
+                    'filename': ops['filename'],
                 }
                 if image_vis is not None:
                     fetches['prediction_dict'] = ops['prediction_dict']
-                    fetches['filename'] = ops['filename']
                     fetches['train_image'] = ops['train_image']
 
                 batch_fetched = sess.run(fetches)
