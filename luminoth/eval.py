@@ -148,7 +148,9 @@ def eval(dataset_split, config_files, watch, from_global_step,
     while True:
         # Get the checkpoint files to evaluate.
         try:
-            checkpoints = get_checkpoints(run_dir, last_global_step)
+            checkpoints = get_checkpoints(
+                run_dir, last_global_step, last_only=not watch
+            )
         except ValueError as e:
             if not watch:
                 tf.logging.error('Missing checkpoint.')
@@ -202,7 +204,7 @@ def eval(dataset_split, config_files, watch, from_global_step,
         time.sleep(5)
 
 
-def get_checkpoints(run_dir, from_global_step=None):
+def get_checkpoints(run_dir, from_global_step=None, last_only=False):
     """Return all available checkpoints.
 
     Args:
@@ -227,12 +229,19 @@ def get_checkpoints(run_dir, from_global_step=None):
         raise ValueError('Could not find checkpoint in {}.'.format(run_dir))
 
     # TODO: Any other way to get the global_step?
-    checkpoints = [
+    checkpoints = sorted([
         {'global_step': int(path.split('-')[-1]), 'file': path}
         for path in ckpt.all_model_checkpoint_paths
-    ]
+    ], key=lambda c: c['global_step'])
 
-    if from_global_step is not None:
+    if last_only:
+        checkpoints = checkpoints[-1:]
+        tf.logging.info(
+            'Using last checkpoint in run_dir, global_step = {}'.format(
+                checkpoints[0]['global_step']
+            )
+        )
+    elif from_global_step is not None:
         checkpoints = [
             c for c in checkpoints
             if c['global_step'] > from_global_step
