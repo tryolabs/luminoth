@@ -39,6 +39,8 @@ function drawCanvas(canvas, imageFile, objects, probs, labels, minProb) {
   image = new Image()
   image.src = URL.createObjectURL(imageFile)
   image.onload = function() {
+    URL.revokeObjectURL(this.src) // release object to avoid memory leak
+
     var imageWidth = image.width
     var imageHeight = image.height
 
