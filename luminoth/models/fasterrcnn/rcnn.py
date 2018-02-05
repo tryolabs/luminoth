@@ -202,10 +202,6 @@ class RCNN(snt.AbstractModule):
             )
             net = self._activation(net)
             if self._debug:
-                # pos = tf.range(1, tf.add(tf.shape(net)[1], 1), dtype=tf.int32)
-                # var = tf.multiply(tf.round(tf.minimum(net, 1.)), tf.to_float(pos))
-                # tf.summary.histogram('fc_{}_relustate'.format(i), var, ['rcnn'])
-
                 prediction_dict['_debug']['layer_{}_out'.format(i)] = net
 
             variable_summaries(net, 'fc_{}_out'.format(i), 'reduced')
