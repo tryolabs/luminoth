@@ -1,79 +1,151 @@
 'use strict'
 ;(function() {
-  const drawBoundingBoxes = function(ctx, objects, probs, labels, minProb) {
-    let labelColors = {}
-    let i
-
-    // Generate unique set of labels
-    for (i = 0; i < labels.length; i++) {
-      labelColors[labels[i]] = null
-    }
-    const distinctLabels = Object.keys(labelColors)
-
-    // Generate color palette based on # of distinct labels
-    const colors = palette('mpn65', distinctLabels.length).map(hex =>
-      hexToRgba(hex, 0.25)
-    )
-    for (i = 0; i < distinctLabels.length; i++) {
-      labelColors[distinctLabels[i]] = colors[i]
-    }
-
-    for (i = 0; i < objects.length; i++) {
-      let prob = probs[i]
-      if (prob < minProb) {
-        continue
-      }
-
-      let label = labels[i]
-      let x = objects[i][0]
-      let y = objects[i][1]
-      let width = objects[i][2] - objects[i][0]
-      let height = objects[i][3] - objects[i][1]
-
-      ctx.font = '10px serif'
-      ctx.fillStyle = 'rgba(30, 30, 30, 1.0)'
-      ctx.fillText(label, x, y - 3)
-      ctx.fillStyle = labelColors[label]
-      ctx.fillRect(x, y, width, height)
-      ctx.strokeStyle = 'rgba(230, 20, 20, 0.55)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x, y, width, height)
-    }
+  let drawing = {
+    backgroundImage: undefined,
+    elements: []
   }
 
-  function drawImage(imageFile, objects, probs, labels, minProb) {
+  const adjustAspectRatio = () => {
+    // Adjust so we don't lose aspect ratio on resize
+    const canvas = document.getElementById('result-canvas')
+    const trueAR = canvas.width / canvas.height
+    canvas.style.maxHeight = canvas.clientWidth / trueAR
+  }
+
+  const drawBoundingBoxes = function(ctx, probThresold) {
+    const outlineWidth = 1
+    const fontSize = 12
+    const pad = 5
+
+    ctx.lineWidth = outlineWidth
+
+    // Draw actual bounding boxes
+    drawing.elements.forEach(elem => {
+      if (elem.prob < probThresold) {
+        return
+      }
+
+      ctx.fillStyle = elem.fillColor
+      ctx.fillRect(elem.x, elem.y, elem.width, elem.height)
+
+      ctx.strokeStyle = elem.outlineColor
+      ctx.strokeRect(elem.x, elem.y, elem.width, elem.height)
+    })
+
+    // Draw labels
+    ctx.font = 'bold ' + fontSize + 'px serif'
+    ctx.textBaseline = 'bottom'
+    drawing.elements.forEach(elem => {
+      if (elem.prob < probThresold) {
+        return
+      }
+
+      const text = elem.label + ' (' + elem.prob.toFixed(2) + ')'
+      const textWidth = ctx.measureText(text).width
+
+      ctx.fillStyle = elem.labelColor
+      ctx.fillRect(
+        elem.x,
+        elem.y + elem.height - fontSize - pad * 2 - outlineWidth,
+        textWidth + pad * 2 + outlineWidth,
+        fontSize + pad * 2 + outlineWidth
+      )
+
+      ctx.fillStyle = 'rgba(30, 30, 30, 1.0)'
+      ctx.fillText(text, elem.x + pad, elem.y + elem.height - pad)
+    })
+  }
+
+  function draw(probThresold) {
     const canvas = document.getElementById('result-canvas')
     const ctx = canvas.getContext('2d')
+    const image = drawing.backgroundImage
+
+    // Don't upscale images
+    canvas.style.maxWidth = image.width
+    canvas.style.maxHeight = image.height
+
+    ctx.canvas.width = image.width
+    ctx.canvas.height = image.height
+    ctx.drawImage(image, 0, 0, image.width, image.height)
+
+    // Get appropriate font for labels
+    // const fontRatio = canvas.width / (canvas.clientWidth * 100)
+    // const fontSize = canvas.clientWidth * fontRatio
+    // console.log(fontSize)
+
+    // ctx.font = fontSize + 'px Serif'
+    drawBoundingBoxes(ctx, probThresold)
+    adjustAspectRatio()
+  }
+
+  function drawImage(imageFile) {
+    const slider = document.getElementById('prob-threshold')
+    const probThresold = slider.value / 100
 
     const image = new Image()
     image.src = URL.createObjectURL(imageFile)
     image.onload = function() {
       URL.revokeObjectURL(this.src) // release object to avoid memory leak
 
-      // Don't upscale images
-      canvas.style.maxWidth = image.width
-      canvas.style.maxHeight = image.height
+      drawing.backgroundImage = image
+      draw(probThresold)
 
-      ctx.canvas.width = image.width
-      ctx.canvas.height = image.height
-      ctx.drawImage(image, 0, 0, image.width, image.height)
+      window.addEventListener('resize', function() {
+        draw(probThresold)
+      })
 
-      drawBoundingBoxes(ctx, objects, probs, labels, minProb)
+      slider.addEventListener('input', function(event) {
+        const threshold = event.target.value / 100
+        draw(threshold)
+
+        document.getElementById('prob-threshold-value').innerHTML =
+          '(' + threshold.toFixed(2) + ')'
+      })
+    }
+  }
+
+  const storeElementsToDraw = function(objects, probs, labels) {
+    let i
+
+    let labelHexColors = {}
+
+    // Generate unique set of labels
+    for (i = 0; i < labels.length; i++) {
+      labelHexColors[labels[i]] = null
+    }
+    const distinctLabels = Object.keys(labelHexColors)
+
+    // Generate color palette based on # of distinct labels,
+    // using Google's palette generator script.
+    const colors = window.palette('mpn65', distinctLabels.length)
+    for (i = 0; i < distinctLabels.length; i++) {
+      labelHexColors[distinctLabels[i]] = colors[i]
+    }
+
+    drawing.elements = []
+    for (i = 0; i < objects.length; i++) {
+      drawing.elements.push({
+        prob: probs[i],
+        label: labels[i],
+        fillColor: window.hexToRgba(labelHexColors[labels[i]], 0.1),
+        outlineColor: window.hexToRgba(labelHexColors[labels[i]], 1.0),
+        labelColor: window.hexToRgba(labelHexColors[labels[i]], 0.5),
+        x: objects[i][0],
+        y: objects[i][1],
+        width: objects[i][2] - objects[i][0],
+        height: objects[i][3] - objects[i][1]
+      })
     }
   }
 
   const formSubmit = function(form) {
-    let modelType = document.getElementById('modelField').value
-    let total = document.getElementById('totalField').value
-    let minProb = document.getElementById('minField').value
+    let modelType = document.getElementById('model-field').value
     // let resultsDiv = document.getElementById('results-row')
     // let jsonDiv = document.getElementById('results')
 
     var formdata = new FormData(form)
-    let url = '/api/' + modelType + '/predict'
-    if (total) {
-      url += '?total=' + total
-    }
+    const url = '/api/' + modelType + '/predict'
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url, true)
@@ -81,30 +153,25 @@
 
     xhr.onreadystatechange = function() {
       if (xhr.readyState == 4 && xhr.status == 200) {
-        // jsonDiv.innerHTML = xhr.response
         const response = JSON.parse(xhr.response)
+        // jsonDiv.innerHTML = xhr.response
         // resultsDiv.style.display = ''
 
-        drawImage(
-          formdata.getAll('image')[0],
+        storeElementsToDraw(
           response.objects,
           response.objects_labels_prob,
-          response.objects_labels,
-          minProb
+          response.objects_labels
         )
+
+        drawImage(formdata.getAll('image')[0])
       }
     }
   }
 
-  window.addEventListener('resize', function() {
-    // Adjust so we don't lose aspect ratio on resize
-    const canvas = document.getElementById('result-canvas')
-    const trueAR = canvas.width / canvas.height
-    canvas.style.maxHeight = canvas.clientWidth / trueAR
-  })
+  window.addEventListener('resize', adjustAspectRatio)
 
   document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('imageForm')
+    const form = document.getElementById('image-form')
     form.addEventListener('submit', event => {
       event.preventDefault()
       formSubmit(form)
