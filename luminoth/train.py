@@ -106,15 +106,18 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
 
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
+    summary_op = [model.summary]
+    summaries = tf.summary.merge_all()
+    if summaries is not None:
+        summary_op.append(summaries)
+    summary_op = tf.summary.merge(summary_op)
+
     scaffold = tf.train.Scaffold(
         # Initialize local and global variables.
         init_op=init_op,
         # Queue-related variables need a special initializer.
         local_init_op=tf.local_variables_initializer(),
-        summary_op=tf.summary.merge([
-            tf.summary.merge_all(),
-            model.summary,
-        ])
+        summary_op=summary_op,
     )
 
     # Custom hooks for our session

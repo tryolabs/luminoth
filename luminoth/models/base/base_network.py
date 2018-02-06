@@ -80,10 +80,12 @@ class BaseNetwork(snt.AbstractModule):
                 output_stride=output_stride
             )
         elif self.resnet_v2_type:
+            output_stride = self._config.get('output_stride')
             return functools.partial(
                 getattr(resnet_v2, self._architecture),
                 is_training=is_training,
-                num_classes=self._config.get('num_classes')
+                num_classes=self._config.get('num_classes'),
+                output_stride=output_stride,
             )
 
     @property
