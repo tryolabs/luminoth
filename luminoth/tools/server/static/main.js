@@ -64,8 +64,8 @@ function drawImage(imageFile, objects, probs, labels, minProb) {
     drawBoundingBoxes(ctx, objects, probs, labels, minProb)
 
     // Get result as PNG and assign to element in DOM
-    const img = canvas.toDataURL()
-    document.getElementById('result-image').src = img
+    const domImg = document.getElementById('result-image')
+    domImg.src = canvas.toDataURL()
   }
 }
 
@@ -73,8 +73,8 @@ const formSubmit = function(form) {
   var modelType = document.getElementById('modelField').value
   var total = document.getElementById('totalField').value
   var minProb = document.getElementById('minField').value
-  var resultsDiv = document.getElementById('results-row')
-  var jsonDiv = document.getElementById('results')
+  // var resultsDiv = document.getElementById('results-row')
+  // var jsonDiv = document.getElementById('results')
 
   var formdata = new FormData(form)
   url = '/api/' + modelType + '/predict'
@@ -88,9 +88,9 @@ const formSubmit = function(form) {
 
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4 && xhr.status == 200) {
-      jsonDiv.innerHTML = xhr.response
+      // jsonDiv.innerHTML = xhr.response
       const response = JSON.parse(xhr.response)
-      resultsDiv.style.display = ''
+      // resultsDiv.style.display = ''
 
       drawImage(
         formdata.getAll('image')[0],
