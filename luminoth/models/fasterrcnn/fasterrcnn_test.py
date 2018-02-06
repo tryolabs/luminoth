@@ -39,6 +39,8 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     'endpoint': 'conv5/conv5_1',
                     'download': False,
                     'fine_tune_from': 'conv4/conv4_2',
+                    'freeze_tail': False,
+                    'use_tail': True,
                     'arg_scope': {
                         'weight_decay': 0.0005,
                     }
@@ -500,21 +502,24 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
             config, prediction_dict_random, image_size)
 
         loss_random_compare = {
-            'rcnn_reg_loss': 1,
+            'rcnn_cls_loss': 5,
+            'rcnn_reg_loss': 3,
+            'rpn_cls_loss': 5,
+            'rpn_reg_loss': 3,
+            'no_reg_loss': 16,
             'regularization_loss': 0,
-            'no_reg_loss': 50,
-            'rpn_cls_loss': 50,
-            'rcnn_cls_loss': 50,
-            'total_loss': 100,
-            'rpn_reg_loss': 50
+            'total_loss': 22,
         }
         for loss in loss_random:
             self.assertGreaterEqual(
                 loss_random[loss],
-                loss_random_compare[loss])
+                loss_random_compare[loss],
+                loss
+            )
             self.assertEqual(
                 loss_perfect[loss],
-                0)
+                0, loss
+            )
 
     def _assert_sequential_values(self, values, delta=1):
         unique_values = np.unique(values)

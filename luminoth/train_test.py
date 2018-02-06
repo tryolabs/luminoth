@@ -33,7 +33,7 @@ class MockFasterRCNN(snt.AbstractModule):
 
     @property
     def summary(self):
-        return tf.summary.scalar('dummy', 1)
+        return tf.summary.scalar('dummy', 1, collections=['rcnn'])
 
 
 class TrainTest(tf.test.TestCase):

@@ -13,6 +13,9 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         self.config = easydict.EasyDict({
             'architecture': None,
             'endpoint': None,
+            'freeze_tail': False,
+            'use_tail': True,
+            'output_stride': 16,
         })
         tf.reset_default_graph()
 
@@ -61,7 +64,9 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         model = TruncatedBaseNetwork(
             easydict.EasyDict({
                 'architecture': 'resnet_v1_50',
-                'endpoint': 'block4/unit_3/bottleneck_v1/conv2'
+                'endpoint': 'block4/unit_3/bottleneck_v1/conv2',
+                'freeze_tail': False,
+                'use_tail': True,
             })
         )
         model(inputs)
@@ -94,6 +99,8 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
                 'architecture': 'resnet_v1_50',
                 'endpoint': 'block4/unit_2/bottleneck_v1/conv2',
                 'fine_tune_from': 'block4/unit_2/bottleneck_v1/conv1',
+                'freeze_tail': False,
+                'use_tail': True,
             })
         )
         model(inputs)
@@ -108,8 +115,8 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
         self.assertEqual(len(trainable_vars), 6)
 
         #
-        # Check that we raise proper exception if fine_tune_from is after
-        # the chosen endpoint (there is nothing to fine-tune!)
+        # Check that we return no vars if fine_tune_from is after the chosen
+        # endpoint (there is nothing to fine-tune!) and tail is frozen.
         #
         model = TruncatedBaseNetwork(
             easydict.EasyDict(
@@ -117,12 +124,13 @@ class TruncatedBaseNetworkTest(tf.test.TestCase):
                     'architecture': 'resnet_v1_50',
                     'endpoint': 'block4/unit_2/bottleneck_v1/conv1',
                     'fine_tune_from': 'block4/unit_2/bottleneck_v1/conv2',
+                    'freeze_tail': True,
+                    'use_tail': True,
                 }
             )
         )
         model(inputs)
-        with self.assertRaises(ValueError):
-            model.get_trainable_vars()
+        self.assertEqual(len(model.get_trainable_vars()), 0)
 
 
 if __name__ == '__main__':
