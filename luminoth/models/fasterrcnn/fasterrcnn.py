@@ -102,9 +102,6 @@ class FasterRCNN(snt.AbstractModule):
             tf.expand_dims(image, 0), is_training=is_training
         )
 
-        if self._config.model.batch_norm:
-            conv_feature_map = snt.BatchNorm()(conv_feature_map, is_training)
-
         # The RPN submodule which generates proposals of objects.
         self._rpn = RPN(
             self._num_anchors, self._config.model.rpn,

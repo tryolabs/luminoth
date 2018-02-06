@@ -193,8 +193,6 @@ class RCNN(snt.AbstractModule):
         for i, layer in enumerate(self._layers):
             # Through FC layer.
             net = layer(net)
-            if self._config.batch_norm:
-                net = snt.BatchNorm()(net, is_training=is_training)
 
             # Apply activation and dropout.
             variable_summaries(
