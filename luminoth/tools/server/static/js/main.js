@@ -96,6 +96,13 @@
     }
   }
 
+  window.addEventListener('resize', function() {
+    // Adjust so we don't lose aspect ratio on resize
+    const canvas = document.getElementById('result-canvas')
+    const trueAR = canvas.width / canvas.height
+    canvas.style.maxHeight = canvas.clientWidth / trueAR
+  })
+
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('imageForm')
     form.addEventListener('submit', event => {
