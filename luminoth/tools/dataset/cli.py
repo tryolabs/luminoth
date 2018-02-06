@@ -1,5 +1,6 @@
 import click
 
+from .merge import merge
 from .transform import transform
 
 
@@ -8,4 +9,5 @@ def dataset():
     pass
 
 
+dataset.add_command(merge)
 dataset.add_command(transform)
