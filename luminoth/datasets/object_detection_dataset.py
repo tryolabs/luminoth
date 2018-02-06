@@ -123,12 +123,13 @@ class ObjectDetectionDataset(BaseDataset):
         # TODO: Send additional metadata through the queue (scale_factor,
         # applied_augmentations)
 
-        queue_dtypes = [tf.float32, tf.int32, tf.string]
-        queue_names = ['image', 'bboxes', 'filename']
+        queue_dtypes = [tf.float32, tf.int32, tf.string, tf.float32]
+        queue_names = ['image', 'bboxes', 'filename', 'scale_factor']
         queue_values = {
             'image': image,
             'bboxes': bboxes,
             'filename': filename,
+            'scale_factor': preprocessing_details['scale_factor'],
         }
 
         return queue_values, queue_dtypes, queue_names
