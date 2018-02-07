@@ -31,7 +31,19 @@ class RCNNTest(tf.test.TestCase):
             'dropout_keep_prob': 1.0,
             'activation_function': 'relu6',
             'use_mean': False,
-            'initializer': {
+            'rcnn_initializer': {
+                'type': 'variance_scaling_initializer',
+                'factor': 1.0,
+                'uniform': True,
+                'mode': 'FAN_AVG',
+            },
+            'bbox_initializer': {
+                'type': 'variance_scaling_initializer',
+                'factor': 1.0,
+                'uniform': True,
+                'mode': 'FAN_AVG',
+            },
+            'cls_initializer': {
                 'type': 'variance_scaling_initializer',
                 'factor': 1.0,
                 'uniform': True,

@@ -53,7 +53,19 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     'l2_regularization_scale': 0.0005,
                     'l1_sigma': 3.0,
                     'use_mean': False,
-                    'initializer': {
+                    'rcnn_initializer': {
+                        'type': 'variance_scaling_initializer',
+                        'factor': 1.0,
+                        'uniform': True,
+                        'mode': 'FAN_AVG'
+                    },
+                    'bbox_initializer': {
+                        'type': 'variance_scaling_initializer',
+                        'factor': 1.0,
+                        'uniform': True,
+                        'mode': 'FAN_AVG'
+                    },
+                    'cls_initializer': {
                         'type': 'variance_scaling_initializer',
                         'factor': 1.0,
                         'uniform': True,

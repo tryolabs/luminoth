@@ -213,7 +213,7 @@ model:
       foreground_threshold: 0.7
       # High and low thresholds with GT to be considered background.
       background_threshold_high: 0.3
-      background_threshold_low: 0.
+      background_threshold_low: 0.0
       foreground_fraction: 0.5
       # Ration between background and foreground in minibatch.
       minibatch_size: 256
@@ -227,7 +227,20 @@ model:
     l2_regularization_scale: 0.0005
     l1_sigma: 3.0
     use_mean: False
-    initializer:
+
+    rcnn_initializer:
+      _replace: True
+      type: variance_scaling_initializer
+      factor: 1.0
+      uniform: True
+      mode: FAN_AVG
+    cls_initializer:
+      _replace: True
+      type: variance_scaling_initializer
+      factor: 1.0
+      uniform: True
+      mode: FAN_AVG
+    bbox_initializer:
       _replace: True
       type: variance_scaling_initializer
       factor: 1.0
