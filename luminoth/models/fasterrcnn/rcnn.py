@@ -46,7 +46,15 @@ class RCNN(snt.AbstractModule):
         self._dropout_keep_prob = config.dropout_keep_prob
         self._use_mean = config.use_mean
 
-        self.initializer = get_initializer(config.initializer, seed=seed)
+        self._rcnn_initializer = get_initializer(
+            config.rcnn_initializer, seed=seed
+        )
+        self._cls_initializer = get_initializer(
+            config.cls_initializer, seed=seed
+        )
+        self._bbox_initializer = get_initializer(
+            config.bbox_initializer, seed=seed
+        )
         self.regularizer = tf.contrib.layers.l2_regularizer(
             scale=config.l2_regularization_scale)
 
@@ -65,7 +73,7 @@ class RCNN(snt.AbstractModule):
             snt.Linear(
                 layer_size,
                 name='fc_{}'.format(i),
-                initializers={'w': self.initializer},
+                initializers={'w': self._rcnn_initializer},
                 regularizers={'w': self.regularizer},
             )
             for i, layer_size in enumerate(self._layer_sizes)
@@ -75,7 +83,7 @@ class RCNN(snt.AbstractModule):
         # well.
         self._classifier_layer = snt.Linear(
             self._num_classes + 1, name='fc_classifier',
-            initializers={'w': self.initializer},
+            initializers={'w': self._cls_initializer},
             regularizers={'w': self.regularizer},
         )
 
@@ -84,7 +92,7 @@ class RCNN(snt.AbstractModule):
         # layer
         self._bbox_layer = snt.Linear(
             self._num_classes * 4, name='fc_bbox',
-            initializers={'w': self.initializer},
+            initializers={'w': self._bbox_initializer},
             regularizers={'w': self.regularizer}
         )
 
