@@ -376,8 +376,8 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 if track_end - track_start > 20.:
                     click.echo(
                         '{} processed in {:.2f}s (global {:.2f} images/s, '
-                        'period {:.2f} images/s, avg {:.2f}, '
-                        'max {} on {})'.format(
+                        'period {:.2f} images/s, avg dets {:.2f}, '
+                        'max dets {} on {})'.format(
                             total_evaluated, track_end - start_time,
                             total_evaluated / (track_end - start_time),
                             track_count / (track_end - track_start),
