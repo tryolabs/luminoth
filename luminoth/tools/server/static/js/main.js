@@ -69,12 +69,6 @@
     ctx.canvas.height = image.height
     ctx.drawImage(image, 0, 0, image.width, image.height)
 
-    // Get appropriate font for labels
-    // const fontRatio = canvas.width / (canvas.clientWidth * 100)
-    // const fontSize = canvas.clientWidth * fontRatio
-    // console.log(fontSize)
-
-    // ctx.font = fontSize + 'px Serif'
     drawBoundingBoxes(ctx, probThresold)
     adjustAspectRatio()
   }
