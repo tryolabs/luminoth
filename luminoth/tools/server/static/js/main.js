@@ -140,9 +140,11 @@
   }
 
   const formSubmit = function(form) {
-    let modelType = document.getElementById('model-field').value
-    // let resultsDiv = document.getElementById('results-row')
-    // let jsonDiv = document.getElementById('results')
+    const modelType = document.getElementById('model-field').value
+    // const resultsDiv = document.getElementById('results-row')
+    // const jsonDiv = document.getElementById('results')
+    const loading = document.getElementById('loading')
+    const canvas = document.getElementById('result-canvas')
 
     var formdata = new FormData(form)
     const url = '/api/' + modelType + '/predict'
@@ -150,6 +152,9 @@
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url, true)
     xhr.send(formdata)
+
+    loading.style.display = 'flex'
+    canvas.style.display = 'none'
 
     xhr.onreadystatechange = function() {
       if (xhr.readyState == 4 && xhr.status == 200) {
@@ -165,6 +170,9 @@
 
         drawImage(formdata.getAll('image')[0])
       }
+
+      loading.style.display = 'none'
+      canvas.style.display = ''
     }
   }
 
