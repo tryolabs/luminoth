@@ -41,6 +41,8 @@ train:
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
+  # Clip gradients by norm, making sure the maximum value is 10.
+  clip_by_norm: False
   # Learning rate config.
   learning_rate:
     # Because we're using kwargs, we want the learning_rate dict to be replaced
