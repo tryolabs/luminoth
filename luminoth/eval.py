@@ -613,3 +613,7 @@ def calculate_map(output_per_batch, num_classes, iou_threshold=0.5):
     mean_ap = np.mean(ap_per_class)
 
     return mean_ap, ap_per_class
+
+
+if __name__ == '__main__':
+    eval()
