@@ -78,8 +78,9 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
                 total_loss, trainable_vars
             )
 
-            # Clip by norm. TODO: Configurable
-            grads_and_vars = clip_gradients_by_norm(grads_and_vars)
+            # Clip by norm.
+            if config.train.clip_by_norm:
+                grads_and_vars = clip_gradients_by_norm(grads_and_vars)
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
