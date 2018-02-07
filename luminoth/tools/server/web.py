@@ -80,6 +80,11 @@ def web(config_files, host, port, debug):
 
     config = get_config(config_files)
     app.config['config'] = config
+
+    # Bounding boxes will be filtered by frontend (using slider), so we set
+    # a low threshold.
+    config.model.rcnn.proposals.min_prob_threshold = 0.01
+
     if config.dataset.dir:
         # Gets the names of the classes
         classes_file = os.path.join(config.dataset.dir, 'classes.json')
