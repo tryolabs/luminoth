@@ -69,8 +69,10 @@ def predict(model_name):
 
 @click.command(help='Start basic web application.')
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
+@click.option('--host', default='127.0.0.1', help='Hostname to listen on. Set this to "0.0.0.0" to have the server available externally.')  # noqa
+@click.option('--port', default=5000, help='Port to listen to.')
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def web(config_files, debug):
+def web(config_files, host, port, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
@@ -85,4 +87,4 @@ def web(config_files, debug):
             app.config['class_labels'] = json.load(
                 tf.gfile.GFile(classes_file))
 
-    app.run(debug=debug)
+    app.run(host=host, port=port, debug=debug)
