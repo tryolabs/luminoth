@@ -32,11 +32,11 @@ def index():
 @app.route('/api/<model_name>/predict', methods=['GET', 'POST'])
 def predict(model_name):
     if request.method == 'GET':
-        return jsonify(error='Use POST method to send image.')
+        return jsonify(error='Use POST method to send image.'), 400
 
     image_array = get_image()
     if image_array is None:
-        return jsonify(error='Missing image.')
+        return jsonify(error='Missing image.'), 400
 
     total = request.args.get('total')
     if total is not None:
