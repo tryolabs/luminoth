@@ -134,13 +134,12 @@
   }
 
   const formSubmit = function(form) {
-    const modelType = document.getElementById('model-field').value
     const loading = document.getElementById('loading')
     const responseDiv = document.getElementById('response')
     const canvas = document.getElementById('result-canvas')
 
     var formdata = new FormData(form)
-    const url = '/api/' + modelType + '/predict'
+    const url = '/api/fasterrcnn/predict'
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url, true)
@@ -165,6 +164,7 @@
           canvas.style.display = ''
         }
 
+        document.getElementById('result-separator').style.display = 'initial'
         document.getElementById('api-response').innerHTML = xhr.response
         responseDiv.style.display = 'inline'
       }

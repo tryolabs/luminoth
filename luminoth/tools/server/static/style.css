@@ -38,8 +38,73 @@ html {
   text-transform: uppercase;
 }
 
+.separator {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  margin-left: 20px;
+  margin-right: 20px;
+
+  border-bottom: 1px dashed #CECECE;
+}
+
+#result-separator {
+  display: none;
+
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .menu {
-  margin: 20px 20px 0 20px;
+  margin: 20px;
+}
+
+.image-form {
+  width: 600px;
+  margin-top: 10px;
+  margin-left: 20px;
+}
+
+.form-options {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-options .form-option {
+  display: flex;
+  justify-content: space-between;
+
+  margin: 5px;
+}
+
+.form-options .form-option .form-option-label {
+  display: flex;
+  flex-direction: flex-start;
+}
+
+.form-options .form-option .form-option-value {
+  display: flex;
+  flex-direction: flex-end;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+
+  margin-top: 10px;
+}
+
+.form-actions .form-button {
+  width: 100px;
+  height: 35px;
+
+  background-color: #0098D6;
+  box-shadow: 0px 0px 1px #58585B;
+  border: 1px solid #0098D6;
+  border-radius: 3px;
+
+  font-size: 18px;
+  color: white;
+  cursor: pointer;
 }
 
 .main-result {
@@ -49,7 +114,7 @@ html {
   margin: 20px;
 }
 
-.main-result__canvas {
+.main-result-canvas {
   display: flex;
   justify-content: center;
 }
@@ -62,12 +127,16 @@ html {
 
 #response {
   display: none;
-  margin: 0;
+  margin-top: 10px;
 }
 
 #response pre {
-  font-size: 12px;
+  margin-top: 10px;
   max-height: 300px;
+
+  width: 300px;
+
+  font-size: 12px;
   overflow-y: auto;
 }
 
@@ -131,6 +200,7 @@ html {
   -ms-transform: translateZ(0);
   transform: translateZ(0);
 }
+
 .loader:before {
   width: 50%;
   height: 50%;
@@ -141,6 +211,7 @@ html {
   left: 0;
   content: '';
 }
+
 .loader:after {
   background: #ffffff;
   width: 75%;
@@ -154,6 +225,7 @@ html {
   bottom: 0;
   right: 0;
 }
+
 @-webkit-keyframes load3 {
   0% {
     -webkit-transform: rotate(0deg);
@@ -164,6 +236,7 @@ html {
     transform: rotate(360deg);
   }
 }
+
 @keyframes load3 {
   0% {
     -webkit-transform: rotate(0deg);
