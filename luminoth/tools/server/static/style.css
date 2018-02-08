@@ -100,12 +100,18 @@ html {
   align-items: baseline;
 }
 
+#image-field {
+  text-align: right;
+}
+
 #prob-threshold {
   height: 20px;
 }
 
 #prob-threshold-value {
   margin-left: 10px;
+  width: 3em;
+  text-align: right;
 }
 
 .form-actions {
@@ -150,7 +156,8 @@ html {
 
 #response {
   display: none;
-  margin-left: 20px
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 #response pre {
