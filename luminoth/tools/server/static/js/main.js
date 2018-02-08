@@ -90,11 +90,7 @@
       })
 
       slider.addEventListener('input', function(event) {
-        const threshold = event.target.value / 100
-        draw(threshold)
-
-        document.getElementById('prob-threshold-value').innerHTML =
-          threshold.toFixed(2)
+        draw(event.target.value / 100)
       })
     }
   }
@@ -181,5 +177,13 @@
       event.preventDefault()
       formSubmit(form)
     })
+
+    document
+      .getElementById('prob-threshold')
+      .addEventListener('input', function(event) {
+        document.getElementById('prob-threshold-value').innerHTML = (
+          event.target.value / 100
+        ).toFixed(2)
+      })
   })
 })()
