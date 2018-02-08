@@ -1,5 +1,19 @@
 @import url('https://fonts.googleapis.com/css?family=Quicksand');
 
+@media screen and (max-width: 799px) {
+  .main-result {
+    flex-direction: column-reverse !important;
+  }
+
+  #response {
+    margin-top: 10px !important;
+  }
+
+  #result-separator {
+    visibility: visible !important;
+  }
+}
+
 * {
   margin: 0;
   margin: 0;
@@ -49,6 +63,7 @@ html {
 
 #result-separator {
   display: none;
+  visibility: hidden;
 
   margin-left: 0;
   margin-right: 0;
@@ -71,19 +86,26 @@ html {
 
 .form-options .form-option {
   display: flex;
-  justify-content: space-between;
 
   margin: 5px;
 }
 
 .form-options .form-option .form-option-label {
   display: flex;
-  flex-direction: flex-start;
+  flex-grow: 1;
 }
 
 .form-options .form-option .form-option-value {
   display: flex;
-  flex-direction: flex-end;
+  align-items: baseline;
+}
+
+#prob-threshold {
+  height: 20px;
+}
+
+#prob-threshold-value {
+  margin-left: 10px;
 }
 
 .form-actions {
@@ -109,7 +131,7 @@ html {
 
 .main-result {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
   margin: 20px;
 }
@@ -117,6 +139,7 @@ html {
 .main-result-canvas {
   display: flex;
   justify-content: center;
+  flex-grow: 1;
 }
 
 #result-canvas {
@@ -127,12 +150,12 @@ html {
 
 #response {
   display: none;
-  margin-top: 10px;
+  margin-left: 20px
 }
 
 #response pre {
   margin-top: 10px;
-  max-height: 300px;
+  max-height: 500px;
 
   width: 300px;
 
@@ -168,8 +191,8 @@ html {
   font-size: 10px;
   margin: 50px auto;
   text-indent: -9999em;
-  width: 11em;
-  height: 11em;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: #0099d6;
   background: -moz-linear-gradient(

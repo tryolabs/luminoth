@@ -22,11 +22,11 @@
             </div>
             <div class="form-option">
               <label class="form-option-label">
-                Probability threshold&nbsp;
-                <span id="prob-threshold-value">(0.90)</span>
+                Probability threshold
               </label>
               <input id="prob-threshold" class="form-option-value"
                      type="range" min="1" max="100" value="90" />
+              <span id="prob-threshold-value">0.90</span>
             </div>
           </div>
           <div class="form-actions">
@@ -38,16 +38,16 @@
       </div>
       <div class="separator"></div>
       <div class="main-result">
+        <div id="response">
+          <div>Raw API response:</div>
+          <pre><code id="api-response"></code></pre>
+        </div>
+        <div id="result-separator" class="separator"></div>
         <div class="main-result-canvas">
           <canvas id="result-canvas"></canvas>
         </div>
         <div id="loading">
           <div class="loader">Loading...</div>
-        </div>
-        <div id="result-separator" class="separator"></div>
-        <div id="response">
-          <div>Raw API response:</div>
-          <pre><code id="api-response"></code></pre>
         </div>
       </div>
       <div class="footer">

@@ -33,14 +33,14 @@
     })
 
     // Draw labels
-    ctx.font = 'bold ' + fontSize + 'px serif'
+    ctx.font = 'bold ' + fontSize + 'px Quicksand'
     ctx.textBaseline = 'bottom'
     drawing.elements.forEach(elem => {
       if (elem.prob < probThresold) {
         return
       }
 
-      const text = elem.label + ' (' + elem.prob.toFixed(2) + ')'
+      const text = elem.label + ' ' + elem.prob.toFixed(2)
       const textWidth = ctx.measureText(text).width
 
       ctx.fillStyle = elem.labelColor
@@ -94,7 +94,7 @@
         draw(threshold)
 
         document.getElementById('prob-threshold-value').innerHTML =
-          '(' + threshold.toFixed(2) + ')'
+          threshold.toFixed(2)
       })
     }
   }
@@ -162,9 +162,9 @@
 
           drawImage(formdata.getAll('image')[0])
           canvas.style.display = ''
+          document.getElementById('result-separator').style.display = 'initial'
         }
 
-        document.getElementById('result-separator').style.display = 'initial'
         document.getElementById('api-response').innerHTML = xhr.response
         responseDiv.style.display = 'inline'
       }
