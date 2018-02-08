@@ -37,22 +37,18 @@
           </fieldset>
         </form>
       </div>
-      <div class="main-image">
-        <canvas id="result-canvas"></canvas>
+      <div class="main-result">
+        <div class="main-result__canvas">
+          <canvas id="result-canvas"></canvas>
+        </div>
         <div id="loading">
           <div class="loader">Loading...</div>
         </div>
-      </div>
-<!-- TODO: results div (raw API response)
-      <div class="row" style="display: none;">
-        <div class="4u">
-          <pre>
-            <code id="results">
-            </code>
-          </pre>
+        <div id="response">
+          <div>Raw API response:</div>
+          <pre><code id="api-response"></code></pre>
         </div>
       </div>
-    -->
       <div class="footer">
         <div>Made with ♥ by</div>
         <a href="https://tryolabs.com/">

@@ -135,9 +135,8 @@
 
   const formSubmit = function(form) {
     const modelType = document.getElementById('model-field').value
-    // const resultsDiv = document.getElementById('results-row')
-    // const jsonDiv = document.getElementById('results')
     const loading = document.getElementById('loading')
+    const responseDiv = document.getElementById('response')
     const canvas = document.getElementById('result-canvas')
 
     var formdata = new FormData(form)
@@ -147,26 +146,30 @@
     xhr.open('POST', url, true)
     xhr.send(formdata)
 
+    responseDiv.style.display = 'none'
     loading.style.display = 'flex'
     canvas.style.display = 'none'
 
     xhr.onreadystatechange = function() {
-      if (xhr.readyState == 4 && xhr.status == 200) {
+      if (xhr.readyState == 4) {
         const response = JSON.parse(xhr.response)
-        // jsonDiv.innerHTML = xhr.response
-        // resultsDiv.style.display = ''
 
-        storeElementsToDraw(
-          response.objects,
-          response.objects_labels_prob,
-          response.objects_labels
-        )
+        if (xhr.status == 200) {
+          storeElementsToDraw(
+            response.objects,
+            response.objects_labels_prob,
+            response.objects_labels
+          )
 
-        drawImage(formdata.getAll('image')[0])
+          drawImage(formdata.getAll('image')[0])
+          canvas.style.display = ''
+        }
+
+        document.getElementById('api-response').innerHTML = xhr.response
+        responseDiv.style.display = 'inline'
       }
 
       loading.style.display = 'none'
-      canvas.style.display = ''
     }
   }
 
