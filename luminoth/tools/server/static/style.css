@@ -21,6 +21,8 @@
 
 html {
   font-family: 'Quicksand', sans-serif;
+
+  background-color: #FBFBFB;
 }
 
 .main {
@@ -74,7 +76,9 @@ html {
 }
 
 .image-form {
-  width: 600px;
+  display: flex;
+
+  width: 650px;
   margin-top: 10px;
   margin-left: 20px;
 }
@@ -82,11 +86,11 @@ html {
 .form-options {
   display: flex;
   flex-direction: column;
+  width: 520px;
 }
 
 .form-options .form-option {
   display: flex;
-
   margin: 5px;
 }
 
@@ -102,28 +106,32 @@ html {
 
 #image-field {
   text-align: right;
+  width: 300px;
 }
 
 #prob-threshold {
   height: 20px;
+  width: 250px;
 }
 
 #prob-threshold-value {
+  box-sizing: border-box;
   margin-left: 10px;
-  width: 3em;
+  width: 40px;
   text-align: right;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-
-  margin-top: 10px;
+  align-items: center;
 }
 
 .form-actions .form-button {
   width: 100px;
   height: 35px;
+
+  margin-left: 50px;
 
   background-color: #0098D6;
   box-shadow: 0px 0px 1px #58585B;
@@ -160,11 +168,21 @@ html {
   margin-right: 20px;
 }
 
-#response pre {
-  margin-top: 10px;
+#response > div {
+  margin-bottom: 20px;
+}
+
+#response > pre {
   max-height: 500px;
+  box-sizing: border-box;
 
   width: 300px;
+  padding: 10px;
+
+  border-radius: 5px;
+  border: 1px dashed #cecece;
+  background-color: #d3e2e9;
+  color: 333333;
 
   font-size: 12px;
   overflow-y: auto;
@@ -243,7 +261,7 @@ html {
 }
 
 .loader:after {
-  background: #ffffff;
+  background: #FBFBFB;
   width: 75%;
   height: 75%;
   border-radius: 50%;
