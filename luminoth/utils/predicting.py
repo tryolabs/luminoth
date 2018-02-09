@@ -11,16 +11,14 @@ from luminoth.datasets import get_dataset
 from luminoth.utils.config import get_config
 
 
-def get_predictions(image_paths, config_files):
-    """
-    Get predictions for multiple images.
+def network_gen(config_files):
+    """Instantiates a network model in order to get predictions from it
 
-    When predicting many images we don't want to load the checkpoint each time.
-    We load the checkpoint in the first iteration and then use the same
-    session and graph for subsequent images.
+    Iterate over this gen by sending images to it and getting the corresponding
+    predictions from it.
     """
+
     config = get_config(config_files)
-
     if config.dataset.dir:
         # Gets the names of the classes
         classes_file = os.path.join(config.dataset.dir, 'classes.json')
@@ -32,18 +30,9 @@ def get_predictions(image_paths, config_files):
     session = None
     fetches = None
     image_tensor = None
+    image = yield None
 
-    for image_path in image_paths:
-        with tf.gfile.Open(image_path, 'rb') as im_file:
-            try:
-                image = Image.open(im_file).convert('RGB')
-            except tf.errors.OutOfRangeError as e:
-                yield {
-                    'error': '{}'.format(e),
-                    'image_path': image_path,
-                }
-                continue
-
+    while True:
         preds = get_prediction(
             image, config,
             session=session, fetches=fetches,
@@ -57,12 +46,11 @@ def get_predictions(image_paths, config_files):
             fetches = preds['fetches']
             image_tensor = preds['image_tensor']
 
-        yield {
+        image = yield {
             'objects': preds['objects'],
             'objects_labels': preds['objects_labels'],
             'objects_labels_prob': preds['objects_labels_prob'],
             'inference_time': preds['inference_time'],
-            'image_path': image_path,
         }
 
 
