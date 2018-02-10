@@ -15,10 +15,12 @@ def is_image(filename):
     f = filename.lower()
     return f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png')
 
+
 def is_video(filename):
     f = filename.lower()
     # TODO: check more video formats
     return f.endswith('.mov') or f.endswith('.mp4')
+
 
 @click.command(help='Obtain a model\'s predictions on an image or directory of images.')  # noqa
 @click.argument('path-or-dir')
@@ -57,53 +59,62 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
     next(network_iter)
 
     # -- Iterate over file paths --
-    with click.progressbar(file_paths, label='Predicting...') as bar:
-        for file_path in bar:
+    for file_path in file_paths:
 
-            save_path = 'pred_' + os.path.basename(file_path)
-            if output_dir:
-                save_path = os.path.join(output_dir, save_path)
+        save_path = 'pred_' + os.path.basename(file_path)
+        if output_dir:
+            save_path = os.path.join(output_dir, save_path)
 
-            if is_image(file_path):
-                with tf.gfile.Open(file_path, 'rb') as f:
-                    try:
-                        image = Image.open(f).convert('RGB')
-                    except tf.errors.OutOfRangeError as e:
-                        tf.logging.warning('Error: {}'.format(e))
-                        tf.logging.warning('{} failed.'.format(file_path))
-                        errors += 1
-                        continue
+        if is_image(file_path):
+            print('Predicting {}...'.format(file_path))
+            with tf.gfile.Open(file_path, 'rb') as f:
+                try:
+                    image = Image.open(f).convert('RGB')
+                except tf.errors.OutOfRangeError as e:
+                    tf.logging.warning('Error: {}'.format(e))
+                    tf.logging.warning('{} failed.'.format(file_path))
+                    errors += 1
+                    continue
 
-                # Run image through network
-                prediction = network_iter.send(image)
-                successes += 1
+            # Run image through network
+            prediction = network_iter.send(image)
+            successes += 1
 
-                # -- Save results --
-                with open(save_path + '.json', 'w') as outfile:
-                    json.dump(prediction, outfile)
-                if save:
-                    with tf.gfile.Open(file_path, 'rb') as im_file:
-                        image = Image.open(im_file)
-                        draw_bboxes_on_image(image, prediction, min_prob)
-                        image.save(save_path)
+            # -- Save results --
+            with open(save_path + '.json', 'w') as outfile:
+                json.dump(prediction, outfile)
+            if save:
+                with tf.gfile.Open(file_path, 'rb') as im_file:
+                    image = Image.open(im_file)
+                    draw_bboxes_on_image(image, prediction, min_prob)
+                    image.save(save_path)
 
-            elif is_video(file_path):
-                writer = skvideo.io.FFmpegWriter(save_path)
-                for frame in skvideo.io.vreader(file_path):
+        elif is_video(file_path):
+            # We'll hardcode the video ouput to mp4 for now
+            save_path = os.path.splitext(save_path)[0] + '.mp4'
+            writer = skvideo.io.FFmpegWriter(save_path)
+            num_of_frames = int(
+                skvideo.io.ffprobe(file_path)['video']['@nb_frames'])
+            video_progress_bar = click.progressbar(
+                skvideo.io.vreader(file_path),
+                length=num_of_frames,
+                label='Predicting {}'.format(file_path))
+            with video_progress_bar as bar:
+                for frame in bar:
                     prediction = network_iter.send(frame)
                     image = Image.fromarray(frame)
-                    print(frame.shape)
                     draw_bboxes_on_image(image, prediction, min_prob)
                     writer.writeFrame(np.array(image))
                 writer.close()
 
-            else:
-                tf.logging.warning('{} is not an image/video'.format(file_path))
+        else:
+            tf.logging.warning("{} isn't an image/video".format(file_path))
 
     # -- Generate logs --
     logs_dir = output_dir if output_dir else 'current directory'
-    message = 'Saving results and tagged images/videos in {}' if save else 'Saving results in {}'
-    tf.logging.info(message.format(logs_dir))
+    saving_logs_message = ('Saving results and tagged images/videos in {}'
+                           if save else 'Saving results in {}')
+    tf.logging.info(saving_logs_message.format(logs_dir))
 
     if errors:
         tf.logging.warning('{} errors.'.format(errors))
@@ -115,8 +126,10 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
             '{} objects detected'.format(len(prediction['objects']))
         )
 
+
 def draw_bboxes_on_image(image, prediction, min_prob):
-    draw = ImageDraw.Draw(image)
+    # Open as 'RGBA' in order to draw translucent boxes
+    draw = ImageDraw.Draw(image, 'RGBA')
 
     objects = prediction['objects']
     labels = prediction['objects_labels']
@@ -127,7 +140,7 @@ def draw_bboxes_on_image(image, prediction, min_prob):
         if prob < min_prob:
             continue
 
-        draw.rectangle(bbox, outline='red')
+        draw.rectangle(bbox, fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
         label = str(label)
         prob = '{:.2f}'.format(prob)
         draw.text(bbox[:2], '{} - {}'.format(label, prob))
