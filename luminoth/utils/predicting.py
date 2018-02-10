@@ -4,8 +4,6 @@ import os
 import tensorflow as tf
 import time
 
-from PIL import Image
-
 from luminoth.models import get_model
 from luminoth.datasets import get_dataset
 from luminoth.utils.config import get_config
