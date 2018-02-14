@@ -1,5 +1,5 @@
 from luminoth.cli import cli  # noqa
-from luminoth.utils.predicting import network_gen  # noqa
+from luminoth.utils.predicting import PredictorNetwork  # noqa
 
 __version__ = '0.0.4dev0'
 
