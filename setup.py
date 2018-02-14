@@ -47,6 +47,7 @@ INSTALL_REQUIRES = [
     'google-cloud-storage>=1.2.0',
     'Flask>=0.12',
     'six>=1.11',
+    'sk-video',
 ]
 TEST_REQUIRES = []
 
