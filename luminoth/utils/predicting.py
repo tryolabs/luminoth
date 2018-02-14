@@ -119,9 +119,9 @@ class PredictorNetwork(object):
         objects_labels_prob = objects_labels_prob.tolist()
 
         if total_predictions:
-            objects = objects[:self.total]
-            objects_labels = objects_labels[:self.total]
-            objects_labels_prob = objects_labels_prob[:self.total]
+            objects = objects[:total_predictions]
+            objects_labels = objects_labels[:total_predictions]
+            objects_labels_prob = objects_labels_prob[:total_predictions]
 
         return {
             'objects': objects,
