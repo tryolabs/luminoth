@@ -14,7 +14,7 @@ def get_output_subfolder(only_classes, only_images, limit_examples,
     Returns: subfolder name for records
     """
     if only_classes is not None:
-        return 'classes-{}'.format(only_classes)
+        return 'classes-{}'.format('-'.join(only_classes))
     elif only_images is not None:
         return 'only-{}'.format(only_images)
     elif limit_examples is not None and limit_classes is not None:
@@ -30,7 +30,8 @@ def get_output_subfolder(only_classes, only_images, limit_examples,
 @click.option('--data-dir', help='Where to locate the original data.')
 @click.option('--output-dir', help='Where to save the transformed data.')
 @click.option('splits', '--split', required=True, multiple=True, help='Which splits to transform.')  # noqa
-@click.option('--only-classes', help='Whitelist of classes.')
+@click.option('--only-classes', multiple=True, help='Whitelist of classes.')
+@click.option('--merge-classes', help='Merge all classes into a single class')
 @click.option('--only-images', help='Create dataset with specific examples.')
 @click.option('--limit-examples', type=int, help='Limit dataset with to the first `N` examples.')  # noqa
 @click.option('--limit-classes', type=int, help='Limit dataset with `N` random classes.')  # noqa
@@ -38,8 +39,8 @@ def get_output_subfolder(only_classes, only_images, limit_examples,
 @click.option('overrides', '--override', '-o', multiple=True, help='Custom parameters for readers.')  # noqa
 @click.option('--debug', is_flag=True, help='Set level logging to DEBUG.')
 def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
-              only_images, limit_examples, limit_classes, seed, overrides,
-              debug):
+              merge_classes, only_images, limit_examples, limit_classes, seed,
+              overrides, debug):
     """
     Prepares dataset for ingestion.
 
@@ -67,6 +68,8 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
     # All splits must have a consistent set of classes.
     classes = None
 
+    merge_classes = merge_classes in ('True', 'true', 'TRUE')
+
     reader_kwargs = parse_override(overrides)
 
     try:
@@ -74,9 +77,9 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
             # Create instance of reader.
             split_reader = reader(
                 data_dir, split,
-                only_classes=only_classes, only_images=only_images,
-                limit_examples=limit_examples, limit_classes=limit_classes,
-                seed=seed, **reader_kwargs
+                only_classes=only_classes, merge_classes=merge_classes,
+                only_images=only_images, limit_examples=limit_examples,
+                limit_classes=limit_classes, seed=seed, **reader_kwargs
             )
 
             if classes is None:

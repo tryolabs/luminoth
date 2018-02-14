@@ -45,14 +45,24 @@ class COCOReader(ObjectDetectionReader):
         for annotation in annotations_json['annotations']:
             image_id = annotation['image_id']
             x, y, width, height = annotation['bbox']
+            if not self._merge_classes:
+                try:
+                    label_id = self.classes.index(
+                        category_to_name[annotation['category_id']]
+                    )
+                except ValueError:
+                    # Class may have gotten filtered by:
+                    # --only-classes or --limit-classes
+                    continue
+            else:
+                label_id = 0
+
             self._image_to_bboxes.setdefault(image_id, []).append({
                 'xmin': x,
                 'ymin': y,
                 'xmax': x + width,
                 'ymax': y + height,
-                'label': self.classes.index(
-                    category_to_name[annotation['category_id']]
-                ),
+                'label': label_id,
             })
 
         self._image_to_details = {}
