@@ -7,8 +7,7 @@ import skvideo.io
 import tensorflow as tf
 
 from PIL import Image, ImageDraw
-
-from luminoth.utils.predicting import network_gen
+from luminoth.utils.predicting import PredictorNetwork
 
 
 def is_image(filename):
@@ -35,6 +34,9 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
+    # -- Initialize model --
+    network = PredictorNetwork(config_files)
+
     # -- Get file paths --
     if tf.gfile.IsDirectory(path_or_dir):
         file_paths = [
@@ -48,15 +50,11 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
     errors = 0
     successes = 0
     total_files = len(file_paths)
-    tf.logging.info('Getting predictions for {} files.'.format(total_files))
+    tf.logging.info('Getting predictions for {} files'.format(total_files))
 
     #  -- Create output_dir if it doesn't exist --
     if output_dir:
         tf.gfile.MakeDirs(output_dir)
-
-    # -- Initialize model --
-    network_iter = network_gen(config_files)
-    next(network_iter)
 
     # -- Iterate over file paths --
     for file_path in file_paths:
@@ -77,7 +75,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
                     continue
 
             # Run image through network
-            prediction = network_iter.send(image)
+            prediction = network.predict_image(image)
             successes += 1
 
             # -- Save results --
@@ -101,7 +99,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
                 label='Predicting {}'.format(file_path))
             with video_progress_bar as bar:
                 for frame in bar:
-                    prediction = network_iter.send(frame)
+                    prediction = network.predict_image(frame)
                     image = Image.fromarray(frame)
                     draw_bboxes_on_image(image, prediction, min_prob)
                     writer.writeFrame(np.array(image))
@@ -140,7 +138,35 @@ def draw_bboxes_on_image(image, prediction, min_prob):
         if prob < min_prob:
             continue
 
-        draw.rectangle(bbox, fill=(0, 0, 255, 60), outline=(0, 0, 255, 150))
+        # Chose colors for bbox, the 60 and 255 correspond to transparency
+        color = get_color(label)
+        fill=tuple(color + [60])
+        outline=tuple(color + [255])
+
+        draw.rectangle(bbox, fill=fill, outline=outline)
         label = str(label)
         prob = '{:.2f}'.format(prob)
         draw.text(bbox[:2], '{} - {}'.format(label, prob))
+
+
+def get_color(class_label):
+    """Rudimentary way to create color palette for plotting clases
+
+    Accepts integer or strings as class_labels
+    """
+    # We get these colors from the luminoth web client
+    web_colors_hex = [
+    'ff0029', '377eb8', '66a61e', '984ea3', '00d2d5', 'ff7f00', 'af8d00',
+    '7f80cd', 'b3e900', 'c42e60', 'a65628', 'f781bf', '8dd3c7', 'bebada',
+    'fb8072', '80b1d3', 'fdb462', 'fccde5', 'bc80bd', 'ffed6f', 'c4eaff',
+    'cf8c00', '1b9e77', 'd95f02', 'e7298a', 'e6ab02', 'a6761d', '0097ff',
+    '00d067', '000000', '252525', '525252', '737373', '969696', 'bdbdbd',
+    'f43600', '4ba93b', '5779bb', '927acc', '97ee3f', 'bf3947', '9f5b00',
+    'f48758', '8caed6', 'f2b94f', 'eff26e', 'e43872', 'd9b100', '9d7a00',
+    '698cff', 'd9d9d9', '00d27e', 'd06800', '009f82', 'c49200', 'cbe8ff',
+    'fecddf', 'c27eb6', '8cd2ce', 'c4b8d9', 'f883b0', 'a49100', 'f48800',
+    '27d0df', 'a04a9b'
+    ]
+    hex_to_rgb = lambda x: [int(x[i:i+2], 16) for i in (0, 2 ,4)]
+    hex_color = web_colors_hex[hash(class_label) % len(web_colors_hex)]
+    return(hex_to_rgb(hex_color))

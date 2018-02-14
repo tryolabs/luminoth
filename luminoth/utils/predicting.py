@@ -9,63 +9,25 @@ from luminoth.datasets import get_dataset
 from luminoth.utils.config import get_config
 
 
-def network_gen(config_files):
-    """Instantiates a network model in order to get predictions from it
+class PredictorNetwork(object):
+    """Instantiates a network in order to get predictions from it
 
-    Iterate over this gen by sending images to it and getting the corresponding
-    predictions from it.
-    """
-
-    config = get_config(config_files)
-    if config.dataset.dir:
-        # Gets the names of the classes
-        classes_file = os.path.join(config.dataset.dir, 'classes.json')
-        if tf.gfile.Exists(classes_file):
-            class_labels = json.load(tf.gfile.GFile(classes_file))
-        else:
-            class_labels = None
-
-    session = None
-    fetches = None
-    image_tensor = None
-    image = yield None
-
-    while True:
-        preds = get_prediction(
-            image, config,
-            session=session, fetches=fetches,
-            image_tensor=image_tensor, class_labels=class_labels,
-            return_tf_vars=True
-        )
-
-        if session is None:
-            # After first loop
-            session = preds['session']
-            fetches = preds['fetches']
-            image_tensor = preds['image_tensor']
-
-        image = yield {
-            'objects': preds['objects'],
-            'objects_labels': preds['objects_labels'],
-            'objects_labels_prob': preds['objects_labels_prob'],
-            'inference_time': preds['inference_time'],
-        }
-
-
-def get_prediction(image, config, total=None, session=None,
-                   fetches=None, image_tensor=None, class_labels=None,
-                   return_tf_vars=False):
-    """
-    Gets the prediction given by the model `model_type` of the image `image`.
     If a checkpoint exists in the job's directory, load it.
     The names of the classes will be obtained from the dataset directory.
     Returns a dictionary with the objects, their labels and probabilities,
-    the inference time and the scale factor. Also if the `return_tf_vars` is
-    True, returns the image tensor, the entire prediction of the model and
-    the sesssion.
-    """
+    the inference time and the scale factor."""
 
-    if session is None and fetches is None and image_tensor is None:
+    def __init__(self, config_files):
+
+        config = get_config(config_files)
+        if config.dataset.dir:
+            # Gets the names of the classes
+            classes_file = os.path.join(config.dataset.dir, 'classes.json')
+            if tf.gfile.Exists(classes_file):
+                self.class_labels = json.load(tf.gfile.GFile(classes_file))
+            else:
+                self.class_labels = None
+
         # Don't use data augmentation in predictions
         config.dataset.data_augmentation = None
 
@@ -75,11 +37,13 @@ def get_prediction(image, config, total=None, session=None,
         model = model_class(config)
 
         graph = tf.Graph()
-        session = tf.Session(graph=graph)
+        self.session = tf.Session(graph=graph)
 
         with graph.as_default():
-            image_tensor = tf.placeholder(tf.float32, (None, None, 3))
-            image_tf, _, process_meta = dataset.preprocess(image_tensor)
+            self.image_placeholder = tf.placeholder(tf.float32, (None, None, 3))
+            image_tf, _, process_meta = dataset.preprocess(
+                self.image_placeholder
+            )
             pred_dict = model(image_tf)
 
             # Restore checkpoint
@@ -94,7 +58,7 @@ def get_prediction(image, config, total=None, session=None,
                     ))
                 ckpt = ckpt.all_model_checkpoint_paths[-1]
                 saver = tf.train.Saver(sharded=True, allow_empty=True)
-                saver.restore(session, ckpt)
+                saver.restore(self.session, ckpt)
                 tf.logging.info('Loaded checkpoint.')
             else:
                 # A prediction without checkpoint is just used for testing
@@ -104,7 +68,7 @@ def get_prediction(image, config, total=None, session=None,
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()
                 )
-                session.run(init_op)
+                self.session.run(init_op)
 
             if config.model.network.with_rcnn:
                 cls_prediction = pred_dict['classification_prediction']
@@ -120,7 +84,7 @@ def get_prediction(image, config, total=None, session=None,
                     tf.shape(objects_labels_prob_tf), dtype=tf.int32
                 )
 
-            fetches = {
+            self.fetches = {
                 'objects': objects_tf,
                 'labels': objects_labels_tf,
                 'probs': objects_labels_prob_tf,
@@ -129,51 +93,34 @@ def get_prediction(image, config, total=None, session=None,
 
             # If in debug mode, return the full prediction dictionary.
             if config.train.debug:
-                fetches['_debug'] = pred_dict
+                self.fetches['_debug'] = pred_dict
 
-    elif session is None or fetches is None or image_tensor is None:
-        raise ValueError(
-            'Either all `session`, `fetches` and `image_tensor` are None, '
-            'or neither of them are.'
-        )
+    def predict_image(self, image):
+        start_time = time.time()
+        fetched = self.session.run(self.fetches, feed_dict={
+            self.image_placeholder: np.array(image)
+        })
+        end_time = time.time()
 
-    start_time = time.time()
-    fetched = session.run(fetches, feed_dict={
-        image_tensor: np.array(image)
-    })
-    end_time = time.time()
+        objects = fetched['objects']
+        objects_labels = fetched['labels']
+        objects_labels_prob = fetched['probs']
+        scale_factor = fetched['scale_factor']
 
-    objects = fetched['objects']
-    objects_labels = fetched['labels']
-    objects_labels_prob = fetched['probs']
-    scale_factor = fetched['scale_factor']
+        objects_labels = objects_labels.tolist()
 
-    objects_labels = objects_labels.tolist()
+        if self.class_labels is not None:
+            objects_labels = [self.class_labels[obj] for obj in objects_labels]
 
-    if class_labels is not None:
-        objects_labels = [class_labels[obj] for obj in objects_labels]
+        # Scale objects to original image dimensions
+        objects /= scale_factor
 
-    # Scale objects to original image dimensions
-    objects /= scale_factor
+        objects = objects.tolist()
+        objects_labels_prob = objects_labels_prob.tolist()
 
-    objects = objects.tolist()
-    objects_labels_prob = objects_labels_prob.tolist()
-
-    if total is not None:
-        objects = objects[:total]
-        objects_labels = objects_labels[:total]
-        objects_labels_prob = objects_labels_prob[:total]
-
-    res = {
-        'objects': objects,
-        'objects_labels': objects_labels,
-        'objects_labels_prob': objects_labels_prob,
-        'inference_time': end_time - start_time,
-    }
-
-    if return_tf_vars:
-        res['image_tensor'] = image_tensor
-        res['fetches'] = fetches
-        res['session'] = session
-
-    return res
+        return {
+            'objects': objects,
+            'objects_labels': objects_labels,
+            'objects_labels_prob': objects_labels_prob,
+            'inference_time': end_time - start_time,
+        }
