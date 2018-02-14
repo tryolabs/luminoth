@@ -95,7 +95,7 @@ class PredictorNetwork(object):
             if config.train.debug:
                 self.fetches['_debug'] = pred_dict
 
-    def predict_image(self, image):
+    def predict_image(self, image, total_predictions=None):
         start_time = time.time()
         fetched = self.session.run(self.fetches, feed_dict={
             self.image_placeholder: np.array(image)
@@ -117,6 +117,11 @@ class PredictorNetwork(object):
 
         objects = objects.tolist()
         objects_labels_prob = objects_labels_prob.tolist()
+
+        if total_predictions:
+            objects = objects[:self.total]
+            objects_labels = objects_labels[:self.total]
+            objects_labels_prob = objects_labels_prob[:self.total]
 
         return {
             'objects': objects,
