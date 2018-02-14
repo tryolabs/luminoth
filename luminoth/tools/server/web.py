@@ -43,7 +43,9 @@ def predict(model_name):
         except ValueError:
             total_predictions = None
 
-    prediction = PREDICTOR_NETWORK.predict_image(image_array, total_predictions)
+    prediction = PREDICTOR_NETWORK.predict_image(
+        image_array, total_predictions
+    )
     return jsonify(prediction)
 
 
