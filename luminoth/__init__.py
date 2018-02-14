@@ -1,7 +1,7 @@
 from luminoth.cli import cli  # noqa
 from luminoth.utils.predicting import get_predictions  # noqa
 
-__version__ = '0.0.3'
+__version__ = '0.0.4dev0'
 
 __title__ = 'Luminoth'
 __description__ = 'Computer vision toolkit based on TensorFlow'
