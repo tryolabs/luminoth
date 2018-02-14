@@ -19,9 +19,8 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 @click.option('--iou-threshold', type=float, default=0.5, help='IoU threshold to use.')  # noqa
-@click.option('--min-probability', type=float, default=0.5, help='Minimum probability to use.')  # noqa
 def eval(dataset_split, config_files, watch, from_global_step,
-         override_params, files_per_class, iou_threshold, min_probability):
+         override_params, files_per_class, iou_threshold):
     """Evaluate models using dataset."""
 
     # If the config file is empty, our config will be the base_config for the
@@ -55,11 +54,6 @@ def eval(dataset_split, config_files, watch, from_global_step,
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
-
-    if config.model.network.with_rcnn:
-        config.model.rcnn.proposals.min_prob_threshold = min_probability
-    else:
-        config.model.rpn.proposals.min_prob_threshold = min_probability
 
     # Seed setup
     if config.train.seed:
@@ -177,7 +171,6 @@ def eval(dataset_split, config_files, watch, from_global_step,
                     files_per_class=files_per_class,
                     files_to_visualize=files_to_visualize,
                     iou_threshold=iou_threshold,
-                    min_probability=min_probability
                 )
                 last_global_step = checkpoint['global_step']
                 tf.logging.info('Evaluated in {:.2f}s'.format(
@@ -263,7 +256,7 @@ def get_checkpoints(run_dir, from_global_step=None, last_only=False):
 def evaluate_once(config, writer, saver, ops, checkpoint,
                   metrics_scope='metrics', image_vis=None,
                   files_per_class=None, files_to_visualize=None,
-                  iou_threshold=0.5, min_probability=0.5):
+                  iou_threshold=0.5):
     """Run the evaluation once.
 
     Create a new session with the previously-built graph, run it through the
@@ -401,16 +394,15 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
             tf.logging.info('Finished evaluation at step {}.'.format(
                 checkpoint['global_step']))
             tf.logging.info('Evaluated {} images.'.format(total_evaluated))
-            tf.logging.info('mAP@{}@{} = {:.2f}'.format(
-                iou_threshold, min_probability, map_at_iou))
+            tf.logging.info('mAP@{} = {:.3f}'.format(
+                iou_threshold, map_at_iou
+            ))
 
             # TODO: Find a way to generate these summaries automatically, or
             # less manually.
             summary = [
                 tf.Summary.Value(
-                    tag='{}/mAP@{}@{}'.format(
-                        metrics_scope, iou_threshold, min_probability
-                    ),
+                    tag='{}/mAP@{}'.format(metrics_scope, iou_threshold),
                     simple_value=map_at_iou
                 ),
                 tf.Summary.Value(
@@ -424,11 +416,12 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
             ]
 
             for idx, val in enumerate(per_class_at_iou):
-                tf.logging.debug('AP@{}@{} for {} = {:.2f}'.format(
-                    iou_threshold, min_probability, idx, val))
+                tf.logging.debug('AP@{} for {} = {:.2f}'.format(
+                    iou_threshold, idx, val
+                ))
                 summary.append(tf.Summary.Value(
-                    tag='{}/AP@{}@{}/{}'.format(
-                        metrics_scope, iou_threshold, min_probability, idx
+                    tag='{}/AP@{}/{}'.format(
+                        metrics_scope, iou_threshold, idx
                     ),
                     simple_value=val
                 ))
