@@ -90,7 +90,15 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
         elif is_video(file_path):
             # We'll hardcode the video ouput to mp4 for now
             save_path = os.path.splitext(save_path)[0] + '.mp4'
-            writer = skvideo.io.FFmpegWriter(save_path)
+            try:
+                writer = skvideo.io.FFmpegWriter(save_path)
+            except AssertionError as e:
+                # from IPython import embed; embed(display_banner=False)
+                tf.logging.error(e)
+                tf.logging.error(
+                    "Please install ffmpeg before making video predictions."
+                )
+                exit()
             num_of_frames = int(
                 skvideo.io.ffprobe(file_path)['video']['@nb_frames'])
             video_progress_bar = click.progressbar(
