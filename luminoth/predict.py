@@ -9,16 +9,16 @@ import tensorflow as tf
 from PIL import Image, ImageDraw
 from luminoth.utils.predicting import PredictorNetwork
 
-
-def is_image(filename):
-    f = filename.lower()
-    return f.endswith('.jpg') or f.endswith('.jpeg') or f.endswith('.png')
+IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
+VIDEO_FORMATS = ['mov', 'mp4']  # TODO: check if more formats work
 
 
-def is_video(filename):
-    f = filename.lower()
-    # TODO: check more video formats
-    return f.endswith('.mov') or f.endswith('.mp4')
+def get_filetype(filename):
+    extension = filename.split('.')[-1]
+    if extension in IMAGE_FORMATS:
+        return 'image'
+    elif extension in VIDEO_FORMATS:
+        return 'video'
 
 
 @click.command(help='Obtain a model\'s predictions on an image or directory of images.')  # noqa
@@ -34,27 +34,36 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    # -- Initialize model --
-    network = PredictorNetwork(config_files)
-
     # -- Get file paths --
     if tf.gfile.IsDirectory(path_or_dir):
         file_paths = [
             os.path.join(path_or_dir, f)
             for f in tf.gfile.ListDirectory(path_or_dir)
-            if is_image(f) or is_video(f)
+            if get_filetype(f) in ('image', 'video')
         ]
     else:
-        file_paths = [path_or_dir]
+        if get_filetype(path_or_dir) in ('image', 'video'):
+            file_paths = [path_or_dir]
+        else:
+            file_paths = []
 
     errors = 0
     successes = 0
     total_files = len(file_paths)
+    if total_files == 0:
+        no_files_message = ("No images or videos found. "
+                            "Accepted formats -> Image: {} - Video: {}")
+        tf.logging.error(no_files_message.format(IMAGE_FORMATS, VIDEO_FORMATS))
+        exit()
+
     tf.logging.info('Getting predictions for {} files'.format(total_files))
 
     #  -- Create output_dir if it doesn't exist --
     if output_dir:
         tf.gfile.MakeDirs(output_dir)
+
+    # -- Initialize model --
+    network = PredictorNetwork(config_files)
 
     # -- Iterate over file paths --
     for file_path in file_paths:
@@ -63,7 +72,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
         if output_dir:
             save_path = os.path.join(output_dir, save_path)
 
-        if is_image(file_path):
+        if get_filetype(file_path) == 'image':
             print('Predicting {}...'.format(file_path))
             with tf.gfile.Open(file_path, 'rb') as f:
                 try:
@@ -87,7 +96,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
                     draw_bboxes_on_image(image, prediction, min_prob)
                     image.save(save_path)
 
-        elif is_video(file_path):
+        elif get_filetype(file_path) == 'video':
             # We'll hardcode the video ouput to mp4 for now
             save_path = os.path.splitext(save_path)[0] + '.mp4'
             try:
@@ -154,7 +163,7 @@ def draw_bboxes_on_image(image, prediction, min_prob):
         draw.rectangle(bbox, fill=fill, outline=outline)
         label = str(label)
         prob = '{:.2f}'.format(prob)
-        draw.text(bbox[:2], '{} - {}'.format(label, prob))
+        draw.text(bbox[:2], '{} - {}'.format(label, prob) if label else prob)
 
 
 def get_color(class_label):
