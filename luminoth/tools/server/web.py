@@ -1,9 +1,8 @@
-import os
-import json
 import click
 import tensorflow as tf
 
 from flask import Flask, jsonify, request, render_template
+from threading import Thread
 from PIL import Image
 
 from luminoth.utils.config import get_config
@@ -43,10 +42,16 @@ def predict(model_name):
         except ValueError:
             total_predictions = None
 
+    NETWORK_START_THREAD.join()
     prediction = PREDICTOR_NETWORK.predict_image(
         image_array, total_predictions
     )
     return jsonify(prediction)
+
+
+def start_network(config_files):
+    global PREDICTOR_NETWORK
+    PREDICTOR_NETWORK = PredictorNetwork(config_files)
 
 
 @click.command(help='Start basic web application.')
@@ -66,15 +71,9 @@ def web(config_files, host, port, debug):
     # a low threshold.
     config.model.rcnn.proposals.min_prob_threshold = 0.01
 
-    if config.dataset.dir:
-        # Gets the names of the classes
-        classes_file = os.path.join(config.dataset.dir, 'classes.json')
-        if tf.gfile.Exists(classes_file):
-            config['class_labels'] = json.load(
-                tf.gfile.GFile(classes_file))
-
     # Initialize model
-    global PREDICTOR_NETWORK
-    PREDICTOR_NETWORK = PredictorNetwork(config_files)
+    global NETWORK_START_THREAD
+    NETWORK_START_THREAD = Thread(target=start_network, args=(config_files))
+    NETWORK_START_THREAD.start()
 
     app.run(host=host, port=port, debug=debug)
