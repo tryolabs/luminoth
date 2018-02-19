@@ -65,115 +65,44 @@ class RCNNProposal(snt.AbstractModule):
                 Shape (final_num_proposals,)
 
         """
-        # First we want get the most probable label for each proposal
-        # We still have the background on idx 0 so we subtract 1 to the idxs.
-        proposal_label = tf.argmax(cls_prob, axis=1) - 1
-        # Get the probability for the selected label for each proposal.
-        proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
-
-        # We are going to use only the non-background proposals.
-        non_background_filter = tf.greater_equal(proposal_label, 0)
-        # Filter proposals with less than threshold probability.
-        min_prob_filter = tf.greater_equal(
-            proposal_label_prob, self._min_prob_threshold
-        )
-        proposal_filter = tf.logical_and(
-            non_background_filter, min_prob_filter
-        )
-
-        total_proposals = tf.shape(proposals)[0]
-
-        equal_shapes = tf.assert_equal(
-            tf.shape(proposals)[0], tf.shape(bbox_pred)[0]
-        )
-        with tf.control_dependencies([equal_shapes]):
-            # Filter all tensors for getting all non-background proposals.
-            proposals = tf.boolean_mask(
-                proposals, proposal_filter)
-            proposal_label = tf.boolean_mask(
-                proposal_label, proposal_filter)
-            proposal_label_prob = tf.boolean_mask(
-                proposal_label_prob, proposal_filter)
-            bbox_pred = tf.boolean_mask(
-                bbox_pred, proposal_filter)
-
-        filtered_proposals = tf.shape(proposals)[0]
-
-        tf.summary.scalar(
-            'background_or_low_prob_proposals',
-            total_proposals - filtered_proposals,
-            ['rcnn']
-        )
-
-        # Create one hot with labels for using it to filter bbox_predictions.
-        label_one_hot = tf.one_hot(proposal_label, depth=self._num_classes)
-        # Flatten label_one_hot to get
-        # (num_non_background_proposals * num_classes, 1) for filtering.
-        label_one_hot_flatten = tf.cast(
-            tf.reshape(label_one_hot, [-1]), tf.bool
-        )
-        # Flatten bbox_predictions getting
-        # (num_non_background_proposals * num_classes, 4).
-        bbox_pred_flatten = tf.reshape(bbox_pred, [-1, 4])
-
-        equal_shapes = tf.assert_equal(
-            tf.shape(bbox_pred_flatten)[0], tf.shape(label_one_hot_flatten)[0]
-        )
-        with tf.control_dependencies([equal_shapes]):
-            # Control same number of dimensions between bbox and mask.
-            bbox_pred = tf.boolean_mask(
-                bbox_pred_flatten, label_one_hot_flatten)
-
-        # Using the bbox_pred and the proposals we generate the objects.
-        raw_objects = decode(proposals, bbox_pred)
-        # Clip boxes to image.
-        clipped_objects = clip_boxes(raw_objects, im_shape)
-
-        # Filter objects that have an non-valid area.
-        (x_min, y_min, x_max, y_max) = tf.unstack(clipped_objects, axis=1)
-        object_filter = tf.greater_equal(
-            tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
-            0.0
-        )
-
-        total_raw_objects = tf.shape(raw_objects)[0]
-        objects = tf.boolean_mask(
-            clipped_objects, object_filter)
-        proposal_label = tf.boolean_mask(
-            proposal_label, object_filter)
-        proposal_label_prob = tf.boolean_mask(
-            proposal_label_prob, object_filter)
-
-        total_objects = tf.shape(objects)[0]
-
-        tf.summary.scalar(
-            'invalid_proposals',
-            total_objects - total_raw_objects, ['rcnn']
-        )
-
-        valid_proposals_ratio = (
-            tf.cast(total_proposals, tf.float32) /
-            tf.cast(total_objects, tf.float32)
-        )
-
-        tf.summary.scalar(
-            'valid_proposals_ratio', valid_proposals_ratio, ['rcnn']
-        )
-
-        # We have to use the TensorFlow's bounding box convention to use the
-        # included function for NMS.
-        # After gathering results we should normalize it back.
-        objects_tf = change_order(objects)
-
         selected_boxes = []
         selected_probs = []
         selected_labels = []
-        # For each class we want to filter those objects and apply NMS to them.
+
+        # For each class, take the proposals with the class-specific
+        # predictions (class scores and bbox regression) and filter accordingly
+        # (valid area, min probability score and NMS).
         for class_id in range(self._num_classes):
-            # Filter objects Tensors with class.
-            class_filter = tf.equal(proposal_label, class_id)
-            class_objects_tf = tf.boolean_mask(objects_tf, class_filter)
-            class_prob = tf.boolean_mask(proposal_label_prob, class_filter)
+            # Apply the class-specific transformations to the proposals to
+            # obtain the current class' prediction.
+            class_prob = cls_prob[:, class_id + 1]  # 0 is background class.
+            class_bboxes = bbox_pred[:, (4 * class_id):(4 * class_id + 4)]
+            raw_class_objects = decode(proposals, class_bboxes)
+
+            # Clip bboxes so they don't go out of the image.
+            class_objects = clip_boxes(raw_class_objects, im_shape)
+
+            # Filter objects based on the min probability threshold and on them
+            # having a valid area.
+            prob_filter = tf.greater_equal(
+                class_prob, self._min_prob_threshold
+            )
+
+            (x_min, y_min, x_max, y_max) = tf.unstack(class_objects, axis=1)
+            area_filter = tf.greater(
+                tf.maximum(x_max - x_min, 0.0)
+                * tf.maximum(y_max - y_min, 0.0),
+                0.0
+            )
+
+            object_filter = tf.logical_and(area_filter, prob_filter)
+
+            class_objects = tf.boolean_mask(class_objects, object_filter)
+            class_prob = tf.boolean_mask(class_prob, object_filter)
+
+            # We have to use the TensorFlow's bounding box convention to use
+            # the included function for NMS.
+            class_objects_tf = change_order(class_objects)
 
             # Apply class NMS.
             class_selected_idx = tf.image.non_max_suppression(
@@ -185,9 +114,12 @@ class RCNNProposal(snt.AbstractModule):
             class_objects_tf = tf.gather(class_objects_tf, class_selected_idx)
             class_prob = tf.gather(class_prob, class_selected_idx)
 
-            # We append values to a regular list which will later be transform
-            # to a proper Tensor.
-            selected_boxes.append(class_objects_tf)
+            # Revert to our bbox convention.
+            class_objects = change_order(class_objects_tf)
+
+            # We append values to a regular list which will later be
+            # transformed to a proper Tensor.
+            selected_boxes.append(class_objects)
             selected_probs.append(class_prob)
             # In the case of the class_id, since it is a loop on classes, we
             # already have a fixed class_id. We use `tf.tile` to create that
@@ -198,13 +130,15 @@ class RCNNProposal(snt.AbstractModule):
 
         # We use concat (axis=0) to generate a Tensor where the rows are
         # stacked on top of each other
-        objects_tf = tf.concat(selected_boxes, axis=0)
-        # Return to the original convention.
-        objects = change_order(objects_tf)
+        objects = tf.concat(selected_boxes, axis=0)
         proposal_label = tf.concat(selected_labels, axis=0)
         proposal_label_prob = tf.concat(selected_probs, axis=0)
 
-        # Get topK detections of all classes.
+        tf.summary.histogram(
+            'proposal_cls_scores', proposal_label_prob, ['rcnn']
+        )
+
+        # Get top-k detections of all classes.
         k = tf.minimum(
             self._total_max_detections,
             tf.shape(proposal_label_prob)[0]
@@ -215,7 +149,6 @@ class RCNNProposal(snt.AbstractModule):
         top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
 
         return {
-            'raw_objects': raw_objects,
             'objects': top_k_objects,
             'proposal_label': top_k_proposal_label,
             'proposal_label_prob': top_k_proposal_label_prob,
