@@ -97,7 +97,7 @@ class PascalVOCReader(ObjectDetectionReader):
             gt_boxes = []
 
             for b in annotation['object']:
-                if not self._merge_classes:
+                if not self.merge_classes:
                     try:
                         label_id = self.classes.index(b['name'])
                     except ValueError:

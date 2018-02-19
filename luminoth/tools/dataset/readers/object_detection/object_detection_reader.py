@@ -48,7 +48,7 @@ class ObjectDetectionReader(BaseReader):
 
         self._limit_examples = limit_examples
         self._limit_classes = limit_classes
-        self._merge_classes = merge_classes
+        self.merge_classes = merge_classes
         random.seed(seed)
 
         self._total = None

@@ -45,7 +45,7 @@ class COCOReader(ObjectDetectionReader):
         for annotation in annotations_json['annotations']:
             image_id = annotation['image_id']
             x, y, width, height = annotation['bbox']
-            if not self._merge_classes:
+            if not self.merge_classes:
                 try:
                     label_id = self.classes.index(
                         category_to_name[annotation['category_id']]
