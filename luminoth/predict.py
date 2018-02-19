@@ -14,7 +14,7 @@ VIDEO_FORMATS = ['mov', 'mp4']  # TODO: check if more formats work
 
 
 def get_filetype(filename):
-    extension = filename.split('.')[-1]
+    extension = filename.split('.')[-1].lower()
     if extension in IMAGE_FORMATS:
         return 'image'
     elif extension in VIDEO_FORMATS:
@@ -27,8 +27,10 @@ def get_filetype(filename):
 @click.option('--output-dir', help='Where to write output')
 @click.option('--save/--no-save', default=False, help='Save the image with the prediction of the model')  # noqa
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
+@click.option('--ignore-classes', default=None, multiple=True, help='Classes to ignore when predicting')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
+def predict(path_or_dir, config_files, output_dir, save, min_prob,
+            ignore_classes, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
@@ -49,6 +51,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
 
     errors = 0
     successes = 0
+    created_files_paths = []
     total_files = len(file_paths)
     if total_files == 0:
         no_files_message = ("No images or videos found. "
@@ -56,14 +59,14 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
         tf.logging.error(no_files_message.format(IMAGE_FORMATS, VIDEO_FORMATS))
         exit()
 
-    tf.logging.info('Getting predictions for {} files'.format(total_files))
+    # -- Initialize model --
+    network = PredictorNetwork(config_files)
 
     #  -- Create output_dir if it doesn't exist --
     if output_dir:
         tf.gfile.MakeDirs(output_dir)
 
-    # -- Initialize model --
-    network = PredictorNetwork(config_files)
+    tf.logging.info('Getting predictions for {} files'.format(total_files))
 
     # -- Iterate over file paths --
     for file_path in file_paths:
@@ -87,22 +90,29 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
             prediction = network.predict_image(image)
             successes += 1
 
-            # -- Save results --
+            # Filter results if required by user
+            if ignore_classes:
+                prediction = filter_classes(prediction, ignore_classes)
+
+            # Save prediction json file
             with open(save_path + '.json', 'w') as outfile:
                 json.dump(prediction, outfile)
+            created_files_paths.append(save_path + '.json')
+
+            # Save predicted image
             if save:
                 with tf.gfile.Open(file_path, 'rb') as im_file:
                     image = Image.open(im_file)
                     draw_bboxes_on_image(image, prediction, min_prob)
                     image.save(save_path)
+                created_files_paths.append(save_path)
 
         elif get_filetype(file_path) == 'video':
-            # We'll hardcode the video ouput to mp4 for now
+            # NOTE: We'll hardcode the video ouput to mp4 for the time being
             save_path = os.path.splitext(save_path)[0] + '.mp4'
             try:
                 writer = skvideo.io.FFmpegWriter(save_path)
             except AssertionError as e:
-                # from IPython import embed; embed(display_banner=False)
                 tf.logging.error(e)
                 tf.logging.error(
                     "Please install ffmpeg before making video predictions."
@@ -116,30 +126,31 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob, debug):
                 label='Predicting {}'.format(file_path))
             with video_progress_bar as bar:
                 for frame in bar:
+                    # Run image through network
                     prediction = network.predict_image(frame)
+
+                    # Filter results if required by user
+                    if ignore_classes:
+                        prediction = filter_classes(prediction, ignore_classes)
+
                     image = Image.fromarray(frame)
                     draw_bboxes_on_image(image, prediction, min_prob)
                     writer.writeFrame(np.array(image))
                 writer.close()
+                created_files_paths.append(save_path)
 
         else:
             tf.logging.warning("{} isn't an image/video".format(file_path))
 
     # -- Generate logs --
-    logs_dir = output_dir if output_dir else 'current directory'
-    saving_logs_message = ('Saving results and tagged images/videos in {}'
-                           if save else 'Saving results in {}')
-    tf.logging.info(saving_logs_message.format(logs_dir))
+    tf.logging.info(
+        "Created the following files: {}".format(
+            ', '.join(created_files_paths)
+        )
+    )
 
     if errors:
         tf.logging.warning('{} errors.'.format(errors))
-
-    if len(file_paths) > 1:
-        tf.logging.info('Predicted {} files'.format(successes))
-    else:
-        tf.logging.info(
-            '{} objects detected'.format(len(prediction['objects']))
-        )
 
 
 def draw_bboxes_on_image(image, prediction, min_prob):
@@ -156,12 +167,12 @@ def draw_bboxes_on_image(image, prediction, min_prob):
             continue
 
         # Chose colors for bbox, the 60 and 255 correspond to transparency
+        # label = str(label)
         color = get_color(label)
         fill = tuple(color + [60])
         outline = tuple(color + [255])
 
         draw.rectangle(bbox, fill=fill, outline=outline)
-        label = str(label)
         prob = '{:.2f}'.format(prob)
         draw.text(bbox[:2], '{} - {}'.format(label, prob) if label else prob)
 
@@ -190,3 +201,18 @@ def get_color(class_label):
 
 def hex_to_rgb(x):
     return [int(x[i:i + 2], 16) for i in (0, 2, 4)]
+
+
+def filter_classes(prediction, ignore_classes):
+    indexes_to_filter = [idx for idx, l in
+                         enumerate(prediction['objects_labels'])
+                         if l in ignore_classes]
+    filtered_prediction = prediction.copy()
+
+    # Replace some elements in filtered_prediction with their filtered version
+    for key in ('objects', 'objects_labels', 'objects_labels_prob'):
+        filtered_prediction[key] = [val for idx, val in
+                                    enumerate(prediction[key])
+                                    if idx not in indexes_to_filter]
+
+    return filtered_prediction
