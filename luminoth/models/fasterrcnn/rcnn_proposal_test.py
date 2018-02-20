@@ -40,7 +40,7 @@ class RCNNProposalTest(tf.test.TestCase):
         """Computes valid bbox_pred from proposals and gt_boxes for each class.
 
         Args:
-            proposed_boxes: Tensor with shape (num_proposals, 5).
+            proposed_boxes: Tensor with shape (num_proposals, 4).
             gt_boxes_per_class: Tensor holding the ground truth boxes for each
                 class. Has shape (num_classes, num_gt_boxes_per_class, 4).
 
@@ -63,8 +63,7 @@ class RCNNProposalTest(tf.test.TestCase):
         return tf.concat(bbox_pred_list, 1)
 
     def _check_proposals_are_clipped(self, proposals, image_shape):
-        """Asserts that no proposals exceed the image boundaries.
-        """
+        """Asserts that no proposals exceed the image boundaries."""
         for proposal in proposals:
             self.assertLess(proposal[0], image_shape[1])
             self.assertLess(proposal[1], image_shape[0])
@@ -73,12 +72,12 @@ class RCNNProposalTest(tf.test.TestCase):
             for i in range(4):
                 self.assertGreaterEqual(proposal[i], 0)
 
-    def testBackgroundFilter(self):
-        """Tests that we're not returning an object when a proposal is background.
+    def testNoBackgroundClass(self):
+        """Tests that we're not returning an object with background class.
 
-        This includes two sub-tests. One case in which there is a foreground
-        proposal, and one in which all proposals are background. We use the
-        same proposed_boxes and gt_boxes, but change the cls_prob.
+        For this, we make sure all predictions have a class between 0 and 2.
+        That is, even though we have four classes (three plus background),
+        background is completely ignored.
         """
 
         proposed_boxes = tf.constant([
@@ -92,51 +91,31 @@ class RCNNProposalTest(tf.test.TestCase):
             [(86, 571, 743, 599)],
         ])
         bbox_pred = self._get_bbox_pred(proposed_boxes, gt_boxes_per_class)
-        cls_prob_one_foreground = tf.constant([
+
+        # We build one prediction for each class.
+        cls_prob = tf.constant([
             (0., .3, .3, .4),
-            (1., 0., 0., 0.),
+            (.8, 0., 0., 2.),
             (.35, .3, .2, .15),
         ])
-        cls_prob_all_background = tf.constant([
-            (.4, 0., .3, .3),
-            (.8, .1, .1, 0.),
-            (.7, .05, .2, .05),
-        ])
 
-        proposal_prediction_one_foreground = self._run_rcnn_proposal(
+        proposal_prediction = self._run_rcnn_proposal(
             self._shared_model,
             proposed_boxes,
             bbox_pred,
-            cls_prob_one_foreground,
+            cls_prob,
         )
-        proposal_prediction_all_background = self._run_rcnn_proposal(
-            self._shared_model,
-            proposed_boxes,
-            bbox_pred,
-            cls_prob_all_background,
-        )
-        # Assertion for 'one foreground' case.
-        # This assertion has two purposes:
-        #     1. checking that we only get one object.
-        #     2. checking that that object has the same box as class 2.
-        # We take this to mean we're correctly ignoring the two proposals
-        # where 'background' is the highest probability class.
-        self.assertAllClose(
-            proposal_prediction_one_foreground['objects'],
-            self._compute_tf_graph(gt_boxes_per_class)[2],
-            atol=self._equality_delta
-        )
-        # Assertion for 'all background' case.
-        self.assertEqual(
-            len(proposal_prediction_all_background['objects']), 0
-        )
+
+        # Make sure we get 3 predictions, one per class (as they're NMSed int
+        # a single one).
+        self.assertEqual(len(proposal_prediction['objects']), 3)
+        self.assertIn(0, proposal_prediction['proposal_label'])
+        self.assertIn(1, proposal_prediction['proposal_label'])
+        self.assertIn(2, proposal_prediction['proposal_label'])
 
     def testNMSFilter(self):
-        """Tests that we're applying NMS correctly.
-        """
+        """Tests that we're applying NMS correctly."""
 
-        # The first two boxes have a very high IoU between them. One of them
-        # should be filtered by the NMS filter.
         proposed_boxes = tf.constant([
             (85, 500, 730, 590),
             (50, 500, 740, 570),
@@ -160,12 +139,10 @@ class RCNNProposalTest(tf.test.TestCase):
             bbox_pred,
             cls_prob,
         )
-        labels = proposal_prediction['proposal_label']
 
-        # Assertions
-        self.assertEqual(proposal_prediction['objects'].shape[0], 2)
-        self.assertIn(0, labels)
-        self.assertIn(2, labels)
+        # All proposals are mapped perfectly into each GT box, so we should
+        # have 3 resulting objects after applying NMS.
+        self.assertEqual(len(proposal_prediction['objects']), 3)
 
     def testImageClipping(self):
         """Tests that we're clipping images correctly.
@@ -219,8 +196,7 @@ class RCNNProposalTest(tf.test.TestCase):
         )
 
     def testBboxPred(self):
-        """Tests that we're using bbox_pred correctly.
-        """
+        """Tests that we're using bbox_pred correctly."""
 
         proposed_boxes = tf.constant([
             (200, 315, 400, 370),
@@ -266,8 +242,7 @@ class RCNNProposalTest(tf.test.TestCase):
         )
 
     def testLimits(self):
-        """Tests that we're respecting the limits imposed by the config.
-        """
+        """Tests that we're respecting the limits imposed by the config."""
 
         limits_config = self._config.copy()
         limits_config['class_max_detections'] = 2

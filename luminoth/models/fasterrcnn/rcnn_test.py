@@ -267,7 +267,10 @@ class RCNNTest(tf.test.TestCase):
         )
 
     def testNumberOfObjects(self):
-        """Tests we're not returning more objects than we get proposals.
+        """Tests we're not returning too many objects.
+
+        The number of objects returned should be lower than the number of
+        proposals received times the number of classes.
         """
 
         rcnn_net = self._shared_model(
@@ -292,7 +295,7 @@ class RCNNTest(tf.test.TestCase):
         # Assertions
         self.assertLessEqual(
             prediction_dict['objects'].shape[0],
-            self._num_proposals
+            self._num_proposals * self._num_classes
         )
 
     def testLoss(self):
