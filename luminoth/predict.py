@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 from luminoth.utils.predicting import PredictorNetwork
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
-VIDEO_FORMATS = ['mov', 'mp4']  # TODO: check if more formats work
+VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
 
 
 def get_filetype(filename):
@@ -125,19 +125,29 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
                 length=num_of_frames,
                 label='Predicting {}'.format(file_path))
             with video_progress_bar as bar:
-                for frame in bar:
-                    # Run image through network
-                    prediction = network.predict_image(frame)
+                try:
+                    for frame in bar:
+                        # Run image through network
+                        prediction = network.predict_image(frame)
 
-                    # Filter results if required by user
-                    if ignore_classes:
-                        prediction = filter_classes(prediction, ignore_classes)
+                        # Filter results if required by user
+                        if ignore_classes:
+                            prediction = filter_classes(prediction, ignore_classes)
 
-                    image = Image.fromarray(frame)
-                    draw_bboxes_on_image(image, prediction, min_prob)
-                    writer.writeFrame(np.array(image))
-                writer.close()
-                created_files_paths.append(save_path)
+                        image = Image.fromarray(frame)
+                        draw_bboxes_on_image(image, prediction, min_prob)
+                        writer.writeFrame(np.array(image))
+                except RuntimeError as e:
+                    print()  # So error won't get printed next to progressbar
+                    tf.logging.error('Error: {}'.format(e))
+                    tf.logging.error('Corrupt videofile: {}'.format(file_path))
+                    tf.logging.error(
+                        'Partially processed video file saved in {}'.format(
+                            save_path))
+                    errors += 1
+
+            writer.close()
+            created_files_paths.append(save_path)
 
         else:
             tf.logging.warning("{} isn't an image/video".format(file_path))
