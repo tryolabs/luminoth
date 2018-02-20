@@ -19,8 +19,9 @@ from luminoth.utils.image_vis import image_vis_summaries
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--files-per-class', type=int, default=10, help='How many files per class display in every epoch.')  # noqa
 @click.option('--iou-threshold', type=float, default=0.5, help='IoU threshold to use.')  # noqa
+@click.option('--max-detections', type=int, default=100, help='Max detections to consider.')  # noqa
 def eval(dataset_split, config_files, watch, from_global_step,
-         override_params, files_per_class, iou_threshold):
+         override_params, files_per_class, iou_threshold, max_detections):
     """Evaluate models using dataset."""
 
     # If the config file is empty, our config will be the base_config for the
@@ -52,14 +53,17 @@ def eval(dataset_split, config_files, watch, from_global_step,
     # Disable data augmentation.
     config.dataset.data_augmentation = []
 
+    # Override max detections with specified value.
+    config.model.rcnn.proposals.total_max_detections = max_detections
+
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
 
-    # Seed setup
+    # Seed setup.
     if config.train.seed:
         tf.set_random_seed(config.train.seed)
 
-    # Set pretrained as not training
+    # Set pretrained as not training.
     config.model.base_network.trainable = False
 
     model_class = get_model(config.model.type)
@@ -82,7 +86,7 @@ def eval(dataset_split, config_files, watch, from_global_step,
         pred_objects_classes = pred['labels']
         pred_objects_scores = pred['probs']
     else:
-        # Force the num_classes to 1
+        # Force the num_classes to 1.
         config.model.network.num_classes = 1
 
         pred = prediction_dict['rpn_prediction']
@@ -116,7 +120,7 @@ def eval(dataset_split, config_files, watch, from_global_step,
     # Using a global saver instead of the one for the model.
     saver = tf.train.Saver(sharded=True, allow_empty=True)
 
-    # Aggregate the required ops to evaluate into a dict..
+    # Aggregate the required ops to evaluate into a dict.
     ops = {
         'init_op': init_op,
         'metric_ops': metric_ops,
@@ -297,8 +301,6 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
         try:
             track_start = start_time
             track_count = 0
-            period_detected_count = 0
-            period_detected_max = 0
             while not coord.should_stop():
                 fetches = {
                     'metric_ops': ops['metric_ops'],
@@ -324,12 +326,6 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 output_per_batch['gt_classes'].append(batch_gt_classes)
 
                 val_losses = batch_fetched['losses']
-
-                num_detected = len(batch_fetched['scores'])
-                period_detected_count += num_detected
-                period_detected_max = max(period_detected_max, num_detected)
-                if period_detected_max == len(batch_fetched['scores']):
-                    period_max_img = batch_fetched['filename']
 
                 if image_vis is not None:
                     filename = batch_fetched['filename'].decode('utf-8')
@@ -369,18 +365,13 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 if track_end - track_start > 20.:
                     click.echo(
                         '{} processed in {:.2f}s (global {:.2f} images/s, '
-                        'period {:.2f} images/s, avg dets {:.2f}, '
-                        'max dets {} on {})'.format(
+                        'period {:.2f} images/s)'.format(
                             total_evaluated, track_end - start_time,
                             total_evaluated / (track_end - start_time),
                             track_count / (track_end - track_start),
-                            period_detected_count / track_count,
-                            period_detected_max, period_max_img
                         ))
                     track_count = 0
                     track_start = track_end
-                    period_detected_count = 0
-                    period_detected_max = 0
 
         except tf.errors.OutOfRangeError:
 
@@ -433,15 +424,6 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                     tag=loss_name,
                     simple_value=loss_value
                 ))
-
-            total_bboxes_per_batch = [
-                len(bboxes) for bboxes in output_per_batch['bboxes']
-            ]
-
-            summary.append(tf.Summary.Value(
-                tag='{}/avg_bboxes'.format(metrics_scope),
-                simple_value=np.mean(total_bboxes_per_batch)
-            ))
 
             writer.add_summary(
                 tf.Summary(value=summary), checkpoint['global_step']
