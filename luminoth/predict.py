@@ -36,7 +36,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    # -- Get file paths --
+    # Get file paths
     if tf.gfile.IsDirectory(path_or_dir):
         file_paths = [
             os.path.join(path_or_dir, f)
@@ -59,16 +59,16 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
         tf.logging.error(no_files_message.format(IMAGE_FORMATS, VIDEO_FORMATS))
         exit()
 
-    # -- Initialize model --
+    # Initialize model
     network = PredictorNetwork(config_files)
 
-    #  -- Create output_dir if it doesn't exist --
+    # Create output_dir if it doesn't exist
     if output_dir:
         tf.gfile.MakeDirs(output_dir)
 
     tf.logging.info('Getting predictions for {} files'.format(total_files))
 
-    # -- Iterate over file paths --
+    # Iterate over file paths
     for file_path in file_paths:
 
         save_path = 'pred_' + os.path.basename(file_path)
@@ -76,13 +76,13 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
             save_path = os.path.join(output_dir, save_path)
 
         if get_filetype(file_path) == 'image':
-            print('Predicting {}...'.format(file_path))
+            click.echo('Predicting {}...'.format(file_path))
             with tf.gfile.Open(file_path, 'rb') as f:
                 try:
                     image = Image.open(f).convert('RGB')
-                except tf.errors.OutOfRangeError as e:
+                except (tf.errors.OutOfRangeError, OSError) as e:
                     tf.logging.warning('Error: {}'.format(e))
-                    tf.logging.warning('{} failed.'.format(file_path))
+                    tf.logging.warning("Couldn't open: {}".format(file_path))
                     errors += 1
                     continue
 
@@ -132,13 +132,14 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
 
                         # Filter results if required by user
                         if ignore_classes:
-                            prediction = filter_classes(prediction, ignore_classes)
+                            prediction = filter_classes(
+                                prediction, ignore_classes)
 
                         image = Image.fromarray(frame)
                         draw_bboxes_on_image(image, prediction, min_prob)
                         writer.writeFrame(np.array(image))
                 except RuntimeError as e:
-                    print()  # So error won't get printed next to progressbar
+                    click.echo()  # Error prints next to progress-bar if not
                     tf.logging.error('Error: {}'.format(e))
                     tf.logging.error('Corrupt videofile: {}'.format(file_path))
                     tf.logging.error(
@@ -152,7 +153,7 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
         else:
             tf.logging.warning("{} isn't an image/video".format(file_path))
 
-    # -- Generate logs --
+    # Generate logs
     tf.logging.info(
         "Created the following files: {}".format(
             ', '.join(created_files_paths)

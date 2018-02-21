@@ -15,7 +15,7 @@ app = Flask(__name__)
 def get_image():
     image = request.files.get('image')
     if not image:
-        return None
+        raise ValueError
 
     image = Image.open(image.stream).convert('RGB')
     return image
@@ -31,9 +31,12 @@ def predict(model_name):
     if request.method == 'GET':
         return jsonify(error='Use POST method to send image.'), 400
 
-    image_array = get_image()
-    if image_array is None:
-        return jsonify(error='Missing image.'), 400
+    try:
+        image_array = get_image()
+    except ValueError:
+        return jsonify(error='Missing image'), 400
+    except OSError:
+        return jsonify(error='Incompatible file type'), 400
 
     total_predictions = request.args.get('total')
     if total_predictions is not None:
