@@ -13,7 +13,7 @@ import click
 
 from luminoth.eval import eval
 from luminoth.predict import predict
-from luminoth.tools import cloud, dataset, server
+from luminoth.tools import checkpoint, cloud, dataset, server
 from luminoth.train import train
 
 
@@ -25,9 +25,10 @@ def cli():
     pass
 
 
+cli.add_command(checkpoint)
 cli.add_command(cloud)
 cli.add_command(dataset)
-cli.add_command(predict)
 cli.add_command(eval)
-cli.add_command(train)
+cli.add_command(predict)
 cli.add_command(server)
+cli.add_command(train)
