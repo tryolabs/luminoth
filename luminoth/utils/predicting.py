@@ -17,9 +17,25 @@ class PredictorNetwork(object):
     Returns a dictionary with the objects, their labels and probabilities,
     the inference time and the scale factor."""
 
-    def __init__(self, config_files):
+    def __init__(self, config_files, checkpoint):
 
-        config = get_config(config_files)
+        if checkpoint:
+            # TODO: Move around.
+            from luminoth.tools.checkpoint import (
+                get_checkpoint, get_checkpoint_path, read_checkpoint_db,
+                LUMINOTH_PATH, CHECKPOINT_PATH
+            )
+            # TODO: Move to `checkpoint` module.
+            db = read_checkpoint_db()
+            checkpoint = get_checkpoint(db, checkpoint)
+            path = get_checkpoint_path(checkpoint['id'])
+            config = get_config(os.path.join(path, 'config.yml'))
+            # TODO: Do the replacement some other way.
+            config.dataset.dir = path
+            config.train.job_dir = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH)
+        else:
+            config = get_config(config_files)
+
         if config.dataset.dir:
             # Gets the names of the classes
             classes_file = os.path.join(config.dataset.dir, 'classes.json')
