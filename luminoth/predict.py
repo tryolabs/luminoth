@@ -23,13 +23,14 @@ def get_filetype(filename):
 
 @click.command(help='Obtain a model\'s predictions on an image or directory of images.')  # noqa
 @click.argument('path-or-dir')
-@click.option('config_files', '--config', '-c', required=True, multiple=True, help='Config to use.')  # noqa
+@click.option('config_files', '--config', '-c', multiple=True, help='Config to use.')  # noqa
+@click.option('--checkpoint', help='Checkpoint to use.')
 @click.option('--output-dir', help='Where to write output')
 @click.option('--save/--no-save', default=False, help='Save the image with the prediction of the model')  # noqa
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
 @click.option('--ignore-classes', default=None, multiple=True, help='Classes to ignore when predicting')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def predict(path_or_dir, config_files, output_dir, save, min_prob,
+def predict(path_or_dir, config_files, checkpoint, output_dir, save, min_prob,
             ignore_classes, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
@@ -60,7 +61,9 @@ def predict(path_or_dir, config_files, output_dir, save, min_prob,
         exit()
 
     # Initialize model
-    network = PredictorNetwork(config_files)
+    # TODO: Resolve config before. Validate config_files and checkpoint. Load
+    # checkpoint information (separate functions from tool).
+    network = PredictorNetwork(config_files, checkpoint)
 
     # Create output_dir if it doesn't exist
     if output_dir:
