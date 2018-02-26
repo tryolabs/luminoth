@@ -97,8 +97,22 @@ def merge_index(local_index, remote_index):
 
 
 def get_checkpoint(db, id_or_alias):
-    """Returns checkpoint in `db` indicatedby `id_or_alias`."""
-    for cp in db['checkpoints']:
+    """Returns checkpoint in `db` indicated by `id_or_alias`.
+
+    First tries to match an ID, then an alias. For the case of repeated
+    aliases, will match first match local checkpoints and then remotes. In both
+    cases, matching will be newest first.
+    """
+    # TODO: Warn when there's a repeated alias.
+    # TODO: Once we track added date, order by that.
+    locals = [c for c in db['checkpoints'] if c['source'] == 'local']
+    remotes = [c for c in db['checkpoints'] if c['source'] == 'remote']
+
+    for cp in locals:
+        if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
+            return cp
+
+    for cp in remotes:
         if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
             return cp
 
