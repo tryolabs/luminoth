@@ -15,6 +15,99 @@ LUMINOTH_PATH = os.path.expanduser('~/.luminoth')
 CHECKPOINT_INDEX = 'checkpoints.json'
 CHECKPOINT_PATH = 'checkpoints'
 
+INDEX_URL = 'http://localhost:8080/index.json'
+
+
+def fetch_remote_index():
+    # TODO: Appropriate retries and error handling.
+    # import requests
+    # index = requests.get(INDEX_URL).json()
+    index = {
+        "checkpoints": [
+            {
+                "id": "4a11f3285abd",
+                "name": "SSD",
+                "description": "Description",
+                "dataset": {"name": "Pascal"},
+                "model": {"name": "ssd"},
+                "alias": "accurate",
+                "url": "http://localhost:8080/4a11f3285abc.tar",
+            }
+        ]
+    }
+
+    return index
+
+
+def merge_index(local_index, remote_index):
+    """Merge the `remote_index` into `local_index`.
+
+    The merging process is only applied over the checkpoints in `local_index`
+    marked as ``remote``.
+    """
+
+    non_remotes_in_local = [
+        c for c in local_index['checkpoints']
+        if c['source'] != 'remote'
+    ]
+    remotes_in_local = {
+        c['id']: c for c in local_index['checkpoints']
+        if c['source'] == 'remote'
+    }
+
+    to_add = []
+    seen_ids = set()
+    for checkpoint in remote_index['checkpoints']:
+        seen_ids.add(checkpoint['id'])
+        local = remotes_in_local.get(checkpoint['id'])
+        if local:
+            # Checkpoint is in local index. Overwrite the overwritable fields
+            # (may remain unchagned).
+            # TODO: More overwritable fields?
+            local['name'] = checkpoint['name']
+            local['description'] = checkpoint['description']
+            local['url'] = checkpoint['url']
+        elif not local:
+            # Checkpoint not found, it's an addition. Transform into our schema
+            # before appending to `to_add`..
+            # TODO: Anything else? Need to formalize schema.
+            checkpoint['source'] = 'remote'
+            checkpoint['status'] = 'NOT_DOWNLOADED'
+            to_add.append(checkpoint)
+
+    # Out of the removed checkpoints, only keep those with status
+    # ``DOWNLOADED`` and turn them into local checkpoints.
+    missing_ids = set(remotes_in_local.keys()) - seen_ids
+    already_downloaded = [
+        c for c in remotes_in_local.values()
+        if c['id'] in missing_ids and c['status'] == 'DOWNLOADED'
+    ]
+    for checkpoint in already_downloaded:
+        checkpoint['status'] = 'LOCAL'
+        checkpoint['source'] = 'local'
+
+    new_remotes = [
+        c for c in remotes_in_local.values()
+        if not c['id'] in missing_ids  # Checkpoints to remove.
+    ] + to_add + already_downloaded
+
+    if len(to_add):
+        click.echo('{} new remote checkpoints added.'.format(len(to_add)))
+    if len(missing_ids):
+        if len(already_downloaded):
+            click.echo('{} remote checkpoints turned to local.'.format(
+                len(already_downloaded)
+            ))
+        click.echo('{} remote checkpoints removed.'.format(
+            len(missing_ids) - len(already_downloaded)
+        ))
+    if not len(to_add) and not len(missing_ids):
+        click.echo('No changes in remote index.')
+
+    local_index['checkpoints'] = non_remotes_in_local + new_remotes
+
+    return local_index
+
 
 def get_checkpoint(db, id_or_alias):
     """Returns checkpoint in `db` indicatedby `id_or_alias`."""
@@ -57,9 +150,11 @@ def list():
         click.echo('No checkpoints available.')
         return
 
-    template = '{:>12} | {:>7} | {:>10} | {:>40} | {:>13}'
+    template = '{:>12} | {:>7} | {:>10} | {:>40} | {:>6} | {:>14}'
 
-    header = template.format('id', 'dataset', 'model', 'description', 'status')
+    header = template.format(
+        'id', 'dataset', 'model', 'description', 'source', 'status'
+    )
     click.echo(header)
     click.echo('=' * len(header))
 
@@ -69,6 +164,7 @@ def list():
             checkpoint['dataset']['name'],
             checkpoint['model']['name'],
             checkpoint['description'],
+            checkpoint['source'],
             checkpoint['status'],
         )
         click.echo(line)
@@ -172,6 +268,7 @@ def create(config_files, override_params, alias):
     metadata = {
         'id': checkpoint_id,
         'status': 'LOCAL',
+        'source': 'local',
         'description': 'Description',
         'dataset': {'name': 'COCO'},
         'model': {'name': config.model.type},
@@ -311,7 +408,19 @@ def import_(path):
     click.echo('Checkpoint {} imported successfully.'.format(metadata['id']))
 
 
-@click.command(help='Download checkpoint')
+@click.command(help='Refresh the remote checkpoint index.')
+def refresh():
+    click.echo('Retrieving remote index... ', nl=False)
+    remote = fetch_remote_index()
+    click.echo('done.')
+
+    db = read_checkpoint_db()
+    db = merge_index(db, remote)
+
+    save_checkpoint_db(db)
+
+
+@click.command(help='Download a remote checkpoint.')
 @click.argument('id_or_alias')
 def download(id_or_alias):
     click.echo('Not implemented yet.')
@@ -329,3 +438,4 @@ checkpoint.add_command(export)
 checkpoint.add_command(import_, name='import')
 checkpoint.add_command(info)
 checkpoint.add_command(list)
+checkpoint.add_command(refresh)
