@@ -3,7 +3,9 @@ import json
 import os
 import shutil
 import six
+import requests
 import tarfile
+import tempfile
 import tensorflow as tf
 import uuid
 
@@ -20,22 +22,7 @@ INDEX_URL = 'http://localhost:8080/index.json'
 
 def fetch_remote_index():
     # TODO: Appropriate retries and error handling.
-    # import requests
-    # index = requests.get(INDEX_URL).json()
-    index = {
-        "checkpoints": [
-            {
-                "id": "4a11f3285abd",
-                "name": "SSD",
-                "description": "Description",
-                "dataset": {"name": "Pascal"},
-                "model": {"name": "ssd"},
-                "alias": "accurate",
-                "url": "http://localhost:8080/4a11f3285abc.tar",
-            }
-        ]
-    }
-
+    index = requests.get(INDEX_URL).json()
     return index
 
 
@@ -295,11 +282,15 @@ def delete(id_or_alias):
         )
         return
 
-    # Remove entry from index.
-    db['checkpoints'] = [
-        cp for cp in db['checkpoints']
-        if not cp['id'] == checkpoint['id']
-    ]
+    # If checkpoint is local, remove entry from index. If it's remote, only
+    # mark as ``NOT_DOWNLOADED``.
+    if checkpoint['source'] == 'local':
+        db['checkpoints'] = [
+            cp for cp in db['checkpoints']
+            if not cp['id'] == checkpoint['id']
+        ]
+    else:
+        checkpoint['status'] = 'NOT_DOWNLOADED'
     save_checkpoint_db(db)
 
     # Delete tar file associated to checkpoint.
@@ -423,7 +414,57 @@ def refresh():
 @click.command(help='Download a remote checkpoint.')
 @click.argument('id_or_alias')
 def download(id_or_alias):
-    click.echo('Not implemented yet.')
+    db = read_checkpoint_db()
+    checkpoint = get_checkpoint(db, id_or_alias)
+    if not checkpoint:
+        click.echo(
+            "Checkpoint '{}' not found in index.".format(id_or_alias)
+        )
+        return
+
+    if checkpoint['source'] != 'remote':
+        # TODO: May occur when using an alias. See a way to handle it or make
+        # sure the user is notified what's happening correctly.
+        click.echo("Checkpoint is not remote.")
+        return
+
+    if checkpoint['status'] != 'NOT_DOWNLOADED':
+        click.echo("Checkpoint is already downloaded.")
+        return
+
+    # Create a temporary directory to download the tar into.
+    tempdir = tempfile.mkdtemp()
+    path = os.path.join(tempdir, '{}.tar'.format(checkpoint['id']))
+
+    # Start the actual tar file download.
+    # TODO: Some way of indicating progress.
+    click.echo(
+        "Downloading checkpoint '{}'... ".format(checkpoint['id']),
+        nl=False
+    )
+    response = requests.get(checkpoint['url'], stream=True)
+    with open(path, 'wb') as f:
+        shutil.copyfileobj(response.raw, f)
+    click.echo('done.')
+
+    # Import the checkpoint from the tar.
+    # TODO: Abstract into function to avoid repetition with `import_`.
+    # TODO: Also check for already-existing path.
+    click.echo("Importing checkpoint... ", nl=False)
+    output = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id'])
+    with tarfile.open(path) as f:
+        members = [m for m in f.getmembers() if m.name != 'metadata.json']
+        f.extractall(output, members)
+    click.echo("done.")
+
+    # Update the checkpoint status and persist database.
+    checkpoint['status'] = 'DOWNLOADED'
+    save_checkpoint_db(db)
+
+    # And finally make sure to delete the temp dir.
+    shutil.rmtree(tempdir)
+
+    click.echo("Checkpoint imported successfully.")
 
 
 @click.group(help='Groups of commands to manage checkpoints')
