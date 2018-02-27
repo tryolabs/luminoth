@@ -20,19 +20,12 @@ class PredictorNetwork(object):
     def __init__(self, config_files, checkpoint):
 
         if checkpoint:
-            # TODO: Move around.
-            from luminoth.tools.checkpoint import (
-                get_checkpoint, get_checkpoint_path, read_checkpoint_db,
-                LUMINOTH_PATH, CHECKPOINT_PATH
-            )
-            # TODO: Move to `checkpoint` module.
-            db = read_checkpoint_db()
-            checkpoint = get_checkpoint(db, checkpoint)
-            path = get_checkpoint_path(checkpoint['id'])
-            config = get_config(os.path.join(path, 'config.yml'))
-            # TODO: Do the replacement some other way.
-            config.dataset.dir = path
-            config.train.job_dir = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH)
+            # TODO: Move around. `PredictorNetwork` should receive config
+            # directly, not perform filesystem nor prompts to the user nor
+            # fail when not found.
+            # TODO: What if it's not found? (See above.)
+            from luminoth.tools.checkpoint import get_checkpoint_config
+            config = get_checkpoint_config(checkpoint)
         else:
             config = get_config(config_files)
 
