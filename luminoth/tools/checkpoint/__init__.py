@@ -97,7 +97,7 @@ def merge_index(local_index, remote_index):
 
 
 def get_checkpoint(db, id_or_alias):
-    """Returns checkpoint in `db` indicated by `id_or_alias`.
+    """Returns checkpoint entry in `db` indicated by `id_or_alias`.
 
     First tries to match an ID, then an alias. For the case of repeated
     aliases, will match first match local checkpoints and then remotes. In both
@@ -122,6 +122,58 @@ def get_checkpoint_path(checkpoint_id):
     return path
 
 
+def get_checkpoint_config(id_or_alias, prompt=True):
+    """Returns the checkpoint config object in order to load the model.
+
+    If `prompt` is ``True`` and the checkpoint is not present in the index,
+    prompt the user to refresh the index. If the checkpoint is present in the
+    index but is remote and not yet downloaded, prompt to download.
+    """
+    db = read_checkpoint_db()
+    checkpoint = get_checkpoint(db, id_or_alias)
+
+    if prompt and not checkpoint:
+        # Checkpoint not found in database. Prompt for refreshing the index and
+        # try again.
+        click.confirm(
+            'Checkpoint not found. Check remote repository?', abort=True
+        )
+        db = refresh_remote_index()
+        checkpoint = get_checkpoint(db, id_or_alias)
+        if not checkpoint:
+            # Still not found, abort.
+            click.echo(
+                "Checkpoint isn't available in remote repository either."
+            )
+            # TODO: Custom luminoth exceptions?
+            raise ValueError('Checkpoint not found.')
+    elif not checkpoint:
+        # No checkpoint but didn't prompt.
+        raise ValueError('Checkpoint not found.')
+
+    if prompt and checkpoint['status'] == 'NOT_DOWNLOADED':
+        # Checkpoint hasn't been downloaded yet. Prompt for downloading it
+        # before continuing.
+        click.confirm(
+            'Checkpoint not present locally. Want to download it?', abort=True
+        )
+        # TODO: Should be class methods, `db` and `checkpoint` are technically
+        # stale now.
+        download_remote_checkpoint(db, checkpoint)
+    elif checkpoint['status'] == 'NOT_DOWNLOADED':
+        # Not downloaded but didn't prompt.
+        raise ValueError('Checkpoint not downloaded.')
+
+    path = get_checkpoint_path(checkpoint['id'])
+    config = get_config(os.path.join(path, 'config.yml'))
+
+    # TODO: Is this the best way to fix the paths?
+    config.dataset.dir = path
+    config.train.job_dir = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH)
+
+    return config
+
+
 # TODO: Move handling of db file into another module, with specification.
 def read_checkpoint_db():
     """Reads the checkpoints database file from disk."""
@@ -143,6 +195,55 @@ def save_checkpoint_db(checkpoints):
         json.dump(checkpoints, f)
 
 
+def refresh_remote_index():
+    click.echo('Retrieving remote index... ', nl=False)
+    remote = fetch_remote_index()
+    click.echo('done.')
+
+    db = read_checkpoint_db()
+    db = merge_index(db, remote)
+
+    save_checkpoint_db(db)
+
+    return db
+
+
+def download_remote_checkpoint(db, checkpoint):
+    # Create a temporary directory to download the tar into.
+    tempdir = tempfile.mkdtemp()
+    path = os.path.join(tempdir, '{}.tar'.format(checkpoint['id']))
+
+    # Start the actual tar file download.
+    # TODO: Some way of indicating progress.
+    click.echo(
+        "Downloading checkpoint '{}'... ".format(checkpoint['id']),
+        nl=False
+    )
+    response = requests.get(checkpoint['url'], stream=True)
+    with open(path, 'wb') as f:
+        shutil.copyfileobj(response.raw, f)
+    click.echo('done.')
+
+    # Import the checkpoint from the tar.
+    # TODO: Abstract into function to avoid repetition with `import_`.
+    # TODO: Also check for already-existing path.
+    click.echo("Importing checkpoint... ", nl=False)
+    output = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id'])
+    with tarfile.open(path) as f:
+        members = [m for m in f.getmembers() if m.name != 'metadata.json']
+        f.extractall(output, members)
+    click.echo("done.")
+
+    # Update the checkpoint status and persist database.
+    checkpoint['status'] = 'DOWNLOADED'
+    save_checkpoint_db(db)
+
+    # And finally make sure to delete the temp dir.
+    shutil.rmtree(tempdir)
+
+    click.echo("Checkpoint imported successfully.")
+
+
 @click.command(help='List available checkpoints.')
 def list():
     db = read_checkpoint_db()
@@ -151,10 +252,10 @@ def list():
         click.echo('No checkpoints available.')
         return
 
-    template = '{:>12} | {:>7} | {:>10} | {:>40} | {:>6} | {:>14}'
+    template = '{:>12} | {:>10} | {:>15} | {:>15} | {:>6} | {:>14}'
 
     header = template.format(
-        'id', 'dataset', 'model', 'description', 'source', 'status'
+        'id', 'dataset', 'model', 'alias', 'source', 'status'
     )
     click.echo(header)
     click.echo('=' * len(header))
@@ -164,7 +265,7 @@ def list():
             checkpoint['id'],
             checkpoint['dataset']['name'],
             checkpoint['model']['name'],
-            checkpoint['description'],
+            checkpoint['alias'],
             checkpoint['source'],
             checkpoint['status'],
         )
@@ -303,7 +404,10 @@ def delete(id_or_alias):
             cp for cp in db['checkpoints']
             if not cp['id'] == checkpoint['id']
         ]
-    else:
+    else:  # Remote.
+        if checkpoint['status'] == 'NOT_DOWNLOADED':
+            click.echo("Checkpoint isn't downloaded. Nothing to delete.")
+            return
         checkpoint['status'] = 'NOT_DOWNLOADED'
     save_checkpoint_db(db)
 
@@ -415,14 +519,7 @@ def import_(path):
 
 @click.command(help='Refresh the remote checkpoint index.')
 def refresh():
-    click.echo('Retrieving remote index... ', nl=False)
-    remote = fetch_remote_index()
-    click.echo('done.')
-
-    db = read_checkpoint_db()
-    db = merge_index(db, remote)
-
-    save_checkpoint_db(db)
+    refresh_remote_index()
 
 
 @click.command(help='Download a remote checkpoint.')
@@ -446,39 +543,7 @@ def download(id_or_alias):
         click.echo("Checkpoint is already downloaded.")
         return
 
-    # Create a temporary directory to download the tar into.
-    tempdir = tempfile.mkdtemp()
-    path = os.path.join(tempdir, '{}.tar'.format(checkpoint['id']))
-
-    # Start the actual tar file download.
-    # TODO: Some way of indicating progress.
-    click.echo(
-        "Downloading checkpoint '{}'... ".format(checkpoint['id']),
-        nl=False
-    )
-    response = requests.get(checkpoint['url'], stream=True)
-    with open(path, 'wb') as f:
-        shutil.copyfileobj(response.raw, f)
-    click.echo('done.')
-
-    # Import the checkpoint from the tar.
-    # TODO: Abstract into function to avoid repetition with `import_`.
-    # TODO: Also check for already-existing path.
-    click.echo("Importing checkpoint... ", nl=False)
-    output = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id'])
-    with tarfile.open(path) as f:
-        members = [m for m in f.getmembers() if m.name != 'metadata.json']
-        f.extractall(output, members)
-    click.echo("done.")
-
-    # Update the checkpoint status and persist database.
-    checkpoint['status'] = 'DOWNLOADED'
-    save_checkpoint_db(db)
-
-    # And finally make sure to delete the temp dir.
-    shutil.rmtree(tempdir)
-
-    click.echo("Checkpoint imported successfully.")
+    download_remote_checkpoint(db, checkpoint)
 
 
 @click.group(help='Groups of commands to manage checkpoints')
