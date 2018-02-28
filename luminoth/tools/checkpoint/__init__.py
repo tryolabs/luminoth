@@ -86,7 +86,7 @@ def merge_index(local_index, remote_index):
             local['url'] = checkpoint['url']
         elif not local:
             # Checkpoint not found, it's an addition. Transform into our schema
-            # before appending to `to_add`..
+            # before appending to `to_add`.
             # TODO: Anything else? Need to formalize schema.
             checkpoint['source'] = 'remote'
             checkpoint['status'] = 'NOT_DOWNLOADED'
@@ -225,25 +225,36 @@ def refresh_remote_index():
 
 
 def download_remote_checkpoint(db, checkpoint):
+    # Check if output directory doesn't exist already to fail early.
+    output = get_checkpoint_path(checkpoint['id'])
+    if os.path.exists(output):
+        click.echo(
+            "Checkpoint directory '{}' for checkpoint_id '{}' already exists. "
+            "Try issuing a `lumi checkpoint delete` or delete the directory "
+            "manually.".format(output, checkpoint['id'])
+        )
+        return
+
     # Create a temporary directory to download the tar into.
     tempdir = tempfile.mkdtemp()
     path = os.path.join(tempdir, '{}.tar'.format(checkpoint['id']))
 
     # Start the actual tar file download.
-    # TODO: Some way of indicating progress.
-    click.echo(
-        "Downloading checkpoint '{}'... ".format(checkpoint['id']),
-        nl=False
-    )
     response = requests.get(checkpoint['url'], stream=True)
+    length = int(response.headers.get('Content-Length'))
+    chunk_size = 16 * 1024
+    progressbar = click.progressbar(
+        response.iter_content(chunk_size=chunk_size),
+        length=length / chunk_size, label='Downloading checkpoint...',
+    )
+
     with open(path, 'wb') as f:
-        shutil.copyfileobj(response.raw, f)
-    click.echo('done.')
+        with progressbar as content:
+            for chunk in content:
+                f.write(chunk)
 
     # Import the checkpoint from the tar.
-    # TODO: Also check for already-existing path.
     click.echo("Importing checkpoint... ", nl=False)
-    output = get_checkpoint_path(checkpoint['id'])
     with tarfile.open(path) as f:
         members = [m for m in f.getmembers() if m.name != 'metadata.json']
         f.extractall(output, members)
@@ -327,7 +338,6 @@ def create(config_files, override_params, alias):
         click.echo("Couldn't find checkpoint in '{}'.".format(run_dir))
         return
 
-    # TODO: Can we count on them being sorted and not do this?
     last_checkpoint = sorted([
         {'global_step': int(path.split('-')[-1]), 'file': path}
         for path in ckpt.all_model_checkpoint_paths
