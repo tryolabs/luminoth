@@ -217,6 +217,13 @@ def get_checkpoint_config(id_or_alias, prompt=True):
     return config
 
 
+def field_allowed(field):
+    # TODO: Schema definition.
+    return field in [
+        'alias', 'description', 'model.name', 'dataset.name',
+    ]
+
+
 # Network-related IO functions.
 
 def get_remote_index_url():
@@ -347,8 +354,6 @@ def info(id_or_alias):
 @click.option('--alias', help="Specify the checkpoint's alias.")
 def create(config_files, override_params, alias):
     click.echo('Creating checkpoint for given configuration...')
-    # TODO: Validate alias and the rest of the commands.
-
     # Get and build the configuration file for the model.
     config = get_config(config_files, override_params=override_params)
 
@@ -433,6 +438,52 @@ def create(config_files, override_params, alias):
     click.echo('Checkpoint {} created successfully.'.format(checkpoint_id))
 
 
+@click.command(help="Edit a checkpoint's metadata.")
+@click.argument('id_or_alias')
+@click.option(
+    'entries', '--entry', '-e', multiple=True,
+    help="Overwrite checkpoint's metadata field value"
+)
+def edit(id_or_alias, entries):
+    db = read_checkpoint_db()
+    checkpoint = get_checkpoint(db, id_or_alias)
+    if not checkpoint:
+        click.echo(
+            "Checkpoint '{}' not found in index.".format(id_or_alias)
+        )
+        return
+
+    # Parse the entries to modify.
+    values = [tuple(entry.split('=')) for entry in entries]
+
+    # Validate allowed field values to modify.
+    disallowed = [k for k, _ in values if not field_allowed(k)]
+    if disallowed:
+        click.echo("The following fields may not be modified: {}".format(
+            ', '.join(disallowed)
+        ))
+        return
+
+    # Make sure there are no repeated values.
+    unique = set([k for k, _ in values])
+    if len(values) - len(unique) > 0:
+        click.echo("Repeated fields. Each field may be passed exactly once.")
+        return
+
+    # Modify the actual values.
+    for field, value in values:
+        # Access the last dict (if nested) and modify it.
+        to_edit = checkpoint
+        bits = field.split('.')
+        for bit in bits[:-1]:
+            to_edit = to_edit[bit]
+        to_edit[bits[-1]] = value
+
+    save_checkpoint_db(db)
+
+    click.echo('Checkpoint edited successfully.')
+
+
 @click.command(help='Remove a checkpoint from the index and delete its files.')
 @click.argument('id_or_alias')
 def delete(id_or_alias):
@@ -492,7 +543,6 @@ def export(id_or_alias, output):
     with tarfile.open(tar_path, 'w') as f:
         # Add the config file. Dump the dict into a BytesIO, go to the
         # beginning of the file and pass it as a file to the tar.
-        # TODO: Python 2 compatibility.
         metadata_file = six.BytesIO()
         metadata_file.write(json.dumps(checkpoint).encode('utf-8'))
         metadata_file.seek(0)
@@ -500,6 +550,8 @@ def export(id_or_alias, output):
         tarinfo = tarfile.TarInfo(name='metadata.json')
         tarinfo.size = len(metadata_file.getvalue())
         f.addfile(tarinfo=tarinfo, fileobj=metadata_file)
+
+        metadata_file.close()
 
         # Add the files present in the checkpoint's directory.
         for filename in os.listdir(checkpoint_path):
@@ -527,7 +579,6 @@ def import_(path):
         return
 
     # Check if checkpoint isn't present already.
-    # TODO: Check for alias conflict too. Flag to overwrite?
     db = read_checkpoint_db()
     checkpoint = get_checkpoint(db, metadata['id'])
     if checkpoint:
@@ -576,9 +627,10 @@ def download(id_or_alias):
         return
 
     if checkpoint['source'] != 'remote':
-        # TODO: May occur when using an alias. See a way to handle it or make
-        # sure the user is notified what's happening correctly.
-        click.echo("Checkpoint is not remote.")
+        click.echo(
+            "Checkpoint is not remote. If you meant to download a remote "
+            "checkpoint and used an alias, try using the id directly."
+        )
         return
 
     if checkpoint['status'] != 'NOT_DOWNLOADED':
@@ -596,6 +648,7 @@ def checkpoint():
 checkpoint.add_command(create)
 checkpoint.add_command(delete)
 checkpoint.add_command(download)
+checkpoint.add_command(edit)
 checkpoint.add_command(export)
 checkpoint.add_command(import_, name='import')
 checkpoint.add_command(info)
