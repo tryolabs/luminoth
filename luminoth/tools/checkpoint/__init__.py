@@ -11,14 +11,16 @@ import uuid
 
 from datetime import datetime
 
+from luminoth import __version__ as lumi_version
 from luminoth.utils.config import get_config
 from luminoth.utils.homedir import get_luminoth_home
 
 
 CHECKPOINT_INDEX = 'checkpoints.json'
 CHECKPOINT_PATH = 'checkpoints'
-# TODO: Don't hard-code? Or put definitive one here.
-REMOTE_INDEX_URL = 'http://localhost:8080/index.json'
+REMOTE_INDEX_URL = (
+    'https://github.com/tryolabs/luminoth/releases/download/v0.0.3/models.json'
+)
 
 
 # Definition of path management functions.
@@ -80,16 +82,12 @@ def merge_index(local_index, remote_index):
         seen_ids.add(checkpoint['id'])
         local = remotes_in_local.get(checkpoint['id'])
         if local:
-            # Checkpoint is in local index. Overwrite the overwritable fields
-            # (may remain unchagned).
-            # TODO: More overwritable fields?
-            local['name'] = checkpoint['name']
-            local['description'] = checkpoint['description']
-            local['url'] = checkpoint['url']
+            # Checkpoint is in local index. Overwrite the all the fields.
+            local.update(**checkpoint)
         elif not local:
             # Checkpoint not found, it's an addition. Transform into our schema
-            # before appending to `to_add`.
-            # TODO: Anything else? Need to formalize schema.
+            # before appending to `to_add`. (The remote index schema is exactly
+            # the same except for the ``source`` and ``status`` keys.)
             checkpoint['source'] = 'remote'
             checkpoint['status'] = 'NOT_DOWNLOADED'
             to_add.append(checkpoint)
@@ -218,10 +216,44 @@ def get_checkpoint_config(id_or_alias, prompt=True):
 
 
 def field_allowed(field):
-    # TODO: Schema definition.
     return field in [
-        'alias', 'description', 'model.name', 'dataset.name',
+        'name', 'description', 'alias', 'dataset.name', 'dataset.num_classes',
     ]
+
+
+def parse_entries(entries, editing=False):
+    """Parses and validates `entries`."""
+    # Parse the entries (list of `<field>=<value>`).
+    values = [tuple(entry.split('=')) for entry in entries]
+
+    # Validate allowed field values to modify.
+    disallowed = [k for k, _ in values if not field_allowed(k)]
+    if disallowed:
+        click.echo("The following fields may not be set: {}".format(
+            ', '.join(disallowed)
+        ))
+        return
+
+    # Make sure there are no repeated values.
+    unique = set([k for k, _ in values])
+    if len(values) - len(unique) > 0:
+        click.echo("Repeated fields. Each field may be passed exactly once.")
+        return
+
+    return dict(values)
+
+
+def apply_entries(checkpoint, entries):
+    """Recursively modifies `checkpoint` with `entries` values."""
+    for field, value in entries.items():
+        # Access the last dict (if nested) and modify it.
+        to_edit = checkpoint
+        bits = field.split('.')
+        for bit in bits[:-1]:
+            to_edit = to_edit[bit]
+        to_edit[bits[-1]] = value
+
+    return checkpoint
 
 
 # Network-related IO functions.
@@ -308,24 +340,27 @@ def list():
         click.echo('No checkpoints available.')
         return
 
-    template = '{:>12} | {:>10} | {:>15} | {:>15} | {:>6} | {:>14}'
+    template = '| {:>12} | {:>20} | {:>15} | {:>15} | {:>10} | {:>14} |'
 
     header = template.format(
-        'id', 'dataset', 'model', 'alias', 'source', 'status'
+        'id', 'name', 'dataset', 'alias', 'source', 'status'
     )
+    click.echo('=' * len(header))
     click.echo(header)
     click.echo('=' * len(header))
 
     for checkpoint in db['checkpoints']:
         line = template.format(
             checkpoint['id'],
+            checkpoint['name'],
             checkpoint['dataset']['name'],
-            checkpoint['model']['name'],
             checkpoint['alias'],
             checkpoint['source'],
             checkpoint['status'],
         )
         click.echo(line)
+
+    click.echo('=' * len(header))
 
 
 @click.command(help='Display detailed information on checkpoint.')
@@ -340,9 +375,39 @@ def info(id_or_alias):
         )
         return
 
-    click.echo('{} - {}'.format(checkpoint['id'], checkpoint['name']))
-    click.echo('Description: {}'.format(checkpoint['description']))
-    # TODO: Rest of the info.
+    if checkpoint['alias']:
+        click.echo('{} ({}, {})'.format(
+            checkpoint['name'], checkpoint['id'], checkpoint['alias']
+        ))
+    else:
+        click.echo('{} ({})'.format(checkpoint['name'], checkpoint['id']))
+
+    if checkpoint['description']:
+        click.echo(checkpoint['description'])
+
+    click.echo()
+
+    click.echo('Model used: {}'.format(checkpoint['model']))
+    click.echo('Dataset information')
+    click.echo('    Name: {}'.format(checkpoint['dataset']['name']))
+    click.echo('    Number of classes: {}'.format(
+        checkpoint['dataset']['num_classes']
+    ))
+
+    click.echo()
+
+    click.echo('Creation date: {}'.format(checkpoint['created_date']))
+    click.echo('Luminoth version: {}'.format(checkpoint['luminoth_version']))
+
+    click.echo()
+
+    if checkpoint['source'] == 'remote':
+        click.echo('Source: {} ({})'.format(
+            checkpoint['source'], checkpoint['status']
+        ))
+        click.echo('URL: {}'.format(checkpoint['url']))
+    else:
+        click.echo('Source: {}'.format(checkpoint['source']))
 
 
 @click.command(help='Create a checkpoint from a configuration file.')
@@ -351,8 +416,16 @@ def info(id_or_alias):
     'override_params', '--override', '-o', multiple=True,
     help='Override model config params.'
 )
-@click.option('--alias', help="Specify the checkpoint's alias.")
-def create(config_files, override_params, alias):
+@click.option(
+    'entries', '--entry', '-e', multiple=True,
+    help="Specify checkpoint's metadata field value."
+)
+def create(config_files, override_params, entries):
+    # Parse the entries passed as options.
+    entries = parse_entries(entries)
+    if entries is None:
+        return
+
     click.echo('Creating checkpoint for given configuration...')
     # Get and build the configuration file for the model.
     config = get_config(config_files, override_params=override_params)
@@ -416,20 +489,34 @@ def create(config_files, override_params, alias):
     if classes_path:
         shutil.copy2(classes_path, path)
 
+    # Get the number of classes, if available.
+    num_classes = None
+    if classes_path:
+        with open(classes_path) as f:
+            num_classes = len(json.load(f))
+
     # Store the new checkpoint into the checkpoint index.
-    # TODO: Collect metadata correctly.
     metadata = {
         'id': checkpoint_id,
+        'name': entries.get('name', ''),
+        'description': entries.get('description', ''),
+        'alias': entries.get('alias', ''),
+
+        'model': config.model.type,
+        'dataset': {
+            'name': entries.get('dataset.name', ''),
+            'num_classes': (
+                num_classes or entries.get('dataset.num_classes', None)
+            ),
+        },
+
+        'luminoth_version': lumi_version,
+        'created_date': datetime.utcnow().isoformat(),
+
         'status': 'LOCAL',
         'source': 'local',
-        'description': 'Description',
-        'dataset': {'name': 'COCO'},
-        'model': {'name': config.model.type},
-        'created_date': datetime.utcnow().isoformat(),
+        'url': None,  # Only for remotes.
     }
-
-    if alias:
-        metadata['alias'] = alias
 
     db = read_checkpoint_db()
     db['checkpoints'].append(metadata)
@@ -442,7 +529,7 @@ def create(config_files, override_params, alias):
 @click.argument('id_or_alias')
 @click.option(
     'entries', '--entry', '-e', multiple=True,
-    help="Overwrite checkpoint's metadata field value"
+    help="Overwrite checkpoint's metadata field value."
 )
 def edit(id_or_alias, entries):
     db = read_checkpoint_db()
@@ -453,31 +540,12 @@ def edit(id_or_alias, entries):
         )
         return
 
-    # Parse the entries to modify.
-    values = [tuple(entry.split('=')) for entry in entries]
-
-    # Validate allowed field values to modify.
-    disallowed = [k for k, _ in values if not field_allowed(k)]
-    if disallowed:
-        click.echo("The following fields may not be modified: {}".format(
-            ', '.join(disallowed)
-        ))
+    # Parse the entries to modify and apply them.
+    entries = parse_entries(entries, editing=True)
+    if entries is None:
         return
 
-    # Make sure there are no repeated values.
-    unique = set([k for k, _ in values])
-    if len(values) - len(unique) > 0:
-        click.echo("Repeated fields. Each field may be passed exactly once.")
-        return
-
-    # Modify the actual values.
-    for field, value in values:
-        # Access the last dict (if nested) and modify it.
-        to_edit = checkpoint
-        bits = field.split('.')
-        for bit in bits[:-1]:
-            to_edit = to_edit[bit]
-        to_edit[bits[-1]] = value
+    apply_entries(checkpoint, entries)
 
     save_checkpoint_db(db)
 
