@@ -9,6 +9,8 @@ import tempfile
 import tensorflow as tf
 import uuid
 
+from datetime import datetime
+
 from luminoth.utils.config import get_config
 from luminoth.utils.homedir import get_luminoth_home
 
@@ -133,18 +135,37 @@ def get_checkpoint(db, id_or_alias):
     aliases, will match first match local checkpoints and then remotes. In both
     cases, matching will be newest first.
     """
-    # TODO: Warn when there's a repeated alias.
-    # TODO: Once we track added date, order by that.
-    locals = [c for c in db['checkpoints'] if c['source'] == 'local']
-    remotes = [c for c in db['checkpoints'] if c['source'] == 'remote']
+    # Go through the checkpoints ordered by creation date. There sholdn't be
+    # repeated aliases, but if there are, prioritize the newest one.
+    locals = sorted(
+        [c for c in db['checkpoints'] if c['source'] == 'local'],
+        key=lambda c: c['created_date'], reverse=True
+    )
+    remotes = sorted(
+        [c for c in db['checkpoints'] if c['source'] == 'remote'],
+        key=lambda c: c['created_date'], reverse=True
+    )
 
+    selected = []
     for cp in locals:
         if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
-            return cp
+            selected.append(cp)
 
     for cp in remotes:
         if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
-            return cp
+            selected.append(cp)
+
+    if len(selected) < 1:
+        return None
+
+    if len(selected) > 1:
+        click.echo(
+            "Multiple checkpoints found for '{}' ({}). Returning '{}'.".format(
+                id_or_alias, len(selected), selected[0]['id']
+            )
+        )
+
+    return selected[0]
 
 
 def get_checkpoint_config(id_or_alias, prompt=True):
@@ -399,6 +420,7 @@ def create(config_files, override_params, alias):
         'description': 'Description',
         'dataset': {'name': 'COCO'},
         'model': {'name': config.model.type},
+        'created_date': datetime.utcnow().isoformat(),
     }
 
     if alias:
