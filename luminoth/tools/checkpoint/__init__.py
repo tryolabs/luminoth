@@ -10,20 +10,50 @@ import tensorflow as tf
 import uuid
 
 from luminoth.utils.config import get_config
+from luminoth.utils.homedir import get_luminoth_home
 
 
-# TODO: Create directories if needed.
-LUMINOTH_PATH = os.path.expanduser('~/.luminoth')
 CHECKPOINT_INDEX = 'checkpoints.json'
 CHECKPOINT_PATH = 'checkpoints'
+# TODO: Don't hard-code? Or put definitive one here.
+REMOTE_INDEX_URL = 'http://localhost:8080/index.json'
 
-INDEX_URL = 'http://localhost:8080/index.json'
+
+# Definition of path management functions.
+
+def get_checkpoints_directory():
+    """Returns checkpoint directory within Luminoth's homedir."""
+    # Checkpoint directory, `$LUMI_HOME/checkpoints/`. Create if not present.
+    path = os.path.join(get_luminoth_home(), CHECKPOINT_PATH)
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    return path
 
 
-def fetch_remote_index():
-    # TODO: Appropriate retries and error handling.
-    index = requests.get(INDEX_URL).json()
+def get_checkpoint_path(checkpoint_id):
+    """Returns checkpoint's directory."""
+    return os.path.join(get_checkpoints_directory(), checkpoint_id)
+
+
+# Index-related functions: access and mutation.
+
+def read_checkpoint_db():
+    """Reads the checkpoints database file from disk."""
+    path = os.path.join(get_checkpoints_directory(), CHECKPOINT_INDEX)
+    if not os.path.exists(path):
+        return {'checkpoints': []}
+
+    with open(path) as f:
+        index = json.load(f)
+
     return index
+
+
+def save_checkpoint_db(checkpoints):
+    """Overwrites the database file in disk with `checkpoints`."""
+    path = os.path.join(get_checkpoints_directory(), CHECKPOINT_INDEX)
+    with open(path, 'w') as f:
+        json.dump(checkpoints, f)
 
 
 def merge_index(local_index, remote_index):
@@ -117,11 +147,6 @@ def get_checkpoint(db, id_or_alias):
             return cp
 
 
-def get_checkpoint_path(checkpoint_id):
-    path = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint_id)
-    return path
-
-
 def get_checkpoint_config(id_or_alias, prompt=True):
     """Returns the checkpoint config object in order to load the model.
 
@@ -145,7 +170,6 @@ def get_checkpoint_config(id_or_alias, prompt=True):
             click.echo(
                 "Checkpoint isn't available in remote repository either."
             )
-            # TODO: Custom luminoth exceptions?
             raise ValueError('Checkpoint not found.')
     elif not checkpoint:
         # No checkpoint but didn't prompt.
@@ -157,8 +181,6 @@ def get_checkpoint_config(id_or_alias, prompt=True):
         click.confirm(
             'Checkpoint not present locally. Want to download it?', abort=True
         )
-        # TODO: Should be class methods, `db` and `checkpoint` are technically
-        # stale now.
         download_remote_checkpoint(db, checkpoint)
     elif checkpoint['status'] == 'NOT_DOWNLOADED':
         # Not downloaded but didn't prompt.
@@ -167,32 +189,26 @@ def get_checkpoint_config(id_or_alias, prompt=True):
     path = get_checkpoint_path(checkpoint['id'])
     config = get_config(os.path.join(path, 'config.yml'))
 
-    # TODO: Is this the best way to fix the paths?
+    # Config paths should point to the path the checkpoint files are stored.
     config.dataset.dir = path
-    config.train.job_dir = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH)
+    config.train.job_dir = get_checkpoints_directory()
 
     return config
 
 
-# TODO: Move handling of db file into another module, with specification.
-def read_checkpoint_db():
-    """Reads the checkpoints database file from disk."""
-    path = os.path.join(LUMINOTH_PATH, CHECKPOINT_INDEX)
-    if not os.path.exists(path):
-        return {'checkpoints': []}
+# Network-related IO functions.
 
-    with open(path) as f:
-        index = json.load(f)
+def get_remote_index_url():
+    url = REMOTE_INDEX_URL
+    if 'LUMI_REMOTE_URL' in os.environ:
+        url = os.environ['LUMI_REMOTE_URL']
+    return url
 
+
+def fetch_remote_index():
+    url = get_remote_index_url()
+    index = requests.get(url).json()
     return index
-
-
-def save_checkpoint_db(checkpoints):
-    """Overwrites the database file in disk with `checkpoints`."""
-    # TODO: Merge instead? Careful with deletions.
-    path = os.path.join(LUMINOTH_PATH, CHECKPOINT_INDEX)
-    with open(path, 'w') as f:
-        json.dump(checkpoints, f)
 
 
 def refresh_remote_index():
@@ -225,10 +241,9 @@ def download_remote_checkpoint(db, checkpoint):
     click.echo('done.')
 
     # Import the checkpoint from the tar.
-    # TODO: Abstract into function to avoid repetition with `import_`.
     # TODO: Also check for already-existing path.
     click.echo("Importing checkpoint... ", nl=False)
-    output = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id'])
+    output = get_checkpoint_path(checkpoint['id'])
     with tarfile.open(path) as f:
         members = [m for m in f.getmembers() if m.name != 'metadata.json']
         f.extractall(output, members)
@@ -243,6 +258,8 @@ def download_remote_checkpoint(db, checkpoint):
 
     click.echo("Checkpoint imported successfully.")
 
+
+# Actual command definition.
 
 @click.command(help='List available checkpoints.')
 def list():
@@ -333,14 +350,12 @@ def create(config_files, override_params, alias):
 
     # Update the directory paths for the configuration file. Since it's going
     # to be packed into a single tar file, we set them to the current directoy.
-    # TODO: Just empty them and hard-code when loading? Other way of doing?
     config.dataset.dir = '.'
     config.train.job_dir = '.'
     config.train.run_name = checkpoint_id
 
     # Create the directory that will contain the model.
-    # TODO: Abstract into function for handling filesystem-related stuff.
-    path = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint_id)
+    path = get_checkpoint_path(checkpoint_id)
     os.makedirs(path, exist_ok=True)
 
     with open(os.path.join(path, 'config.yml'), 'w') as f:
@@ -412,8 +427,7 @@ def delete(id_or_alias):
     save_checkpoint_db(db)
 
     # Delete tar file associated to checkpoint.
-    # TODO: Don't calculate this everytime, centralized way to access.
-    path = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id'])
+    path = get_checkpoint_path(checkpoint['id'])
     try:
         shutil.rmtree(path)
     except OSError:
@@ -442,10 +456,7 @@ def export(id_or_alias, output):
         os.path.abspath(output),
         '{}.tar'.format(checkpoint['id'])
     )
-    # TODO: Same as above, no hard-coding.
-    checkpoint_path = os.path.join(
-        LUMINOTH_PATH, CHECKPOINT_PATH, checkpoint['id']
-    )
+    checkpoint_path = get_checkpoint_path(checkpoint['id'])
     with tarfile.open(tar_path, 'w') as f:
         # Add the config file. Dump the dict into a BytesIO, go to the
         # beginning of the file and pass it as a file to the tar.
@@ -494,8 +505,7 @@ def import_(path):
         return
 
     # Check if the output directory doesn't exist already.
-    # TODO: Path management.
-    output_path = os.path.join(LUMINOTH_PATH, CHECKPOINT_PATH, metadata['id'])
+    output_path = get_checkpoint_path(metadata['id'])
     if os.path.exists(output_path):
         click.echo(
             "Checkpoint directory '{}' for checkpoint_id '{}' already exists. "
