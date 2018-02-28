@@ -228,7 +228,7 @@ def get_checkpoints(run_dir, from_global_step=None, last_only=False):
     if not ckpt or not ckpt.all_model_checkpoint_paths:
         raise ValueError('Could not find checkpoint in {}.'.format(run_dir))
 
-    # TODO: Any other way to get the global_step?
+    # TODO: Any other way to get the global_step? (Same as in `checkpoints`.)
     checkpoints = sorted([
         {'global_step': int(path.split('-')[-1]), 'file': path}
         for path in ckpt.all_model_checkpoint_paths
