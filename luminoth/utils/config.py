@@ -223,3 +223,10 @@ def get_model_config(base_config, custom_config, override_params):
 
     # Delete meta-keys before returning.
     return cleanup_config(config)
+
+
+def override_config_params(config, params):
+    """Overrides `config` with `params` and returns it."""
+    override_config = EasyDict(parse_override(params))
+    config = merge_into(override_config, config, overwrite=True)
+    return config

@@ -7,6 +7,8 @@ import skvideo.io
 import tensorflow as tf
 
 from PIL import Image, ImageDraw
+from luminoth.tools.checkpoint import get_checkpoint_config
+from luminoth.utils.config import get_config, override_config_params
 from luminoth.utils.predicting import PredictorNetwork
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
@@ -25,13 +27,14 @@ def get_filetype(filename):
 @click.argument('path-or-dir')
 @click.option('config_files', '--config', '-c', multiple=True, help='Config to use.')  # noqa
 @click.option('--checkpoint', help='Checkpoint to use.')
+@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--output-dir', help='Where to write output')
 @click.option('--save/--no-save', default=False, help='Save the image with the prediction of the model')  # noqa
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
 @click.option('--ignore-classes', default=None, multiple=True, help='Classes to ignore when predicting')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def predict(path_or_dir, config_files, checkpoint, output_dir, save, min_prob,
-            ignore_classes, debug):
+def predict(path_or_dir, config_files, checkpoint, override_params, output_dir,
+            save, min_prob, ignore_classes, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
@@ -60,10 +63,16 @@ def predict(path_or_dir, config_files, checkpoint, output_dir, save, min_prob,
         tf.logging.error(no_files_message.format(IMAGE_FORMATS, VIDEO_FORMATS))
         exit()
 
-    # Initialize model
-    # TODO: Resolve config before. Validate config_files and checkpoint. Load
-    # checkpoint information (separate functions from tool).
-    network = PredictorNetwork(config_files, checkpoint)
+    # Resolve the config to use and initialize the mdoel.
+    if checkpoint:
+        config = get_checkpoint_config(checkpoint)
+    else:
+        config = get_config(config_files)
+
+    if override_params:
+        config = override_config_params(config, override_params)
+
+    network = PredictorNetwork(config)
 
     # Create output_dir if it doesn't exist
     if output_dir:

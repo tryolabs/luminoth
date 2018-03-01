@@ -6,7 +6,6 @@ import time
 
 from luminoth.models import get_model
 from luminoth.datasets import get_dataset
-from luminoth.utils.config import get_config
 
 
 class PredictorNetwork(object):
@@ -17,17 +16,7 @@ class PredictorNetwork(object):
     Returns a dictionary with the objects, their labels and probabilities,
     the inference time and the scale factor."""
 
-    def __init__(self, config_files, checkpoint):
-
-        if checkpoint:
-            # TODO: Move around. `PredictorNetwork` should receive config
-            # directly, not perform filesystem nor prompts to the user nor
-            # fail when not found.
-            # TODO: What if it's not found? (See above.)
-            from luminoth.tools.checkpoint import get_checkpoint_config
-            config = get_checkpoint_config(checkpoint)
-        else:
-            config = get_config(config_files)
+    def __init__(self, config):
 
         if config.dataset.dir:
             # Gets the names of the classes
