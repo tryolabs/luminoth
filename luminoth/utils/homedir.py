@@ -1,5 +1,6 @@
 """Luminoth home (~/.luminoth) management utilities."""
 import os
+import tensorflow as tf
 
 
 DEFAULT_LUMINOTH_HOME = os.path.expanduser('~/.luminoth')
@@ -15,6 +16,6 @@ def get_luminoth_home(create_if_missing=True):
 
     # Create the directory if it doesn't exist.
     if create_if_missing and not os.path.exists(path):
-        os.makedirs(path, exist_ok=True)
+        tf.gfile.MakeDirs(path)
 
     return path

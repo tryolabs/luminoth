@@ -30,7 +30,7 @@ def get_checkpoints_directory():
     # Checkpoint directory, `$LUMI_HOME/checkpoints/`. Create if not present.
     path = os.path.join(get_luminoth_home(), CHECKPOINT_PATH)
     if not os.path.exists(path):
-        os.makedirs(path, exist_ok=True)
+        tf.gfile.MakeDirs(path)
     return path
 
 
@@ -465,7 +465,7 @@ def create(config_files, override_params, entries):
 
     # Create the directory that will contain the model.
     path = get_checkpoint_path(checkpoint_id)
-    os.makedirs(path, exist_ok=True)
+    tf.gfile.MakeDirs(path)
 
     with open(os.path.join(path, 'config.yml'), 'w') as f:
         json.dump(config, f)
