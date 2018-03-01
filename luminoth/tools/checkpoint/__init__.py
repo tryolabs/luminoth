@@ -604,7 +604,7 @@ def export(id_or_alias, output):
 
     # Create the tar that will contain the checkpoint.
     tar_path = os.path.join(
-        os.path.abspath(output),
+        os.path.abspath(os.path.expanduser(output)),
         '{}.tar'.format(checkpoint['id'])
     )
     checkpoint_path = get_checkpoint_path(checkpoint['id'])
@@ -633,6 +633,7 @@ def export(id_or_alias, output):
 @click.argument('path')
 def import_(path):
     # Load the checkpoint metadata first.
+    path = os.path.expanduser(path)
     try:
         with tarfile.open(path) as f:
             metadata = json.load(f.extractfile('metadata.json'))
