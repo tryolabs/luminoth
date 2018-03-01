@@ -11,12 +11,12 @@ train:
   # after each Session.run
   tf_debug: False
   # Run name is used for better checkpoint and log hierarchy
-  run_name: ssd_1
+  run_name: ssd
   # Disables logging and saving checkpoints
   no_log: False
   # Displays debugging images with results every N steps. Debug mode must be
   # enabled
-  display_every_steps: 500
+  display_every_steps: 5000
   # Display debugging images every N seconds.
   display_every_secs:
   # Shuffle the dataset. It should only be disabled when trying to reproduce
@@ -35,6 +35,8 @@ train:
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
+  # Clip gradients by norm, making sure the maximum value is 10.
+  clip_by_norm: True
   # Learning rate config.
   learning_rate:
     # Because we're using kwargs, we want the learning_rate dict to be replaced
@@ -68,7 +70,7 @@ eval:
 dataset:
   type: tfrecord
   # From which directory to read the dataset
-  dir: datasets/voc/tf
+  dir: /data/datasets/pascal-2007-2012/
   # Which split of tfrecords to look for
   split: train
   image_preprocessing:
@@ -78,6 +80,25 @@ dataset:
 
   # Data augmentation techniques
   data_augmentation:
+    - flip:
+        left_right: True
+        up_down: False
+        prob: 0.5
+    - patch:
+        min_height: 30
+        min_width: 30
+        prob: 0.5
+    - distortion:
+        brightness:
+          max_delta: 0.2
+        hue:
+          max_delta: 0.2
+        saturation:
+          lower: 0.5
+          upper: 1.5
+        prob: 0.5
+    - expand:
+        prob: 0.5
 
 model:
   type: ssd
