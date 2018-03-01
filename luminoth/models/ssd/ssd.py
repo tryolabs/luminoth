@@ -135,11 +135,14 @@ class SSD(snt.AbstractModule):
             clipped_bboxes = clip_boxes(scaled_bboxes, self.image_shape)
             all_anchors_list.append(clipped_bboxes)
         all_anchors = np.concatenate(all_anchors_list, axis=0)
-        # They were using float64, is all this precision necesary?
+        # TODO: They were using float64, is all this precision necesary?
         all_anchors = tf.convert_to_tensor(all_anchors, dtype=tf.float64)
 
+        # We'll return this dict after we fill it with predictions
         prediction_dict = {}
-        if gt_boxes is not None:
+
+        # Generate targets for training
+        if is_training and gt_boxes is not None:
             # Generate targets
             target_creator = SSDTarget(self._num_classes, all_anchors.shape[0],
                                        self._config.model.target)
@@ -152,22 +155,21 @@ class SSD(snt.AbstractModule):
             # during training due to hard negative mining.
             # We use class_targets to know which ones to ignore (they
             # are marked as -1 if they are to be ignored)
-            if is_training:
-                with tf.name_scope('prepare_batch'):
-                    predictions_filter = tf.greater_equal(class_targets, 0)
+            with tf.name_scope('prepare_batch'):
+                predictions_filter = tf.greater_equal(class_targets, 0)
 
-                    target_anchors = tf.boolean_mask(
-                        all_anchors, predictions_filter)
-                    bbox_offsets_targets = tf.boolean_mask(
-                        bbox_offsets_targets, predictions_filter)
-                    class_targets = tf.boolean_mask(
-                        class_targets, predictions_filter)
-                    class_scores = tf.boolean_mask(
-                        class_scores, predictions_filter)
-                    class_probabilities = tf.boolean_mask(
-                        class_probabilities, predictions_filter)
-                    bbox_offsets = tf.boolean_mask(
-                        bbox_offsets, predictions_filter)
+                target_anchors = tf.boolean_mask(
+                    all_anchors, predictions_filter)
+                bbox_offsets_targets = tf.boolean_mask(
+                    bbox_offsets_targets, predictions_filter)
+                class_targets = tf.boolean_mask(
+                    class_targets, predictions_filter)
+                class_scores = tf.boolean_mask(
+                    class_scores, predictions_filter)
+                class_probabilities = tf.boolean_mask(
+                    class_probabilities, predictions_filter)
+                bbox_offsets = tf.boolean_mask(
+                    bbox_offsets, predictions_filter)
 
             prediction_dict['target'] = {
                 'cls': class_targets,
@@ -176,28 +178,32 @@ class SSD(snt.AbstractModule):
             }
 
         # Get the proposals and save the result
-        proposals_creator = SSDProposal(target_anchors.shape[0],
-                                        self._num_classes,
+        proposals_creator = SSDProposal(self._num_classes,
                                         self._config.model.proposals,
                                         debug=self._debug)
-        proposal_prediction = proposals_creator(
-            class_probabilities, bbox_offsets, target_anchors,
-            tf.cast(tf.shape(image)[1:3], tf.float32)
-        )
+        if is_training and self._debug:
+            # Generate proposals for visualization during training with debug
+            proposals = proposals_creator(
+                class_probabilities, bbox_offsets, target_anchors,
+                tf.cast(tf.shape(image)[1:3], tf.float32)
+            )
+            prediction_dict['classification_prediction'] = proposals
+        if not is_training:
+            # Generate proposals for prediction
+            proposals = proposals_creator(
+                class_probabilities, bbox_offsets, all_anchors,
+                tf.cast(tf.shape(image)[1:3], tf.float32)
+            )
+            prediction_dict['classification_prediction'] = proposals 
 
-        prediction_dict.update({
-            'proposal_prediction': proposal_prediction,  # Is this used?
-            'classification_prediction': proposal_prediction,  # Is this used?
-            'cls_pred': class_scores,
-            'loc_pred': bbox_offsets
-        })
-
-        # TODO add variable summaries
+        prediction_dict['cls_pred'] = class_scores
+        prediction_dict['loc_pred'] = bbox_offsets
 
         if self._debug:
             prediction_dict['all_anchors'] = all_anchors
             prediction_dict['cls_prob'] = class_probabilities
-            prediction_dict['gt_boxes'] = gt_boxes
+            if is_training:
+                prediction_dict['gt_boxes'] = gt_boxes
 
         return prediction_dict
 

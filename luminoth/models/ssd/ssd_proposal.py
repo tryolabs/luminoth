@@ -23,10 +23,9 @@ class SSDProposal(snt.AbstractModule):
     and in general. These values are easily modifiable in the configuration
     files.
     """
-    def __init__(self, num_anchors, num_classes, config, debug=False,
+    def __init__(self, num_classes, config, debug=False,
                  name='proposal_layer'):
         super(SSDProposal, self).__init__(name=name)
-        self._num_anchors = num_anchors
         self._num_classes = num_classes
 
         # Threshold to use for NMS.
