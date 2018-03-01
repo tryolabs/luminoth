@@ -3,14 +3,15 @@ import tensorflow as tf
 from luminoth.datasets.base_dataset import BaseDataset
 from luminoth.utils.image import (
     resize_image_fixed, resize_image, flip_image, random_patch, random_resize,
-    random_distortion
+    random_distortion, expand
 )
 
 DATA_AUGMENTATION_STRATEGIES = {
     'flip': flip_image,
     'patch': random_patch,
     'resize': random_resize,
-    'distortion': random_distortion
+    'distortion': random_distortion,
+    'expand': expand
 }
 
 
@@ -71,8 +72,8 @@ class ObjectDetectionDataset(BaseDataset):
         Transformations are applied according to the config values.
         """
         # Resize images (if needed)
-        image, bboxes, scale_factor = self._resize_image(image, bboxes)
         image, bboxes, applied_augmentations = self._augment(image, bboxes)
+        image, bboxes, scale_factor = self._resize_image(image, bboxes)
 
         return image, bboxes, {
             'scale_factor': scale_factor,

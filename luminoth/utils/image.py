@@ -563,3 +563,59 @@ def random_distortion(image, bboxes=None, brightness=None, contrast=None,
             'bboxes': bboxes,
         }
     return return_dict
+
+
+def expand(image, bboxes=None, fill=0, min_ratio=1, max_ratio=4, seed=None):
+    """
+    Increases the image size by adding large padding around the image
+
+    Acts as a zoom out of the image, and when the image is later resized to
+    the input size the network expects, it provides smaller size object
+    examples.
+
+    Args:
+        image: Tensor with image of shape (H, W, 3).
+        bboxes: Optional Tensor with bounding boxes with shape (num_bboxes, 5).
+            where we have (x_min, y_min, x_max, y_max, label) for each one.
+
+    Returns:
+        Dictionary containing:
+            image: Tensor with zoomed out image.
+            bboxes: Tensor with zoomed out bounding boxes with shape
+                (num_bboxes, 5).
+    """
+    # image = tf.Print(image, [image], summarize=500, message='lol')
+    image_shape = tf.to_float(tf.shape(image))
+    height = image_shape[0]
+    width = image_shape[1]
+    size_multiplier = tf.random_uniform([1], minval=min_ratio,
+                                        maxval=max_ratio, seed=seed)
+
+    # Expand image
+    new_height = height * size_multiplier
+    new_width = width * size_multiplier
+    pad_left = tf.random_uniform([1], minval=0,
+                                 maxval=new_width-width, seed=seed)
+    pad_right = new_width - width - pad_left
+    pad_top = tf.random_uniform([1], minval=0,
+                                maxval=new_height-height, seed=seed)
+    pad_bottom = new_height - height - pad_top
+    paddings = tf.stack([tf.concat([pad_top, pad_bottom], axis=0),
+                         tf.concat([pad_left, pad_right], axis=0),
+                         tf.constant([0., 0.])])
+    expanded_image = tf.pad(image, tf.to_int32(paddings), constant_values=fill)
+
+    # Adjust bboxes
+    # bboxes = tf.Print(bboxes, [bboxes], summarize=300)
+    shift_bboxes_by = tf.concat([pad_left, pad_top, pad_left, pad_top], axis=0)
+    bbox_labels = tf.reshape(bboxes[:, 4], (-1, 1))
+    bbox_adjusted_coords = bboxes[:, :4] + tf.to_int32(shift_bboxes_by)
+    bbox_adjusted = tf.concat([bbox_adjusted_coords, bbox_labels], axis=1)
+
+    # TODO: use mean instead of 0 for fill
+
+    # Return results
+    return_dict = {'image': expanded_image}
+    if bboxes is not None:
+        return_dict['bboxes'] = bbox_adjusted
+    return return_dict
