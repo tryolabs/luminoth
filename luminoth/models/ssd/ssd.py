@@ -54,9 +54,10 @@ class SSD(snt.AbstractModule):
         self._losses_collections = ['ssd_losses']
 
         # We want the pretrained model to be outside the ssd name scope.
-        self.feature_extractor = SSDFeatureExtractor(
-            config.model.base_network, parent_name=self.module_name
-        )
+        with self._enter_variable_scope():
+            self.feature_extractor = SSDFeatureExtractor(
+                config.model.base_network, parent_name=self.module_name
+            )
 
     def _build(self, image, gt_boxes=None, is_training=True):
         """
