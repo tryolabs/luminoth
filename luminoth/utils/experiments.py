@@ -4,8 +4,9 @@ import os.path
 import subprocess
 import tensorflow as tf
 
+from luminoth.utils.homedir import get_luminoth_home
 
-DEFAULT_BASE_PATH = os.path.expanduser('~/.luminoth')
+
 DEFAULT_FILENAME = 'runs.json'
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -45,7 +46,7 @@ def get_tensorflow_version():
 
 
 def save_run(config, environment=None, comment=None, extra_config=None,
-             base_path=DEFAULT_BASE_PATH, filename=DEFAULT_FILENAME):
+             filename=DEFAULT_FILENAME):
     if environment == 'cloud':
         # We don't write runs inside Google Cloud, we run it before.
         return
@@ -64,8 +65,9 @@ def save_run(config, environment=None, comment=None, extra_config=None,
         'extra_config': extra_config,
     }
 
-    file_path = os.path.join(base_path, filename)
-    tf.gfile.MakeDirs(base_path)
+    path = get_luminoth_home()
+    file_path = os.path.join(path, filename)
+    tf.gfile.MakeDirs(path)
 
     with tf.gfile.Open(file_path, 'a') as log:
         log.write(json.dumps(experiment) + '\n')

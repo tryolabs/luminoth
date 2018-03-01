@@ -5,6 +5,8 @@ import requests
 import tarfile
 import tensorflow as tf
 
+from luminoth.utils.homedir import get_luminoth_home
+
 
 TENSORFLOW_OFFICIAL_ENDPOINT = 'http://download.tensorflow.org/models/'
 
@@ -30,7 +32,7 @@ def get_default_path():
             job_dir = os.path.join(job_dir, 'pretrained_checkpoints/')
             return job_dir
 
-    return '~/.luminoth/'
+    return get_luminoth_home()
 
 
 DEFAULT_PATH = get_default_path()
