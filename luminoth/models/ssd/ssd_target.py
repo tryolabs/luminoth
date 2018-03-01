@@ -152,8 +152,12 @@ class SSDTarget(snt.AbstractModule):
         max_cls_probs = tf.reduce_max(cls_probs, axis=1)
 
         # Exclude boxes with IOU > `background_threshold_high` with any GT.
-        bg_overlaps_filter = tf.less_equal(
+        iou_less_than_bg_tresh_high_filter = tf.less_equal(
             max_overlaps, self._background_threshold_high
+        )
+        bg_anchors = tf.less_equal(anchors_label, 0)
+        bg_overlaps_filter = tf.logical_and(
+            iou_less_than_bg_tresh_high_filter, bg_anchors
         )
 
         max_cls_probs = tf.where(
