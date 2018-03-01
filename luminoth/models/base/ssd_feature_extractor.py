@@ -110,7 +110,7 @@ class SSDFeatureExtractor(BaseNetwork):
 
             # This parameter determines onto which variables we try to load the
             # pretrained weights
-            self.pretrained_weights_scope = 'ssd_feature_extractor/vgg_16'
+            self.pretrained_weights_scope = 'ssd/ssd_feature_extractor/vgg_16'
 
         # Its actually an ordered dict
         return utils.convert_collection_to_dict('FEATURE_MAPS')
