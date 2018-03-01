@@ -41,8 +41,6 @@ class SSDFeatureExtractor(BaseNetwork):
         if self.parent_name:
             scope = self.parent_name + '/' + scope
 
-        inputs = self.preprocess(inputs)
-
         base_net_endpoints = super(SSDFeatureExtractor, self)._build(
             inputs, is_training=is_training)['end_points']
 
