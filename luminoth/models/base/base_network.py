@@ -181,7 +181,7 @@ class BaseNetwork(snt.AbstractModule):
         if self._config.get('weights') is None:
             # Download the weights (or used cached) if not specified in the
             # config file.
-            # Weights are downloaded by default to the ~/.luminoth folder if
+            # Weights are downloaded by default to the $LUMI_HOME folder if
             # running locally, or to the job bucket if running in Google Cloud.
             self._config['weights'] = get_checkpoint_file(self._architecture)
 
