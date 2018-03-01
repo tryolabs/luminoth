@@ -5,7 +5,8 @@ from flask import Flask, jsonify, request, render_template
 from threading import Thread
 from PIL import Image
 
-from luminoth.utils.config import get_config
+from luminoth.tools.checkpoint import get_checkpoint_config
+from luminoth.utils.config import get_config, override_config_params
 from luminoth.utils.predicting import PredictorNetwork
 
 
@@ -52,35 +53,39 @@ def predict(model_name):
     return jsonify(prediction)
 
 
-def start_network(config_files, checkpoint):
+def start_network(config):
     global PREDICTOR_NETWORK
-    PREDICTOR_NETWORK = PredictorNetwork(config_files, checkpoint)
+    PREDICTOR_NETWORK = PredictorNetwork(config)
 
 
 @click.command(help='Start basic web application.')
 @click.option('config_files', '--config', '-c', multiple=True, help='Config to use.')  # noqa
 @click.option('--checkpoint', help='Checkpoint to use.')
+@click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
 @click.option('--host', default='127.0.0.1', help='Hostname to listen on. Set this to "0.0.0.0" to have the server available externally.')  # noqa
 @click.option('--port', default=5000, help='Port to listen to.')
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
-def web(config_files, checkpoint, host, port, debug):
+def web(config_files, checkpoint, override_params, host, port, debug):
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.INFO)
 
-    # TODO: This shouldn't be done here. (Or it should, and PredictorNetwork
-    # should receive just the config.)
-    # Bounding boxes will be filtered by frontend (using slider), so we set
-    # a low threshold.
-    # config = get_config(config_files)
-    # config.model.rcnn.proposals.min_prob_threshold = 0.01
+    if checkpoint:
+        config = get_checkpoint_config(checkpoint)
+    else:
+        config = get_config(config_files)
+
+    if override_params:
+        config = override_config_params(config, override_params)
+
+    # Bounding boxes will be filtered by frontend (using slider), so we set a
+    # low threshold.
+    config.model.rcnn.proposals.min_prob_threshold = 0.01
 
     # Initialize model
     global NETWORK_START_THREAD
-    NETWORK_START_THREAD = Thread(
-        target=start_network, args=(config_files, checkpoint)
-        )
+    NETWORK_START_THREAD = Thread(target=start_network, args=(config,))
     NETWORK_START_THREAD.start()
 
     app.run(host=host, port=port, debug=debug)
