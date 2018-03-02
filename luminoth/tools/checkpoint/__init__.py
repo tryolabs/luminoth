@@ -82,7 +82,7 @@ def merge_index(local_index, remote_index):
         seen_ids.add(checkpoint['id'])
         local = remotes_in_local.get(checkpoint['id'])
         if local:
-            # Checkpoint is in local index. Overwrite the all the fields.
+            # Checkpoint is in local index. Overwrite all the fields.
             local.update(**checkpoint)
         elif not local:
             # Checkpoint not found, it's an addition. Transform into our schema
@@ -130,18 +130,18 @@ def get_checkpoint(db, id_or_alias):
     """Returns checkpoint entry in `db` indicated by `id_or_alias`.
 
     First tries to match an ID, then an alias. For the case of repeated
-    aliases, will match first match local checkpoints and then remotes. In both
+    aliases, will first match local checkpoints and then remotes. In both
     cases, matching will be newest first.
     """
     # Go through the checkpoints ordered by creation date. There sholdn't be
     # repeated aliases, but if there are, prioritize the newest one.
     locals = sorted(
         [c for c in db['checkpoints'] if c['source'] == 'local'],
-        key=lambda c: c['created_date'], reverse=True
+        key=lambda c: c['created_at'], reverse=True
     )
     remotes = sorted(
         [c for c in db['checkpoints'] if c['source'] == 'remote'],
-        key=lambda c: c['created_date'], reverse=True
+        key=lambda c: c['created_at'], reverse=True
     )
 
     selected = []
@@ -396,7 +396,7 @@ def info(id_or_alias):
 
     click.echo()
 
-    click.echo('Creation date: {}'.format(checkpoint['created_date']))
+    click.echo('Creation date: {}'.format(checkpoint['created_at']))
     click.echo('Luminoth version: {}'.format(checkpoint['luminoth_version']))
 
     click.echo()
@@ -485,13 +485,11 @@ def create(config_files, override_params, entries):
             """.format(checkpoint_prefix)
         )
 
-    # Add the `classes.json` file.
-    if classes_path:
-        shutil.copy2(classes_path, path)
-
-    # Get the number of classes, if available.
+    # Add the `classes.json` file. Also get the number of classes, if
+    # available.
     num_classes = None
     if classes_path:
+        shutil.copy2(classes_path, path)
         with open(classes_path) as f:
             num_classes = len(json.load(f))
 
@@ -511,7 +509,7 @@ def create(config_files, override_params, entries):
         },
 
         'luminoth_version': lumi_version,
-        'created_date': datetime.utcnow().isoformat(),
+        'created_at': datetime.utcnow().isoformat(),
 
         'status': 'LOCAL',
         'source': 'local',
