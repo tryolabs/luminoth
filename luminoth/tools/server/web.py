@@ -73,8 +73,11 @@ def web(config_files, checkpoint, override_params, host, port, debug):
 
     if checkpoint:
         config = get_checkpoint_config(checkpoint)
-    else:
+    elif config_files:
         config = get_config(config_files)
+    else:
+        click.echo('You must specify either a checkpoint or a config file.')
+        return
 
     if override_params:
         config = override_config_params(config, override_params)
