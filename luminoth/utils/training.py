@@ -81,7 +81,7 @@ def get_optimizer(train_config, global_step=None):
     return optimizer_cls(learning_rate, **optimizer_config)
 
 
-def clip_gradients_by_norm(grads_and_vars, add_to_summary=True):
+def clip_gradients_by_norm(grads_and_vars, add_to_summary=False):
     if add_to_summary:
         for grad, var in grads_and_vars:
             if grad is not None:
