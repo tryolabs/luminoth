@@ -63,7 +63,7 @@ def predict(path_or_dir, config_files, checkpoint, override_params, output_dir,
         tf.logging.error(no_files_message.format(IMAGE_FORMATS, VIDEO_FORMATS))
         exit()
 
-    # Resolve the config to use and initialize the mdoel.
+    # Resolve the config to use and initialize the model.
     if checkpoint:
         config = get_checkpoint_config(checkpoint)
     elif config_files:

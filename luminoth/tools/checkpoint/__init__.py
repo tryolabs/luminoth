@@ -19,7 +19,8 @@ from luminoth.utils.homedir import get_luminoth_home
 CHECKPOINT_INDEX = 'checkpoints.json'
 CHECKPOINT_PATH = 'checkpoints'
 REMOTE_INDEX_URL = (
-    'https://github.com/tryolabs/luminoth/releases/download/v0.0.3/models.json'
+    'https://github.com/tryolabs/luminoth/releases/download/v0.0.3/'
+    'checkpoints.json'
 )
 
 
@@ -112,7 +113,7 @@ def merge_index(local_index, remote_index):
         click.echo('{} new remote checkpoints added.'.format(len(to_add)))
     if len(missing_ids):
         if len(already_downloaded):
-            click.echo('{} remote checkpoints turned to local.'.format(
+            click.echo('{} remote checkpoints transformed to local.'.format(
                 len(already_downloaded)
             ))
         click.echo('{} remote checkpoints removed.'.format(
@@ -133,23 +134,23 @@ def get_checkpoint(db, id_or_alias):
     aliases, will first match local checkpoints and then remotes. In both
     cases, matching will be newest first.
     """
-    # Go through the checkpoints ordered by creation date. There sholdn't be
+    # Go through the checkpoints ordered by creation date. There shouldn't be
     # repeated aliases, but if there are, prioritize the newest one.
-    locals = sorted(
+    local_checkpoints = sorted(
         [c for c in db['checkpoints'] if c['source'] == 'local'],
         key=lambda c: c['created_at'], reverse=True
     )
-    remotes = sorted(
+    remote_checkpoints = sorted(
         [c for c in db['checkpoints'] if c['source'] == 'remote'],
         key=lambda c: c['created_at'], reverse=True
     )
 
     selected = []
-    for cp in locals:
+    for cp in local_checkpoints:
         if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
             selected.append(cp)
 
-    for cp in remotes:
+    for cp in remote_checkpoints:
         if cp['id'] == id_or_alias or cp['alias'] == id_or_alias:
             selected.append(cp)
 
@@ -208,7 +209,8 @@ def get_checkpoint_config(id_or_alias, prompt=True):
     path = get_checkpoint_path(checkpoint['id'])
     config = get_config(os.path.join(path, 'config.yml'))
 
-    # Config paths should point to the path the checkpoint files are stored.
+    # Config paths should point to the path where the checkpoint files are
+    # stored.
     config.dataset.dir = path
     config.train.job_dir = get_checkpoints_directory()
 
@@ -590,7 +592,7 @@ def delete(id_or_alias):
 
 @click.command(help='Export a checkpoint to a tar file for easy sharing.')
 @click.argument('id_or_alias')
-@click.option('--output', default='.', help="Specify the output location.")
+@click.option('--output', default='.', help='Specify the output location.')
 def export(id_or_alias, output):
     db = read_checkpoint_db()
     checkpoint = get_checkpoint(db, id_or_alias)
@@ -695,7 +697,7 @@ def download(id_or_alias):
 
     if checkpoint['source'] != 'remote':
         click.echo(
-            "Checkpoint is not remote. If you meant to download a remote "
+            "Checkpoint is not remote. If you intended to download a remote "
             "checkpoint and used an alias, try using the id directly."
         )
         return
