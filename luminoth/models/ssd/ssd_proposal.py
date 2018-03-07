@@ -23,8 +23,7 @@ class SSDProposal(snt.AbstractModule):
     and in general. These values are easily modifiable in the configuration
     files.
     """
-    def __init__(self, num_classes, config, debug=False,
-                 name='proposal_layer'):
+    def __init__(self, num_classes, config, variances, name='proposal_layer'):
         super(SSDProposal, self).__init__(name=name)
         self._num_classes = num_classes
 
@@ -37,7 +36,7 @@ class SSDProposal(snt.AbstractModule):
         self._min_prob_threshold = config.min_prob_threshold or 0.0
 
         self._filter_outside_anchors = config.filter_outside_anchors
-        self._debug = debug
+        self._variances = variances
 
     def _build(self, cls_prob, loc_pred, all_anchors, im_shape):
         """

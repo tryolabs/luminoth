@@ -8,8 +8,8 @@ from luminoth.utils.bbox_overlap import bbox_overlap_tf
 class SSDTarget(snt.AbstractModule):
     """TODO
     """
-    def __init__(self, num_classes, num_anchors,
-                 config, seed=None, name='ssd_target'):
+    def __init__(self, num_classes, num_anchors, config, variances, seed=None,
+                 name='ssd_target'):
         """
         Args:
             num_classes: Number of possible classes.
@@ -26,6 +26,8 @@ class SSDTarget(snt.AbstractModule):
         # High and low treshold to be considered background.
         self._background_threshold_high = config.background_threshold_high
         self._background_threshold_low = config.background_threshold_low
+
+        self._variances = variances
         self._seed = seed
 
     def _build(self, probs, all_anchors, gt_boxes, im_shape):
@@ -220,6 +222,7 @@ class SSDTarget(snt.AbstractModule):
         bbox_targets = encode(
             anchors_with_target,
             anchors_gt_boxes,
+            variances=self._variances
         )
 
         # We unmap targets to anchor_labels (containing the length of
