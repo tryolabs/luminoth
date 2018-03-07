@@ -44,8 +44,8 @@ class SSDTarget(snt.AbstractModule):
                 between 0 and num_classes, with 0 being background), or -1 when
                 the anchor is to be ignored in the minibatch.
                 The shape of the Tensor is (num_anchors, 1).
-            bbox_offsets_targets: A bounding box regression target for each of the
-                anchors that have and greater than zero label. For every
+            bbox_offsets_targets: A bounding box regression target for each of
+                the anchors that have a greater than zero label. For every
                 other anchors we return zeros.
                 The shape of the Tensor is (num_anchors, 4).
         """
