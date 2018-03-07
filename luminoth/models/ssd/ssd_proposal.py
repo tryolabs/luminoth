@@ -63,104 +63,76 @@ class SSDProposal(snt.AbstractModule):
                 proposal_label: It's shape is (final_num_proposals,)
                 proposal_label_prob: It's shape is (final_num_proposals,)
         """
-        # First we want to get the most probable label for each anchor
-        # We still have the background on idx 0 so we substract 1 to the idxs,
-        # so the background label now is -1.
-        proposal_label = tf.argmax(cls_prob, axis=1) - 1
-        # Get the probability for the selected label for each proposal.
-        proposal_label_prob = tf.reduce_max(cls_prob, axis=1)
-        # We are going to use only the non-background anchors.
-        non_background_filter = tf.greater_equal(proposal_label, 0)
-        # Filter anchors with less than threshold probability.
-        min_prob_filter = tf.greater_equal(
-            proposal_label_prob, self._min_prob_threshold)
-        # Join the previous 2 filters
-        proposal_filter = tf.logical_and(non_background_filter, min_prob_filter)
-
-        total_anchors = tf.shape(all_anchors)[0]
-        equal_shapes = tf.assert_equal(
-            tf.shape(all_anchors)[0], tf.shape(loc_pred)[0])
-
-        with tf.control_dependencies([equal_shapes]):
-            # Filter all tensors for getting all non-background anchors.
-            all_anchors = tf.boolean_mask(all_anchors, proposal_filter)
-            proposal_label = tf.boolean_mask(proposal_label, proposal_filter)
-            proposal_label_prob = tf.boolean_mask(
-                proposal_label_prob, proposal_filter)
-            loc_pred = tf.boolean_mask(loc_pred, proposal_filter)
-
-        filtered_anchors = tf.shape(all_anchors)[0]
-        tf.summary.scalar(
-             'background_or_low_prob_anchors',
-             total_anchors - filtered_anchors, ['ssd_proposal']
-         )
-
-        # Using the loc_pred and the anchors we generate the proposals.
-        raw_proposals = decode(all_anchors, loc_pred)
-        # Clip boxes to image.
-        clipped_proposals = clip_boxes(raw_proposals, im_shape)
-
-        # Filter proposals that have an non-valid area.
-        (x_min, y_min, x_max, y_max) = tf.unstack(clipped_proposals, axis=1)
-        proposal_filter = tf.greater(
-            tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
-            0.0
-        )
-
-        total_raw_proposals = tf.shape(raw_proposals)[0]
-
-        proposals = tf.boolean_mask(
-            clipped_proposals, proposal_filter)
-        proposal_label = tf.boolean_mask(
-            proposal_label, proposal_filter)
-        proposal_label_prob = tf.boolean_mask(
-            proposal_label_prob, proposal_filter)
-        proposal_anchors = tf.boolean_mask(
-            all_anchors, proposal_filter)
-
-        total_proposals = tf.shape(proposals)[0]
-
-        tf.summary.scalar(
-            'invalid_proposals',
-            total_proposals - total_raw_proposals, ['ssd']
-        )
-
-        tf.summary.scalar(
-            'valid_proposals_ratio',
-            tf.cast(total_anchors, tf.float32) /
-            tf.cast(total_proposals, tf.float32), ['ssd']
-        )
-
-        # We have to use the TensorFlow's bounding box convention to use the
-        # included function for NMS.
-        # After gathering results we should normalize it back.
-        proposals_tf = change_order(proposals)
-
         selected_boxes = []
         selected_probs = []
         selected_labels = []
-        # For each class we want to filter those proposals and apply NMS.
+
         for class_id in range(self._num_classes):
-            # Filter proposals Tensors with class.
-            class_filter = tf.equal(proposal_label, class_id)
-            class_proposal_tf = tf.boolean_mask(proposals_tf, class_filter)
-            class_prob = tf.boolean_mask(proposal_label_prob, class_filter)
+            # Get the confidences for this class (+ 1 is to ignore background)
+            class_cls_prob = cls_prob[:, class_id + 1]
+
+            # Filter by min_prob_threshold
+            min_prob_filter = tf.greater_equal(
+                class_cls_prob, self._min_prob_threshold)
+            class_cls_prob = tf.boolean_mask(class_cls_prob, min_prob_filter)
+            class_loc_pred = tf.boolean_mask(loc_pred, min_prob_filter)
+            anchors = tf.boolean_mask(all_anchors, min_prob_filter)
+
+            # Using the loc_pred and the anchors, we generate the proposals.
+            raw_proposals = decode(anchors, class_loc_pred, self._variances)
+            # Clip boxes to image.
+            clipped_proposals = clip_boxes(raw_proposals, im_shape)
+
+            # Filter proposals that have an non-valid area.
+            (x_min, y_min, x_max, y_max) = tf.unstack(
+                clipped_proposals, axis=1)
+            proposal_filter = tf.greater(
+                tf.maximum(x_max - x_min, .0) * tf.maximum(y_max - y_min, .0),
+                .0
+            )
+            class_proposals = tf.boolean_mask(
+                clipped_proposals, proposal_filter)
+            class_loc_pred = tf.boolean_mask(
+                class_loc_pred, proposal_filter)
+            class_cls_prob = tf.boolean_mask(
+                class_cls_prob, proposal_filter)
+            proposal_anchors = tf.boolean_mask(
+                anchors, proposal_filter)
+
+            # Log results of filtering non-valid area proposals
+            total_anchors = tf.shape(all_anchors)[0]
+            total_proposals = tf.shape(class_proposals)[0]
+            total_raw_proposals = tf.shape(raw_proposals)[0]
+            tf.summary.scalar(
+                'invalid_proposals',
+                total_proposals - total_raw_proposals, ['ssd']
+            )
+            tf.summary.scalar(
+                'valid_proposals_ratio',
+                tf.cast(total_anchors, tf.float32) /
+                tf.cast(total_proposals, tf.float32), ['ssd']
+            )
+
+            # We have to use the TensorFlow's bounding box convention to use
+            # the included function for NMS.
+            # After gathering results we should normalize it back.
+            class_proposal_tf = change_order(class_proposals)
 
             # Apply class NMS.
             class_selected_idx = tf.image.non_max_suppression(
-                class_proposal_tf, class_prob, self._class_max_detections,
+                class_proposal_tf, class_cls_prob, self._class_max_detections,
                 iou_threshold=self._class_nms_threshold
             )
 
             # Using NMS resulting indices, gather values from Tensors.
             class_proposal_tf = tf.gather(
                 class_proposal_tf, class_selected_idx)
-            class_prob = tf.gather(class_prob, class_selected_idx)
+            class_cls_prob = tf.gather(class_cls_prob, class_selected_idx)
 
-            # We append values to a regular list which will later be transformed
-            # to a proper Tensor.
+            # We append values to a regular list which will later be
+            # transformed to a proper Tensor.
             selected_boxes.append(class_proposal_tf)
-            selected_probs.append(class_prob)
+            selected_probs.append(class_cls_prob)
             # In the case of the class_id, since it is a loop on classes, we
             # already have a fixed class_id. We use `tf.tile` to create that
             # Tensor with the total number of indices returned by the NMS.
