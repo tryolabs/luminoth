@@ -147,10 +147,10 @@ model:
 
   proposals:
     # Maximum total detections for an image (sorted by score)
-    total_max_detections: 200
+    total_max_detections: 100
     # Maximum number of detections for each class
     # Not used in paper, so I set class_max_detections = total_max_detections
-    class_max_detections: 200
+    class_max_detections: 100
     # NMS threshold used to remove "almost duplicate" of the same class
     class_nms_threshold: 0.45
     # Minimum prob to be used as proposed object
@@ -158,6 +158,11 @@ model:
     # in order to get some usable final predictions, the confidence
     # threshold must be set higher, e.g. to 0.5.
     # ( Acording to: https://github.com/pierluigiferrari/ssd_keras/blob/d1b4e7e218af7d31314b9927c08e735e54f5af30/ssd300_training.ipynb#L548 )
-    min_prob_threshold: 0.01
+    min_prob_threshold: 0.00001
     # Filter proposals from anchors partially outside the image.
     filter_outside_anchors: True
+
+  # Variance, although it should probably be called 'box_scale_factors' as discussed here: https://github.com/rykov8/ssd_keras/issues/53
+  # Used to scale location prediction and confidence prediction
+  # Also discussed here: https://github.com/weiliu89/caffe/issues/155
+  variances: [0.1, 0.2]

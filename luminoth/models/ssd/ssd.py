@@ -145,7 +145,8 @@ class SSD(snt.AbstractModule):
         if is_training and gt_boxes is not None:
             # Generate targets
             target_creator = SSDTarget(self._num_classes, all_anchors.shape[0],
-                                       self._config.model.target)
+                                       self._config.model.target,
+                                       self._config.model.variances)
             class_targets, bbox_offsets_targets = target_creator(
                 class_probabilities, all_anchors, gt_boxes,
                 tf.cast(tf.shape(image), tf.float32)
@@ -180,7 +181,7 @@ class SSD(snt.AbstractModule):
         # Get the proposals and save the result
         proposals_creator = SSDProposal(self._num_classes,
                                         self._config.model.proposals,
-                                        debug=self._debug)
+                                        self._config.model.variances)
         if is_training and self._debug:
             # Generate proposals for visualization during training with debug
             proposals = proposals_creator(
