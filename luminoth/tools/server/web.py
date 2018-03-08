@@ -27,7 +27,7 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/api/<model_name>/predict', methods=['GET', 'POST'])
+@app.route('/api/<model_name>/predict/', methods=['GET', 'POST'])
 def predict(model_name):
     if request.method == 'GET':
         return jsonify(error='Use POST method to send image.'), 400
@@ -46,11 +46,13 @@ def predict(model_name):
         except ValueError:
             total_predictions = None
 
+    # Wait for the model to finish loading.
     NETWORK_START_THREAD.join()
-    prediction = PREDICTOR_NETWORK.predict_image(
-        image_array, total_predictions
-    )
-    return jsonify(prediction)
+
+    objects = PREDICTOR_NETWORK.predict_image(image_array)
+    objects = objects[:total_predictions]
+
+    return jsonify({'objects': objects})
 
 
 def start_network(config):

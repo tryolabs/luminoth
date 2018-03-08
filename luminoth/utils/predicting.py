@@ -2,19 +2,20 @@ import json
 import numpy as np
 import os
 import tensorflow as tf
-import time
 
 from luminoth.models import get_model
 from luminoth.datasets import get_dataset
 
 
 class PredictorNetwork(object):
-    """Instantiates a network in order to get predictions from it
+    """Instantiates a network in order to get predictions from it.
 
-    If a checkpoint exists in the job's directory, load it.
-    The names of the classes will be obtained from the dataset directory.
-    Returns a dictionary with the objects, their labels and probabilities,
-    the inference time and the scale factor."""
+    If a checkpoint exists in the job's directory, load it.  The names of the
+    classes will be obtained from the dataset directory.
+
+    Returns a list of objects detected, which is a dict of its coordinates,
+    label and probability, ordered by probability.
+    """
 
     def __init__(self, config):
 
@@ -95,37 +96,29 @@ class PredictorNetwork(object):
             if config.train.debug:
                 self.fetches['_debug'] = pred_dict
 
-    def predict_image(self, image, total_predictions=None):
-        start_time = time.time()
+    def predict_image(self, image):
         fetched = self.session.run(self.fetches, feed_dict={
             self.image_placeholder: np.array(image)
         })
-        end_time = time.time()
 
         objects = fetched['objects']
-        objects_labels = fetched['labels']
-        objects_labels_prob = fetched['probs']
+        labels = fetched['labels'].tolist()
+        probs = fetched['probs'].tolist()
         scale_factor = fetched['scale_factor']
 
-        objects_labels = objects_labels.tolist()
-
         if self.class_labels is not None:
-            objects_labels = [self.class_labels[obj] for obj in objects_labels]
+            labels = [self.class_labels[label] for label in labels]
 
-        # Scale objects to original image dimensions
+        # Scale objects to original image dimensions.
         objects /= scale_factor
+        objects = [[round(coord) for coord in obj] for obj in objects.tolist()]
 
-        objects = objects.tolist()
-        objects_labels_prob = objects_labels_prob.tolist()
+        predictions = sorted([
+            {
+                'bbox': obj,
+                'label': label,
+                'prob': round(prob, 4),
+            } for obj, label, prob in zip(objects, labels, probs)
+        ], key=lambda x: x['prob'], reverse=True)
 
-        if total_predictions:
-            objects = objects[:total_predictions]
-            objects_labels = objects_labels[:total_predictions]
-            objects_labels_prob = objects_labels_prob[:total_predictions]
-
-        return {
-            'objects': objects,
-            'objects_labels': objects_labels,
-            'objects_labels_prob': objects_labels_prob,
-            'inference_time': end_time - start_time,
-        }
+        return predictions
