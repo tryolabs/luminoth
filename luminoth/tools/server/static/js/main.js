@@ -5,14 +5,14 @@
     elements: []
   }
 
-  const adjustAspectRatio = () => {
+  function adjustAspectRatio() {
     // Adjust so we don't lose aspect ratio on resize
     const canvas = document.getElementById('result-canvas')
     const trueAR = canvas.width / canvas.height
     canvas.style.maxHeight = canvas.clientWidth / trueAR
   }
 
-  const drawBoundingBoxes = function(ctx, probThresold) {
+  function drawBoundingBoxes(ctx, probThresold) {
     const outlineWidth = 1
     const fontSize = 12
     const pad = 5
@@ -95,14 +95,14 @@
     }
   }
 
-  const storeElementsToDraw = function(objects, probs, labels) {
+  function storeElementsToDraw(objects) {
     let i
 
     let labelHexColors = {}
 
     // Generate unique set of labels
-    for (i = 0; i < labels.length; i++) {
-      labelHexColors[labels[i]] = null
+    for (i = 0; i < objects.length; i++) {
+      labelHexColors[objects[i].label] = null
     }
     const distinctLabels = Object.keys(labelHexColors)
 
@@ -115,16 +115,17 @@
 
     drawing.elements = []
     for (i = 0; i < objects.length; i++) {
+      const obj = objects[i]
       drawing.elements.push({
-        prob: probs[i],
-        label: labels[i],
-        fillColor: window.hexToRgba(labelHexColors[labels[i]], 0.1),
-        outlineColor: window.hexToRgba(labelHexColors[labels[i]], 1.0),
-        labelColor: window.hexToRgba(labelHexColors[labels[i]], 0.5),
-        x: objects[i][0],
-        y: objects[i][1],
-        width: objects[i][2] - objects[i][0],
-        height: objects[i][3] - objects[i][1]
+        prob: obj.prob,
+        label: obj.label,
+        fillColor: window.hexToRgba(labelHexColors[obj.label], 0.1),
+        outlineColor: window.hexToRgba(labelHexColors[obj.label], 1.0),
+        labelColor: window.hexToRgba(labelHexColors[obj.label], 0.5),
+        x: obj.bbox[0],
+        y: obj.bbox[1],
+        width: obj.bbox[2] - obj.bbox[0],
+        height: obj.bbox[3] - obj.bbox[1]
       })
     }
   }
@@ -135,7 +136,7 @@
     const canvas = document.getElementById('result-canvas')
 
     var formdata = new FormData(form)
-    const url = '/api/fasterrcnn/predict'
+    const url = '/api/fasterrcnn/predict/'
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url, true)
@@ -150,11 +151,7 @@
         const response = JSON.parse(xhr.response)
 
         if (xhr.status == 200) {
-          storeElementsToDraw(
-            response.objects,
-            response.objects_labels_prob,
-            response.objects_labels
-          )
+          storeElementsToDraw(response.objects)
 
           drawImage(formdata.getAll('image')[0])
           canvas.style.display = ''
