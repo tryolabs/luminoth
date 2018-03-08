@@ -36,7 +36,7 @@ train:
   # Debug mode must be enabled.
   full_trace: False
   # Clip gradients by norm, making sure the maximum value is 10.
-  clip_by_norm: True
+  clip_by_norm: False
   # Learning rate config.
   learning_rate:
     # Because we're using kwargs, we want the learning_rate dict to be replaced
@@ -45,7 +45,8 @@ train:
     # Learning rate decay method ((empty), "none", piecewise_constant, exponential_decay, polynomial_decay)
     # You can define different decay methods using `decay_method` and defining all the necessary arguments.
     decay_method:
-    learning_rate: 0.001
+    # Oficial initial learning rate is 0.001 (with batch size 32)
+    learning_rate: 0.0003
 
   # Optimizer config
   optimizer:
@@ -54,8 +55,8 @@ train:
     _replace: True
     # Type of optimizer to use (momentum, adam, gradient_descent, rmsprop)
     type: momentum
-    # any options are passed directly to the optimizer as kwarg.
-    momentum: 0.9
+    # Oficial momentum is 0.9
+    momentum: 0.5
 
   # Number of epochs (complete dataset batches) to run
   num_epochs: 10000
@@ -97,8 +98,8 @@ dataset:
           lower: 0.5
           upper: 1.5
         prob: 0.5
-    - expand:
-        prob: 0.5
+#   - expand:
+#       prob: 0.5
 
 model:
   type: ssd
