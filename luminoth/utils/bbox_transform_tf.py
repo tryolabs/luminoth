@@ -23,8 +23,8 @@ def encode(bboxes, gt_boxes, variances=[1, 1]):
         (gt_boxes_width, gt_boxes_height,
          gt_boxes_urx, gt_boxes_ury) = get_width_upright(gt_boxes)
 
-        targets_dx = (gt_boxes_urx - bboxes_urx) / (bboxes_width * variances[0])
-        targets_dy = (gt_boxes_ury - bboxes_ury) / (bboxes_height * variances[0])
+        targets_dx = (gt_boxes_urx - bboxes_urx)/(bboxes_width * variances[0])
+        targets_dy = (gt_boxes_ury - bboxes_ury)/(bboxes_height * variances[0])
 
         targets_dw = tf.log(gt_boxes_width / bboxes_width) / variances[1]
         targets_dh = tf.log(gt_boxes_height / bboxes_height) / variances[1]

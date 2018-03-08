@@ -74,3 +74,76 @@ def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):
     ])
 
     return anchors
+
+
+def generate_raw_anchors(feature_maps, anchor_min_scale, anchor_max_scale,
+                         anchor_ratios, anchors_per_point):
+    """
+    Returns a dictionary containing the anchors per feature map.
+
+    Returns:
+    anchors: A dictionary with feature maps as keys and an array of anchors
+        as values ('[[x_min, y_min, x_max, y_max], ...]') with shape
+        (anchors_per_point[i] * endpoints_outputs[i][0]
+         * endpoints_outputs[i][1], 4)
+    """
+    # TODO: Anchor generation needs heavy refactor
+
+    # We interpolate the scales of the anchors from a min and a max scale
+    scales = np.linspace(anchor_min_scale, anchor_max_scale, len(feature_maps))
+
+    anchors = {}
+    for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
+        feat_map_shape = feat_map.shape.as_list()[1:3]
+        anchor_reference = generate_anchors_reference(
+            anchor_ratios, scales[i: i + 2],
+            anchors_per_point[i], feat_map_shape
+        )
+        anchors[feat_map_name] = generate_anchors_per_feat_map(
+            feat_map_shape, anchor_reference)
+
+    return anchors
+
+
+def generate_anchors_per_feat_map(feature_map_shape, anchor_reference):
+    """Generate anchor for an image.
+
+    Using the feature map, the output of the pretrained network for an
+    image, and the anchor_reference generated using the anchor config
+    values. We generate a list of anchors.
+
+    Anchors are just fixed bounding boxes of different ratios and sizes
+    that are uniformly generated throught the image.
+
+    Args:
+        feature_map_shape: Shape of the convolutional feature map used as
+            input for the RPN. Should be (batch, height, width, depth).
+
+    Returns:
+        all_anchors: A flattened Tensor with all the anchors of shape
+            `(num_anchors_per_points * feature_width * feature_height, 4)`
+            using the (x1, y1, x2, y2) convention.
+    """
+    with tf.variable_scope('generate_anchors'):
+        shift_x = np.arange(feature_map_shape[1])
+        shift_y = np.arange(feature_map_shape[0])
+        shift_x, shift_y = np.meshgrid(shift_x, shift_y)
+
+        shift_x = np.reshape(shift_x, [-1])
+        shift_y = np.reshape(shift_y, [-1])
+
+        shifts = np.stack(
+            [shift_x, shift_y, shift_x, shift_y],
+            axis=0
+        )
+
+        shifts = np.transpose(shifts)
+        # Shifts now is a (H x W, 4) Tensor
+
+        # Expand dims to use broadcasting sum.
+        all_anchors = (
+            np.expand_dims(anchor_reference, axis=0) +
+            np.expand_dims(shifts, axis=1)
+        )
+        # Flatten
+        return np.reshape(all_anchors, (-1, 4))
