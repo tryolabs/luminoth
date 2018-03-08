@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from tensorflow.contrib.layers.python.layers import initializers, utils
+from tensorflow.contrib.layers.python.layers import utils
 from tensorflow.contrib.framework.python.ops import variables
 from tensorflow.python.ops import init_ops
 
@@ -89,10 +89,12 @@ class SSDFeatureExtractor(BaseNetwork):
                                       padding='SAME', stride=1, scope='pool5')
                 # TODO: or is it rate=12?
                 net = slim.conv2d(net, 1024, [3, 3], rate=6, scope='conv6')
-                net = slim.dropout(net, self._dropout_keep_prob, is_training=is_training)
+                net = slim.dropout(net, self._dropout_keep_prob,
+                                   is_training=is_training)
                 net = slim.conv2d(net, 1024, [1, 1], scope='conv7',
                                   outputs_collections='FEATURE_MAPS')
-                net = slim.dropout(net, self._dropout_keep_prob, is_training=is_training)
+                net = slim.dropout(net, self._dropout_keep_prob,
+                                   is_training=is_training)
                 net = slim.conv2d(net, 256, [1, 1], scope='conv8_1')
                 net = slim.conv2d(net, 512, [3, 3], stride=2, scope='conv8_2',
                                   outputs_collections='FEATURE_MAPS')

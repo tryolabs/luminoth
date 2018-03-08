@@ -7,7 +7,7 @@ from luminoth.models.base import SSDFeatureExtractor
 from luminoth.models.ssd.ssd_proposal import SSDProposal
 from luminoth.models.ssd.ssd_target import SSDTarget
 from luminoth.models.ssd.ssd_utils import (
-    generate_anchors_reference, adjust_bboxes
+    generate_raw_anchors, adjust_bboxes
 )
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import get_saver
@@ -50,7 +50,8 @@ class SSD(snt.AbstractModule):
 
         # Weight for the localization loss
         self._loc_loss_weight = config.model.loss.localization_loss_weight
-        # TODO: why not use the default LOSSES collection?
+
+        # TODO: Why not use the default LOSSES collection?
         self._losses_collections = ['ssd_losses']
 
         # We want the pretrained model to be outside the ssd name scope.
@@ -121,8 +122,11 @@ class SSD(snt.AbstractModule):
         class_probabilities = slim.softmax(class_scores)
 
         # Generate anchors (generated only once, therefore we use numpy)
-        raw_anchors_per_featmap = self.generate_raw_anchors(feature_maps)
-        all_anchors_list = []
+        raw_anchors_per_featmap = generate_raw_anchors(
+            feature_maps, self._anchor_min_scale, self._anchor_max_scale,
+            self._anchor_ratios, self._anchors_per_point
+        )
+        anchors_list = []
         for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
             # TODO: Anchor generation should be simpler. We should create
             #       them in image scale from the start instead of scaling
@@ -133,10 +137,10 @@ class SSD(snt.AbstractModule):
                 feat_map_shape[1], self.image_shape[0], self.image_shape[1]
             )
             clipped_bboxes = clip_boxes(scaled_bboxes, self.image_shape)
-            all_anchors_list.append(clipped_bboxes)
-        all_anchors = np.concatenate(all_anchors_list, axis=0)
+            anchors_list.append(clipped_bboxes)
+        anchors = np.concatenate(anchors_list, axis=0)
         # TODO: They were using float64, is all this precision necesary?
-        all_anchors = tf.convert_to_tensor(all_anchors, dtype=tf.float64)
+        anchors = tf.convert_to_tensor(anchors, dtype=tf.float64)
 
         # We'll return this dict after we fill it with predictions
         prediction_dict = {}
@@ -144,11 +148,11 @@ class SSD(snt.AbstractModule):
         # Generate targets for training
         if is_training and gt_boxes is not None:
             # Generate targets
-            target_creator = SSDTarget(self._num_classes, all_anchors.shape[0],
+            target_creator = SSDTarget(self._num_classes, anchors.shape[0],
                                        self._config.model.target,
                                        self._config.model.variances)
             class_targets, bbox_offsets_targets = target_creator(
-                class_probabilities, all_anchors, gt_boxes,
+                class_probabilities, anchors, gt_boxes,
                 tf.cast(tf.shape(image), tf.float32)
             )
 
@@ -160,7 +164,7 @@ class SSD(snt.AbstractModule):
                 predictions_filter = tf.greater_equal(class_targets, 0)
 
                 target_anchors = tf.boolean_mask(
-                    all_anchors, predictions_filter)
+                    anchors, predictions_filter)
                 bbox_offsets_targets = tf.boolean_mask(
                     bbox_offsets_targets, predictions_filter)
                 class_targets = tf.boolean_mask(
@@ -189,19 +193,20 @@ class SSD(snt.AbstractModule):
                 tf.cast(tf.shape(image)[1:3], tf.float32)
             )
             prediction_dict['classification_prediction'] = proposals
+
         if not is_training:
             # Generate proposals for prediction
             proposals = proposals_creator(
-                class_probabilities, bbox_offsets, all_anchors,
+                class_probabilities, bbox_offsets, anchors,
                 tf.cast(tf.shape(image)[1:3], tf.float32)
             )
-            prediction_dict['classification_prediction'] = proposals 
+            prediction_dict['classification_prediction'] = proposals
 
         prediction_dict['cls_pred'] = class_scores
         prediction_dict['loc_pred'] = bbox_offsets
 
         if self._debug:
-            prediction_dict['all_anchors'] = all_anchors
+            prediction_dict['all_anchors'] = anchors
             prediction_dict['cls_prob'] = class_probabilities
             if is_training:
                 prediction_dict['gt_boxes'] = gt_boxes
@@ -261,8 +266,8 @@ class SSD(snt.AbstractModule):
                 name='bbox_offsets_target_positives'
             )
 
-            # Calculate the smooth l1 regression loss between the flatten bboxes
-            # offsets  and the labeled targets.
+            # Calculate the smooth l1 regression loss between the flatten
+            # bboxes offsets  and the labeled targets.
             reg_loss_per_proposal = smooth_l1_loss(
                 bbox_offsets_positives, bbox_offsets_target_positives)
 
@@ -306,75 +311,6 @@ class SSD(snt.AbstractModule):
             )
 
             return total_loss
-
-    def generate_raw_anchors(self, feature_maps):
-        """
-        Returns a dictionary containing the anchors per feature map.
-
-        Returns:
-        anchors: A dictionary with feature maps as keys and an array of anchors
-            as values ('[[x_min, y_min, x_max, y_max], ...]') with shape
-            (anchors_per_point[i] * endpoints_outputs[i][0]
-             * endpoints_outputs[i][1], 4)
-        """
-        # We interpolate the scales of the anchors from a min and a max scale
-        scales = np.linspace(self._anchor_min_scale, self._anchor_max_scale,
-                             len(feature_maps))
-
-        anchors = {}
-        for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
-            feat_map_shape = feat_map.shape.as_list()[1:3]
-            anchor_reference = generate_anchors_reference(
-                self._anchor_ratios, scales[i: i + 2],
-                self._anchors_per_point[i], feat_map_shape
-            )
-            anchors[feat_map_name] = self._generate_anchors(
-                feat_map_shape, anchor_reference)
-
-        return anchors
-
-    def _generate_anchors(self, feature_map_shape, anchor_reference):
-        """Generate anchor for an image.
-
-        Using the feature map, the output of the pretrained network for an
-        image, and the anchor_reference generated using the anchor config
-        values. We generate a list of anchors.
-
-        Anchors are just fixed bounding boxes of different ratios and sizes
-        that are uniformly generated throught the image.
-
-        Args:
-            feature_map_shape: Shape of the convolutional feature map used as
-                input for the RPN. Should be (batch, height, width, depth).
-
-        Returns:
-            all_anchors: A flattened Tensor with all the anchors of shape
-                `(num_anchors_per_points * feature_width * feature_height, 4)`
-                using the (x1, y1, x2, y2) convention.
-        """
-        with tf.variable_scope('generate_anchors'):
-            shift_x = np.arange(feature_map_shape[1])
-            shift_y = np.arange(feature_map_shape[0])
-            shift_x, shift_y = np.meshgrid(shift_x, shift_y)
-
-            shift_x = np.reshape(shift_x, [-1])
-            shift_y = np.reshape(shift_y, [-1])
-
-            shifts = np.stack(
-                [shift_x, shift_y, shift_x, shift_y],
-                axis=0
-            )
-
-            shifts = np.transpose(shifts)
-            # Shifts now is a (H x W, 4) Tensor
-
-            # Expand dims to use broadcasting sum.
-            all_anchors = (
-                np.expand_dims(anchor_reference, axis=0) +
-                np.expand_dims(shifts, axis=1)
-            )
-            # Flatten
-            return np.reshape(all_anchors, (-1, 4))
 
     @property
     def summary(self):

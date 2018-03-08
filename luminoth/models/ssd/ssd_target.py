@@ -17,16 +17,11 @@ class SSDTarget(snt.AbstractModule):
         """
         super(SSDTarget, self).__init__(name=name)
         self._num_classes = num_classes
-        # Ratio of foreground vs background for the minibatch.
         self._foreground_fraction = config.hard_negative_ratio
         self._num_anchors = tf.cast(num_anchors, tf.int32)
-        # IoU lower threshold with a ground truth box to be considered that
-        # specific class.
         self._foreground_threshold = config.foreground_threshold
-        # High and low treshold to be considered background.
         self._background_threshold_high = config.background_threshold_high
         self._background_threshold_low = config.background_threshold_low
-
         self._variances = variances
         self._seed = seed
 
@@ -63,40 +58,11 @@ class SSDTarget(snt.AbstractModule):
         )
 
         overlaps = bbox_overlap_tf(all_anchors, gt_boxes[:, :4])
-        # overlaps now contains (num_anchors, num_gt_boxes) with the IoU of
-        # anchor P and ground truth box G in overlaps[P, G]
-
-        # For each overlap there is two possible outcomes for labelling by now:
-        #  if max(iou) > config.foreground_threshold then we label with
-        #      the highest IoU in overlap.
-        #  elif (config.background_threshold_low <= max(iou) <=
-        #       config.background_threshold_high) we label with background (0)
-        #  else we label with -1.
-
-        # max_overlaps gets, for each anchor, the index in which we can
-        # find the gt_box with which it has the highest overlap.
         max_overlaps = tf.reduce_max(overlaps, axis=1)
-
-        # TODO Check if removing this breaks something
-        # # Filter all_anchors with negative or zero area.
-        # (x_min, y_min, x_max, y_max) = tf.unstack(
-        #     all_anchors, axis=1
-        # )
-        # anchors_filter = tf.greater(
-        #     tf.maximum(x_max - x_min, 0.0) * tf.maximum(y_max - y_min, 0.0),
-        #     0.0
-        # )
-        # # We (force) reshape the filter so that we can use it as a boolean mask
-        # anchors_filter = tf.reshape(anchors_filter, [-1])
-        # # Ignore the all_anchors with negative area with a -1
-        # anchors_label = tf.where(
-        #     condition=anchors_filter,
-        #     x=anchors_label,
-        #     y=tf.fill(dims=anchors_label_shape, value=-1.)
-        # )
 
         # Get the index of the best gt_box for each anchor.
         best_gtbox_for_anchors_idx = tf.argmax(overlaps, axis=1)
+
         # Having the index of the gt bbox with the best label we need to get
         # the label for each gt box and sum 1 to it because 0 is used for
         # background.
@@ -116,19 +82,14 @@ class SSDTarget(snt.AbstractModule):
             y=anchors_label
         )
 
-        # ################### TODO is this necesary? ###############
         best_anchor_idxs = tf.argmax(overlaps, axis=0)
-        # Set the indices in best_anchor_idxs to True, and the rest to false.
-        # tf.sparse_to_dense is used because we know the set of indices which
-        # we want to set to True, and we know the rest of the indices
-        # should be set to False. That's exactly the use case of
-        # tf.sparse_to_dense.
         is_best_box = tf.sparse_to_dense(
             sparse_indices=best_anchor_idxs,
             sparse_values=True, default_value=False,
             output_shape=tf.cast(anchors_label_shape, tf.int64),
             validate_indices=False
         )
+
         # Now we need to find the anchors that are the best for each of the
         # gt_boxes. We overwrite the previous anchors_label with this
         # because setting the best anchor for each gt_box has priority.
@@ -146,7 +107,6 @@ class SSDTarget(snt.AbstractModule):
             y=anchors_label,
             name="update_labels_for_bestbox_anchors"
         )
-        #  ##########################################################
 
         # Use the worst backgrounds (the bgs whose probability of being fg is
         # the greatest).
@@ -189,12 +149,10 @@ class SSDTarget(snt.AbstractModule):
             y=anchors_label
         )
 
-        """
-        Next step is to calculate the proper bbox targets for the labeled
-        anchors based on the values of the ground-truth boxes.
-        We have to use only the anchors labeled >= 1, each matching with
-        the proper gt_boxes
-        """
+        # Next step is to calculate the proper bbox targets for the labeled
+        # anchors based on the values of the ground-truth boxes.
+        # We have to use only the anchors labeled >= 1, each matching with
+        # the proper gt_boxes
 
         # Get the ids of the anchors that mater for bbox_target comparison.
         is_anchor_with_target = tf.greater(
