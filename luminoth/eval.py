@@ -53,7 +53,10 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
     config.dataset.data_augmentation = []
 
     # Override max detections with specified value.
-    config.model.rcnn.proposals.total_max_detections = max_detections
+    if config.model.network.with_rcnn:
+        config.model.rcnn.proposals.total_max_detections = max_detections
+    else:
+        config.model.rpn.proposals.post_nms_top_n = max_detections
 
     # Also overwrite `min_prob_threshold` in order to use all the detections.
     config.model.rcnn.proposals.min_prob_threshold = 0.0
