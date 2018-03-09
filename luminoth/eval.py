@@ -1,4 +1,5 @@
 import click
+import json
 import numpy as np
 import os
 import tensorflow as tf
@@ -49,8 +50,16 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
 
     # Build the dataset tensors, overriding the default dataset split.
     config.dataset.split = dataset_split
+
     # Disable data augmentation.
     config.dataset.data_augmentation = []
+
+    # Attempt to get class names, if available.
+    classes_file = os.path.join(config.dataset.dir, 'classes.json')
+    if tf.gfile.Exists(classes_file):
+        class_labels = json.load(tf.gfile.GFile(classes_file))
+    else:
+        class_labels = None
 
     # Override max detections with specified value.
     if config.model.network.with_rcnn:
@@ -175,6 +184,7 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
                 start = time.time()
                 evaluate_once(
                     config, writer, saver, ops, checkpoint,
+                    class_labels=class_labels,
                     metrics_scope=metrics_scope,
                     image_vis=config.eval.image_vis,
                     files_per_class=files_per_class,
@@ -262,7 +272,7 @@ def get_checkpoints(run_dir, from_global_step=None, last_only=False):
 
 
 def evaluate_once(config, writer, saver, ops, checkpoint,
-                  metrics_scope='metrics', image_vis=None,
+                  class_labels, metrics_scope='metrics', image_vis=None,
                   files_per_class=None, files_to_visualize=None):
     """Run the evaluation once.
 
@@ -411,9 +421,12 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
             )
 
             for idx, val in enumerate(ap_per_class[:, 0]):
+                class_label = '{} ({})'.format(
+                    class_labels[idx], idx
+                ) if class_labels else idx
                 tf.logging.debug(
                     'Average Precision (AP) @ [0.50] for {} = {:.3f}'.format(
-                        idx, val
+                        class_label, val
                     )
                 )
 
