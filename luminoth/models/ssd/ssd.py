@@ -3,7 +3,7 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from luminoth.models.base import SSDFeatureExtractor
+from luminoth.models.ssd.ssd_feature_extractor import SSDFeatureExtractor
 from luminoth.models.ssd.ssd_proposal import SSDProposal
 from luminoth.models.ssd.ssd_target import SSDTarget
 from luminoth.models.ssd.ssd_utils import (
