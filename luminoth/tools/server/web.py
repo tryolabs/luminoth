@@ -4,6 +4,7 @@ import tensorflow as tf
 from flask import Flask, jsonify, request, render_template
 from threading import Thread
 from PIL import Image
+from six.moves import _thread
 
 from luminoth.tools.checkpoint import get_checkpoint_config
 from luminoth.utils.config import get_config, override_config_params
@@ -57,7 +58,12 @@ def predict(model_name):
 
 def start_network(config):
     global PREDICTOR_NETWORK
-    PREDICTOR_NETWORK = PredictorNetwork(config)
+    try:
+        PREDICTOR_NETWORK = PredictorNetwork(config)
+    except Exception as e:
+        # An error occurred loading the model; interrupt the whole server.
+        tf.logging.error(e)
+        _thread.interrupt_main()
 
 
 @click.command(help='Start basic web application.')
