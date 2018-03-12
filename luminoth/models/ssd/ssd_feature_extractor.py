@@ -8,7 +8,7 @@ from tensorflow.python.ops import init_ops
 from luminoth.models.base import BaseNetwork
 
 
-VALID_ARCHITECTURES = set([
+VALID_SSD_ARCHITECTURES = set([
     'vgg_16',
 ])
 
@@ -18,13 +18,10 @@ class SSDFeatureExtractor(BaseNetwork):
     def __init__(self, config, parent_name=None, name='ssd_feature_extractor',
                  **kwargs):
         super(SSDFeatureExtractor, self).__init__(config, name=name, **kwargs)
-        if config.get('architecture') not in VALID_ARCHITECTURES:
+        if self._architecture not in VALID_SSD_ARCHITECTURES:
             raise ValueError('Invalid architecture "{}"'.format(
-                config.get('architecture')
+                self._architecture
             ))
-
-        self._architecture = config.get('architecture')
-        self._config = config
         self.parent_name = parent_name
         self._dropout_keep_prob = config.dropout_keep_prob
 
@@ -50,33 +47,29 @@ class SSDFeatureExtractor(BaseNetwork):
             base_network_truncation_endpoint = base_net_endpoints[
                 scope + '/vgg_16/conv5/conv5_3']
 
-            # We'll add the feature maps to a collection. In the paper they use
-            # one of vgg16's layers as a feature map, so we start by adding it.
-            vgg_conv4_3_name = scope + '/vgg_16/conv4/conv4_3'
-            vgg_conv4_3 = base_net_endpoints[vgg_conv4_3_name]
-
             # As it is pointed out in SSD and ParseNet papers, `conv4_3` has a
             # different features scale compared to other layers, to adjust it
             # we need to add a spatial normalization before adding the
             # predictors.
+            vgg_conv4_3_name = scope + '/vgg_16/conv4/conv4_3'
+            vgg_conv4_3 = base_net_endpoints[vgg_conv4_3_name]
             with tf.variable_scope(vgg_conv4_3_name + '_norm'):
                 inputs_shape = vgg_conv4_3.shape
                 inputs_rank = inputs_shape.ndims
                 dtype = vgg_conv4_3.dtype.base_dtype
-
                 norm_dim = tf.range(inputs_rank - 1, inputs_rank)
                 params_shape = inputs_shape[-1:]
 
+                # Normalize.
                 vgg_conv4_3_norm = tf.nn.l2_normalize(
                     vgg_conv4_3, norm_dim, epsilon=1e-12
                 )
 
-                # Post scaling.
+                # Scale.
                 scale = variables.model_variable(
                     'gamma', shape=params_shape, dtype=dtype,
                     initializer=init_ops.ones_initializer()
                 )
-
                 vgg_conv4_3_norm = tf.multiply(vgg_conv4_3_norm, scale)
 
             tf.add_to_collection('FEATURE_MAPS', vgg_conv4_3_norm)
@@ -114,5 +107,5 @@ class SSDFeatureExtractor(BaseNetwork):
             # pretrained weights
             self.pretrained_weights_scope = 'ssd/ssd_feature_extractor/vgg_16'
 
-        # Its actually an ordered dict
+        # It's actually an ordered dict
         return utils.convert_collection_to_dict('FEATURE_MAPS')

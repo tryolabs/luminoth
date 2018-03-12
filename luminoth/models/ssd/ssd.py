@@ -16,49 +16,24 @@ from luminoth.utils.bbox_transform import clip_boxes
 
 
 class SSD(snt.AbstractModule):
-    """TODO
+    """SSD: Single Shot MultiBox Detector
     """
 
     def __init__(self, config, name='ssd'):
         super(SSD, self).__init__(name=name)
-
-        # Main configuration object, it holds not only the necessary
-        # information for this module but also configuration for each of the
-        # different submodules.
         self._config = config
-
-        # Total number of classes to classify.
         self._num_classes = config.model.network.num_classes
-
-        # Turn on debug mode with returns more Tensors which can be used for
-        # better visualization and (of course) debugging.
         self._debug = config.train.debug
         self._seed = config.train.seed
-
-        # Anchor config, check out the docs of base_config.yml for a better
-        # understanding of how anchors work.
         self._anchor_max_scale = config.model.anchors.max_scale
         self._anchor_min_scale = config.model.anchors.min_scale
         self._anchor_ratios = np.array(config.model.anchors.ratios)
-
-        # Image shape (SSD has a fixed image shape)
         self.image_shape = [config.dataset.image_preprocessing.fixed_height,
                             config.dataset.image_preprocessing.fixed_width]
-
-        # Total number of anchors per point, per endpoint.
         self._anchors_per_point = config.model.anchors.anchors_per_point
-
-        # Weight for the localization loss
         self._loc_loss_weight = config.model.loss.localization_loss_weight
-
         # TODO: Why not use the default LOSSES collection?
         self._losses_collections = ['ssd_losses']
-
-        # We want the pretrained model to be outside the ssd name scope.
-        with self._enter_variable_scope():
-            self.feature_extractor = SSDFeatureExtractor(
-                config.model.base_network, parent_name=self.module_name
-            )
 
     def _build(self, image, gt_boxes=None, is_training=True):
         """
@@ -85,12 +60,15 @@ class SSD(snt.AbstractModule):
             bbox_offsets: A tensor with the predicted bbox_offsets
             class_scores: A tensor with the predicted classes scores
         """
-        if gt_boxes is not None:
-            gt_boxes = tf.cast(gt_boxes, tf.float32)
-
+        # Reshape image
         self.image_shape.append(3)  # Add channels to shape
         image.set_shape(self.image_shape)
         image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
+
+        # Generate feature maps from image
+        self.feature_extractor = SSDFeatureExtractor(
+            self._config.model.base_network, parent_name=self.module_name
+        )
         feature_maps = self.feature_extractor(image, is_training=is_training)
 
         # Build a MultiBox predictor on top of each feature layer and collect
@@ -142,15 +120,18 @@ class SSD(snt.AbstractModule):
         # TODO: They were using float64, is all this precision necesary?
         anchors = tf.convert_to_tensor(anchors, dtype=tf.float64)
 
-        # We'll return this dict after we fill it with predictions
+        # This is the dict we'll return after filling it with SSD's results
         prediction_dict = {}
 
         # Generate targets for training
         if is_training and gt_boxes is not None:
+            gt_boxes = tf.cast(gt_boxes, tf.float32)
+
             # Generate targets
-            target_creator = SSDTarget(self._num_classes, anchors.shape[0],
-                                       self._config.model.target,
-                                       self._config.model.variances)
+            target_creator = SSDTarget(
+                self._num_classes, anchors.shape[0], self._config.model.target,
+                self._config.model.variances
+            )
             class_targets, bbox_offsets_targets = target_creator(
                 class_probabilities, anchors, gt_boxes,
                 tf.cast(tf.shape(image), tf.float32)
@@ -163,7 +144,7 @@ class SSD(snt.AbstractModule):
             with tf.name_scope('prepare_batch'):
                 predictions_filter = tf.greater_equal(class_targets, 0)
 
-                target_anchors = tf.boolean_mask(
+                anchors = tf.boolean_mask(
                     anchors, predictions_filter)
                 bbox_offsets_targets = tf.boolean_mask(
                     bbox_offsets_targets, predictions_filter)
@@ -176,39 +157,37 @@ class SSD(snt.AbstractModule):
                 bbox_offsets = tf.boolean_mask(
                     bbox_offsets, predictions_filter)
 
+            # Add target tensors to prediction dict
             prediction_dict['target'] = {
                 'cls': class_targets,
                 'bbox_offsets': bbox_offsets_targets,
-                'anchors': target_anchors
+                'anchors': anchors
             }
 
-        # Get the proposals and save the result
-        proposals_creator = SSDProposal(self._num_classes,
-                                        self._config.model.proposals,
-                                        self._config.model.variances)
-        if is_training and self._debug:
-            # Generate proposals for visualization during training with debug
-            proposals = proposals_creator(
-                class_probabilities, bbox_offsets, target_anchors,
-                tf.cast(tf.shape(image)[1:3], tf.float32)
-            )
-            prediction_dict['classification_prediction'] = proposals
+        # Add network's raw output to prediction dict
+        prediction_dict['cls_pred'] = class_scores
+        prediction_dict['loc_pred'] = bbox_offsets
 
-        if not is_training:
-            # Generate proposals for prediction
+        # We generate proposals when predicting, or when debug=True for
+        # generating visualizations during training.
+        if not is_training or self._debug:
+            proposals_creator = SSDProposal(
+                self._num_classes, self._config.model.proposals,
+                self._config.model.variances
+            )
             proposals = proposals_creator(
                 class_probabilities, bbox_offsets, anchors,
                 tf.cast(tf.shape(image)[1:3], tf.float32)
             )
             prediction_dict['classification_prediction'] = proposals
 
-        prediction_dict['cls_pred'] = class_scores
-        prediction_dict['loc_pred'] = bbox_offsets
-
+        # Add some non essential metrics for debugging
         if self._debug:
             prediction_dict['all_anchors'] = anchors
             prediction_dict['cls_prob'] = class_probabilities
             if is_training:
+                # TODO does it make sense to return this when its an input
+                # to our network and we do no changes to it?
                 prediction_dict['gt_boxes'] = gt_boxes
 
         return prediction_dict
