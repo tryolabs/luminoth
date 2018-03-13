@@ -1,6 +1,6 @@
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 
+from sonnet.python.modules.conv import Conv2D
 from tensorflow.contrib.layers.python.layers import utils
 from tensorflow.contrib.framework.python.ops import variables
 from tensorflow.python.ops import init_ops
@@ -23,7 +23,20 @@ class SSDFeatureExtractor(BaseNetwork):
                 self._architecture
             ))
         self.parent_name = parent_name
-        self._dropout_keep_prob = config.dropout_keep_prob
+        self.activation_fn = tf.nn.relu
+
+    def _init_vgg16_extra_layers(self):
+        # TODO: Try Xavier initializer
+        self.conv6 = Conv2D(1024, [3, 3], rate=6, name='conv6')
+        self.conv7 = Conv2D(1024, [1, 1], name='conv7')
+        self.conv8_1 = Conv2D(256, [1, 1], name='conv8_1')
+        self.conv8_2 = Conv2D(512, [3, 3], stride=2, name='conv8_2')
+        self.conv9_1 = Conv2D(128, [1, 1], name='conv9_1')
+        self.conv9_2 = Conv2D(256, [3, 3], stride=2, name='conv9_2')
+        self.conv10_1 = Conv2D(128, [1, 1], name='conv10_1')
+        self.conv10_2 = Conv2D(256, [3, 3], padding='VALID', name='conv10_2')
+        self.conv11_1 = Conv2D(128, [1, 1], name='conv11_1')
+        self.conv11_2 = Conv2D(256, [3, 3], padding='VALID', name='conv11_2')
 
     def _build(self, inputs, is_training=True):
         """
@@ -41,10 +54,10 @@ class SSDFeatureExtractor(BaseNetwork):
         base_net_endpoints = super(SSDFeatureExtractor, self)._build(
             inputs, is_training=is_training)['end_points']
 
-        # The original SSD paper uses a modified version of the vgg16 network,
-        # which we'll build here
         if self.vgg_type:
-            base_network_truncation_endpoint = base_net_endpoints[
+            # The original SSD paper uses a modified version of the vgg16
+            # network, which we'll modify here
+            vgg_network_truncation_endpoint = base_net_endpoints[
                 scope + '/vgg_16/conv5/conv5_3']
 
             # As it is pointed out in SSD and ParseNet papers, `conv4_3` has a
@@ -66,42 +79,48 @@ class SSDFeatureExtractor(BaseNetwork):
                 )
 
                 # Scale.
+                # TODO use tf.get_variable and initialize
+                #      to 20 as described in paper
                 scale = variables.model_variable(
                     'gamma', shape=params_shape, dtype=dtype,
                     initializer=init_ops.ones_initializer()
                 )
                 vgg_conv4_3_norm = tf.multiply(vgg_conv4_3_norm, scale)
-
             tf.add_to_collection('FEATURE_MAPS', vgg_conv4_3_norm)
 
-            # TODO: check that the usage of `padding='VALID'` is correct
-            # TODO: check that the 1x1 convs actually use relu
-            # Modifications to vgg16
+            # Extra layers for vgg16 as detailed in paper
+            self._init_vgg16_extra_layers()
             with tf.variable_scope('extra_feature_layers'):
-                net = slim.max_pool2d(base_network_truncation_endpoint, [3, 3],
-                                      padding='SAME', stride=1, scope='pool5')
-                # TODO: or is it rate=12?
-                net = slim.conv2d(net, 1024, [3, 3], rate=6, scope='conv6')
-                net = slim.dropout(net, self._dropout_keep_prob,
-                                   is_training=is_training)
-                net = slim.conv2d(net, 1024, [1, 1], scope='conv7',
-                                  outputs_collections='FEATURE_MAPS')
-                net = slim.dropout(net, self._dropout_keep_prob,
-                                   is_training=is_training)
-                net = slim.conv2d(net, 256, [1, 1], scope='conv8_1')
-                net = slim.conv2d(net, 512, [3, 3], stride=2, scope='conv8_2',
-                                  outputs_collections='FEATURE_MAPS')
-                net = slim.conv2d(net, 128, [1, 1], scope='conv9_1')
-                net = slim.conv2d(net, 256, [3, 3], stride=2, scope='conv9_2',
-                                  outputs_collections='FEATURE_MAPS')
-                net = slim.conv2d(net, 128, [1, 1], scope='conv10_1')
-                net = slim.conv2d(net, 256, [3, 3], scope='conv10_2',
-                                  padding='VALID',
-                                  outputs_collections='FEATURE_MAPS')
-                net = slim.conv2d(net, 128, [1, 1], scope='conv11_1')
-                net = slim.conv2d(net, 256, [3, 3], scope='conv11_2',
-                                  padding='VALID',
-                                  outputs_collections='FEATURE_MAPS')
+                # from IPython import embed; embed(display_banner=False)
+                net = tf.nn.max_pool(
+                    vgg_network_truncation_endpoint, [1, 3, 3, 1],
+                    padding='SAME', strides=[1, 1, 1, 1], name='pool5'
+                )
+                net = self.conv6(net)
+                net = self.activation_fn(net)
+                net = self.conv7(net)
+                net = self.activation_fn(net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+                net = self.conv8_1(net)
+                net = self.activation_fn(net)
+                net = self.conv8_2(net)
+                net = self.activation_fn(net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+                net = self.conv9_1(net)
+                net = self.activation_fn(net)
+                net = self.conv9_2(net)
+                net = self.activation_fn(net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+                net = self.conv10_1(net)
+                net = self.activation_fn(net)
+                net = self.conv10_2(net)
+                net = self.activation_fn(net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+                net = self.conv11_1(net)
+                net = self.activation_fn(net)
+                net = self.conv11_2(net)
+                net = self.activation_fn(net)
+                tf.add_to_collection('FEATURE_MAPS', net)
 
             # This parameter determines onto which variables we try to load the
             # pretrained weights

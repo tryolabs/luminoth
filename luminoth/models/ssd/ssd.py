@@ -1,8 +1,8 @@
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 
+from sonnet.python.modules.conv import Conv2D
 from luminoth.models.ssd.ssd_feature_extractor import SSDFeatureExtractor
 from luminoth.models.ssd.ssd_proposal import SSDProposal
 from luminoth.models.ssd.ssd_target import SSDTarget
@@ -79,25 +79,24 @@ class SSD(snt.AbstractModule):
             num_anchors = self._anchors_per_point[i]
 
             # Predict bbox offsets
-            bbox_offsets_layer = slim.conv2d(
-                feat_map, num_anchors * 4, [3, 3], activation_fn=None,
-                scope=feat_map_name + '/conv_loc', padding='SAME'
-            )
+            bbox_offsets_layer = Conv2D(
+                num_anchors * 4, [3, 3], name=feat_map_name + '_offsets_conv'
+            )(feat_map)
             bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
             bbox_offsets_list.append(bbox_offsets_flattened)
 
             # Predict class scores
-            class_scores_layer = slim.conv2d(
-                feat_map, num_anchors * (self._num_classes + 1), [3, 3],
-                activation_fn=None, scope=feat_map_name + '/conv_cls',
-                padding='SAME'
+            class_scores_layer = Conv2D(
+                num_anchors * (self._num_classes + 1), [3, 3],
+                name=feat_map_name + '_classes_conv',
+            )(feat_map)
+            class_scores_flattened = tf.reshape(
+                class_scores_layer, [-1, self._num_classes + 1]
             )
-            class_scores_flattened = tf.reshape(class_scores_layer,
-                                                [-1, self._num_classes + 1])
             class_scores_list.append(class_scores_flattened)
         bbox_offsets = tf.concat(bbox_offsets_list, axis=0)
         class_scores = tf.concat(class_scores_list, axis=0)
-        class_probabilities = slim.softmax(class_scores)
+        class_probabilities = tf.nn.softmax(class_scores)
 
         # Generate anchors (generated only once, therefore we use numpy)
         raw_anchors_per_featmap = generate_raw_anchors(
