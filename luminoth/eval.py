@@ -61,14 +61,18 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
     else:
         class_labels = None
 
-    # Override max detections with specified value.
-    if config.model.network.with_rcnn:
-        config.model.rcnn.proposals.total_max_detections = max_detections
-    else:
-        config.model.rpn.proposals.post_nms_top_n = max_detections
+    if config.model.type == 'fasterrcnn':
+        # Override max detections with specified value.
+        if config.model.network.with_rcnn:
+            config.model.rcnn.proposals.total_max_detections = max_detections
+        else:
+            config.model.rpn.proposals.post_nms_top_n = max_detections
 
-    # Also overwrite `min_prob_threshold` in order to use all the detections.
-    config.model.rcnn.proposals.min_prob_threshold = 0.0
+        # Also overwrite `min_prob_threshold` in order to use all detections.
+        config.model.rcnn.proposals.min_prob_threshold = 0.0
+    else:
+        config.model.proposals.total_max_detections = max_detections
+        config.model.proposals.min_prob_threshold = 0.0
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1
@@ -94,7 +98,7 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
     # intermediate tensors.
     prediction_dict = model(train_image, train_objects)
 
-    if config.model.network.with_rcnn:
+    if config.model.type == 'ssd' or config.model.network.with_rcnn:
         pred = prediction_dict['classification_prediction']
         pred_objects = pred['objects']
         pred_objects_classes = pred['labels']
@@ -360,7 +364,7 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                     if visualize_file:
                         image_summaries = image_vis_summaries(
                             batch_fetched['prediction_dict'],
-                            with_rcnn=config.model.network.with_rcnn,
+                            config=config.model,
                             extra_tag=filename,
                             image_visualization_mode=image_vis,
                             image=batch_fetched['train_image'],
