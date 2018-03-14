@@ -120,7 +120,8 @@ def resize_image_fixed(image, new_height, new_width, bboxes=None):
     height = image_shape[0]
     width = image_shape[1]
 
-    scale_factor = height / new_height
+    scale_factor_height = new_height / height
+    scale_factor_width = new_width / width
 
     # Resize image using TensorFlow's own `resize_image` utility.
     image = tf.image.resize_images(
@@ -137,12 +138,12 @@ def resize_image_fixed(image, new_height, new_width, bboxes=None):
         return {
             'image': image,
             'bboxes': bboxes,
-            'scale_factor': scale_factor,
+            'scale_factor': [scale_factor_height, scale_factor_width],
         }
 
     return {
         'image': image,
-        'scale_factor': scale_factor,
+        'scale_factor': [scale_factor_height, scale_factor_width],
     }
 
 
