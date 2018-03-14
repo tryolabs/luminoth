@@ -4,6 +4,7 @@ import numpy as np
 import os
 import skvideo.io
 import sys
+import time
 import tensorflow as tf
 
 from PIL import Image, ImageDraw
@@ -161,6 +162,7 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
     objects_per_frame = []
     with video_progress_bar as bar:
         try:
+            start_time = time.time()
             for idx, frame in enumerate(bar):
                 # Run image through network.
                 objects = network.predict_image(frame)
@@ -181,6 +183,10 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
                 image = Image.fromarray(frame)
                 draw_bboxes_on_image(image, objects, min_prob)
                 writer.writeFrame(np.array(image))
+            stop_time = time.time()
+            click.echo(
+                'fps: {0:.1f}'.format(num_of_frames / (stop_time - start_time))
+            )
         except RuntimeError as e:
             click.echo()  # Error prints next to progress bar otherwise.
             click.echo('Error while processing {}: {}'.format(path, e))

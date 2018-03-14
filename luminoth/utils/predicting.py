@@ -114,8 +114,12 @@ class PredictorNetwork(object):
         if self.class_labels is not None:
             labels = [self.class_labels[label] for label in labels]
 
-        # Scale objects to original image dimensions.
-        objects /= scale_factor
+        # Scale objects to original image dimensions
+        if isinstance(scale_factor, list):
+            objects /= [scale_factor[1], scale_factor[0],
+                        scale_factor[1], scale_factor[0]]
+        else:
+            objects /= scale_factor
         objects = [[round(coord) for coord in obj] for obj in objects.tolist()]
 
         predictions = sorted([

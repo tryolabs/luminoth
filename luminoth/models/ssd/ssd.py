@@ -35,7 +35,7 @@ class SSD(snt.AbstractModule):
         # TODO: Why not use the default LOSSES collection?
         self._losses_collections = ['ssd_losses']
 
-    def _build(self, image, gt_boxes=None, is_training=True):
+    def _build(self, image, gt_boxes=None, is_training=False):
         """
         Returns bounding boxes and classification probabilities.
 
@@ -184,7 +184,7 @@ class SSD(snt.AbstractModule):
         if self._debug:
             prediction_dict['all_anchors'] = anchors
             prediction_dict['cls_prob'] = class_probabilities
-            if is_training:
+            if gt_boxes:
                 # TODO does it make sense to return this when its an input
                 # to our network and we do no changes to it?
                 prediction_dict['gt_boxes'] = gt_boxes
