@@ -252,8 +252,10 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
     elif config_files:
         config = get_config(config_files)
     else:
-        click.echo('You must specify either a checkpoint or a config file.')
-        return
+        click.echo(
+            'Neither checkpoint not config specified, assuming `accurate`.'
+        )
+        config = get_checkpoint_config('accurate')
 
     if override_params:
         config = override_config_params(config, override_params)
