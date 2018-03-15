@@ -5,6 +5,9 @@ from luminoth.models.fasterrcnn.rcnn_proposal import RCNNProposal
 from luminoth.models.fasterrcnn.rcnn_target import RCNNTarget
 from luminoth.models.fasterrcnn.roi_pool import ROIPoolingLayer
 from luminoth.utils.losses import smooth_l1_loss
+from luminoth.utils.safe_wrappers import (
+    safe_softmax_cross_entropy_with_logits
+)
 from luminoth.utils.vars import (
     get_initializer, layer_summaries, variable_summaries,
     get_activation_function
@@ -323,7 +326,7 @@ class RCNN(snt.AbstractModule):
 
             # We get cross entropy loss of each proposal.
             cross_entropy_per_proposal = (
-                tf.nn.softmax_cross_entropy_with_logits(
+                safe_softmax_cross_entropy_with_logits(
                     labels=cls_target_one_hot, logits=cls_score_labeled
                 )
             )
