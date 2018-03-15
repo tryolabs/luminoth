@@ -125,6 +125,7 @@ model:
 
   # Whether to use batch normalization in the model.
   batch_norm: False
+  variances: [0.1, 0.2]
 
   base_network:
     # Which type of pretrained network to use.
