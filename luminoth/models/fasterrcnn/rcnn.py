@@ -215,7 +215,7 @@ class RCNN(snt.AbstractModule):
                 net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
 
         cls_score = self._classifier_layer(net)
-        cls_prob = tf.nn.softmax(cls_score, dim=1)
+        cls_prob = tf.nn.softmax(cls_score, axis=1)
         bbox_offsets = self._bbox_layer(net)
 
         prediction_dict['rcnn'] = {
@@ -323,8 +323,9 @@ class RCNN(snt.AbstractModule):
 
             # We get cross entropy loss of each proposal.
             cross_entropy_per_proposal = (
-                tf.nn.softmax_cross_entropy_with_logits(
-                    labels=cls_target_one_hot, logits=cls_score_labeled
+                tf.nn.softmax_cross_entropy_with_logits_v2(
+                    labels=tf.stop_gradient(cls_target_one_hot),
+                    logits=cls_score_labeled
                 )
             )
 
