@@ -123,7 +123,7 @@ class SSD(snt.AbstractModule):
         prediction_dict = {}
 
         # Generate targets for training
-        if is_training and gt_boxes is not None:
+        if gt_boxes is not None:
             gt_boxes = tf.cast(gt_boxes, tf.float32)
 
             # Generate targets
@@ -184,7 +184,7 @@ class SSD(snt.AbstractModule):
         if self._debug:
             prediction_dict['all_anchors'] = anchors
             prediction_dict['cls_prob'] = class_probabilities
-            if gt_boxes:
+            if gt_boxes is not None:
                 # TODO does it make sense to return this when its an input
                 # to our network and we do no changes to it?
                 prediction_dict['gt_boxes'] = gt_boxes
