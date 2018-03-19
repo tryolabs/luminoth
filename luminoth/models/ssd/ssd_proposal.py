@@ -66,6 +66,7 @@ class SSDProposal(snt.AbstractModule):
         selected_boxes = []
         selected_probs = []
         selected_labels = []
+        selected_anchors = []  # For debugging
 
         for class_id in range(self._num_classes):
             # Get the confidences for this class (+ 1 is to ignore background)
@@ -139,6 +140,7 @@ class SSDProposal(snt.AbstractModule):
             selected_labels.append(
                 tf.tile([class_id], [tf.shape(class_selected_idx)[0]])
             )
+            selected_anchors.append(proposal_anchors)
 
         # We use concat (axis=0) to generate a Tensor where the rows are
         # stacked on top of each other
@@ -147,6 +149,7 @@ class SSDProposal(snt.AbstractModule):
         proposals = change_order(proposals_tf)
         proposal_label = tf.concat(selected_labels, axis=0)
         proposal_label_prob = tf.concat(selected_probs, axis=0)
+        proposal_anchors = tf.concat(selected_anchors, axis=0)
 
         # Get topK detections of all classes.
         k = tf.minimum(
