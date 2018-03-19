@@ -1435,17 +1435,21 @@ def draw_ssd_top_k_anchors_per_gt(pred_dict, image, top_k=5):
             list(gt_box[:4]), fill=(0, 0, 255, 60), outline=(0, 0, 255, 150)
         )
 
-        # Get indices of the top_k anchors
-        partition_edge = top_k * -1
-        top_k_anchors_idx = np.argpartition(
-            overlaps_per_gt_box, partition_edge
-        )[partition_edge:]
+        if top_k < len(overlaps):
+            # Get indices of the top_k anchors
+            partition_edge = top_k * -1
+            top_k_anchors_idx = np.argpartition(
+                overlaps_per_gt_box, partition_edge
+            )[partition_edge:]
         
-        # Get top_k anchors
-        top_k_anchors = anchors[top_k_anchors_idx]
+            # Get top_k anchors
+            top_k_anchors = anchors[top_k_anchors_idx]
 
-        # Get the iou for the top_k anchors
-        top_k_overlaps = overlaps_per_gt_box[top_k_anchors_idx]
+            # Get the iou for the top_k anchors
+            top_k_overlaps = overlaps_per_gt_box[top_k_anchors_idx]
+        else:
+            top_k_anchors = anchors
+            top_k_overlaps = overlaps_per_gt_box
 
         # Draw best k anchors with regards to overlap (iou)
         for anchor, iou in zip(top_k_anchors, top_k_overlaps):
