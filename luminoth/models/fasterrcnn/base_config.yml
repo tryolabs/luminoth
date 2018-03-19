@@ -125,7 +125,6 @@ model:
 
   # Whether to use batch normalization in the model.
   batch_norm: False
-  variances: [0.1, 0.2]
 
   base_network:
     # Which type of pretrained network to use.
@@ -229,6 +228,8 @@ model:
       minibatch_size: 256
       # Assign to get consistent "random" selection in batch.
       random_seed:  # Only to be used for debugging.
+      # Variances to normalize encoded targets with.
+      target_normalization_variances: [0.1, 0.2]
 
   rcnn:
     layer_sizes: []  # Could be e.g. `[4096, 4096]`.

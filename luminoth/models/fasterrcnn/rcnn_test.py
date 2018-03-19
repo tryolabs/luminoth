@@ -69,6 +69,7 @@ class RCNNTest(tf.test.TestCase):
                 'foreground_threshold': 0.5,
                 'background_threshold_high': 0.5,
                 'background_threshold_low': 0.1,
+                'target_normalization_variances': [1.0, 1.0],
             },
 
         })

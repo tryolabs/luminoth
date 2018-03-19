@@ -35,6 +35,7 @@ class RCNNTarget(snt.AbstractModule):
         # Ratio of foreground vs background for the minibatch.
         self._foreground_fraction = config.foreground_fraction
         self._minibatch_size = config.minibatch_size
+        self._variances = config.target_normalization_variances
         # IoU lower threshold with a ground truth box to be considered that
         # specific class.
         self._foreground_threshold = config.foreground_threshold
@@ -276,13 +277,12 @@ class RCNNTarget(snt.AbstractModule):
             proposals,
             proposals_with_target_idx
         )
-        # We create our targets with bbox_transform
+        # We create our targets with bbox_transform.
         bbox_targets_nonzero = encode(
             proposals_with_target,
             proposals_gt_boxes,
+            variances=self._variances,
         )
-        # TODO: We should normalize it in order for bbox_targets to have zero
-        # mean and unit variance according to the paper.
 
         # We unmap targets to proposal_labels (containing the length of
         # proposals)

@@ -22,6 +22,7 @@ class RCNNTargetTest(tf.test.TestCase):
             'background_threshold_low': 0.1,
             'foreground_fraction': 0.5,
             'minibatch_size': 2,
+            'target_normalization_variances': [1.0, 1.0],
         })
         # We check for a difference smaller than this numbers in our tests
         # instead of checking for exact equality.
