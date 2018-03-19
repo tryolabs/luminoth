@@ -26,7 +26,6 @@ class SSDFeatureExtractor(BaseNetwork):
         self.activation_fn = tf.nn.relu
 
     def _init_vgg16_extra_layers(self):
-        # TODO: Try Xavier initializer
         self.conv6 = Conv2D(1024, [3, 3], rate=6, name='conv6')
         self.conv7 = Conv2D(1024, [1, 1], name='conv7')
         self.conv8_1 = Conv2D(256, [1, 1], name='conv8_1')
@@ -54,7 +53,7 @@ class SSDFeatureExtractor(BaseNetwork):
         base_net_endpoints = super(SSDFeatureExtractor, self)._build(
             inputs, is_training=is_training)['end_points']
 
-        if self.vgg_type:
+        if self.vgg_16_type:
             # The original SSD paper uses a modified version of the vgg16
             # network, which we'll modify here
             vgg_network_truncation_endpoint = base_net_endpoints[
@@ -91,7 +90,6 @@ class SSDFeatureExtractor(BaseNetwork):
             # Extra layers for vgg16 as detailed in paper
             self._init_vgg16_extra_layers()
             with tf.variable_scope('extra_feature_layers'):
-                # from IPython import embed; embed(display_banner=False)
                 net = tf.nn.max_pool(
                     vgg_network_truncation_endpoint, [1, 3, 3, 1],
                     padding='SAME', strides=[1, 1, 1, 1], name='pool5'
@@ -124,7 +122,7 @@ class SSDFeatureExtractor(BaseNetwork):
 
             # This parameter determines onto which variables we try to load the
             # pretrained weights
-            self.pretrained_weights_scope = 'ssd/ssd_feature_extractor/vgg_16'
+            self.pretrained_weights_scope = scope + '/vgg_16'
 
         # It's actually an ordered dict
         return utils.convert_collection_to_dict('FEATURE_MAPS')

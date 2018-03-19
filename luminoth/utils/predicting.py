@@ -76,18 +76,23 @@ class PredictorNetwork(object):
                 objects_tf = cls_prediction['objects']
                 objects_labels_tf = cls_prediction['labels']
                 objects_labels_prob_tf = cls_prediction['probs']
-            elif config.model.network.get('with_rcnn', False):
-                cls_prediction = pred_dict['classification_prediction']
-                objects_tf = cls_prediction['objects']
-                objects_labels_tf = cls_prediction['labels']
-                objects_labels_prob_tf = cls_prediction['probs']
+            elif config.model.type == 'fasterrcnn':
+                if config.model.network.get('with_rcnn', False):
+                    cls_prediction = pred_dict['classification_prediction']
+                    objects_tf = cls_prediction['objects']
+                    objects_labels_tf = cls_prediction['labels']
+                    objects_labels_prob_tf = cls_prediction['probs']
+                else:
+                    rpn_prediction = pred_dict['rpn_prediction']
+                    objects_tf = rpn_prediction['proposals']
+                    objects_labels_prob_tf = rpn_prediction['scores']
+                    # All labels without RCNN are zero
+                    objects_labels_tf = tf.zeros(
+                        tf.shape(objects_labels_prob_tf), dtype=tf.int32
+                    )
             else:
-                rpn_prediction = pred_dict['rpn_prediction']
-                objects_tf = rpn_prediction['proposals']
-                objects_labels_prob_tf = rpn_prediction['scores']
-                # All labels without RCNN are zero
-                objects_labels_tf = tf.zeros(
-                    tf.shape(objects_labels_prob_tf), dtype=tf.int32
+                raise ValueError(
+                    "Model type '{}' not supported".format(config.model.type)
                 )
 
             self.fetches = {
@@ -115,10 +120,15 @@ class PredictorNetwork(object):
             labels = [self.class_labels[label] for label in labels]
 
         # Scale objects to original image dimensions
-        if isinstance(scale_factor, list):
+        if isinstance(scale_factor, tuple):
+            # If scale factor is a tuple, it means we need to scale height and
+            # width by a different amount. In that case scale factor is:
+            # (scale_factor_height, scale_factor_width)
             objects /= [scale_factor[1], scale_factor[0],
                         scale_factor[1], scale_factor[0]]
         else:
+            # If scale factor is a scalar, height and width get scaled by the
+            # same amount
             objects /= scale_factor
         objects = [[round(coord) for coord in obj] for obj in objects.tolist()]
 

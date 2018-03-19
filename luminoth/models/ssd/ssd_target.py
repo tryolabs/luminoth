@@ -6,9 +6,18 @@ from luminoth.utils.bbox_overlap import bbox_overlap_tf
 
 
 class SSDTarget(snt.AbstractModule):
-    """TODO
+    """Generate SSD target tensors for both probabilities and bounding boxes.
+
+    There are two types of targets, anchor_label and bounding box targets.
+
+    Anchor labels are just the label which best fits each anchor, and therefore
+    are the target for that anchor, they are used both for background and
+    foreground labels.
+
+    Bounding box targets are just the encoded coordinates that anchors labeled
+    as foreground should target.
     """
-    def __init__(self, num_classes, num_anchors, config, variances, seed=None,
+    def __init__(self, num_classes, config, variances, seed=None,
                  name='ssd_target'):
         """
         Args:
@@ -17,15 +26,13 @@ class SSDTarget(snt.AbstractModule):
         """
         super(SSDTarget, self).__init__(name=name)
         self._num_classes = num_classes
-        self._foreground_fraction = config.hard_negative_ratio
-        self._num_anchors = tf.cast(num_anchors, tf.int32)
+        self._hard_negative_ratio = config.hard_negative_ratio
         self._foreground_threshold = config.foreground_threshold
         self._background_threshold_high = config.background_threshold_high
-        self._background_threshold_low = config.background_threshold_low
         self._variances = variances
         self._seed = seed
 
-    def _build(self, probs, all_anchors, gt_boxes, im_shape):
+    def _build(self, probs, all_anchors, gt_boxes):
         """
         Args:
             all_anchors: A Tensor with anchors for all of SSD's features.
@@ -33,7 +40,6 @@ class SSDTarget(snt.AbstractModule):
             gt_boxes: A Tensor with the ground truth boxes for the image.
                 The shape of the Tensor is (num_gt, 5), having the truth label
                 as the last value for each box.
-            im_shape: (1, height, width, )
         Returns:
             class_targets: Either a truth value of the anchor (a value
                 between 0 and num_classes, with 0 being background), or -1 when
@@ -133,7 +139,7 @@ class SSDTarget(snt.AbstractModule):
         num_fg_mask = tf.greater(anchors_label, 0.0)
         num_fg = tf.cast(tf.count_nonzero(num_fg_mask), tf.float32)
 
-        num_bg = tf.cast(num_fg * self._foreground_fraction, tf.int32)
+        num_bg = tf.cast(num_fg * self._hard_negative_ratio, tf.int32)
         top_k_bg = tf.nn.top_k(max_cls_probs, k=num_bg)
 
         set_bg = tf.sparse_to_dense(

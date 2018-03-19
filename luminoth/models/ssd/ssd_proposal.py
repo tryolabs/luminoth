@@ -17,7 +17,7 @@ class SSDProposal(snt.AbstractModule):
     We apply NMS because the way object detectors are usually scored is by
     treating duplicated detections (multiple detections that overlap the same
     ground truth value) as false positive. It is resonable to assume that there
-    may exist such case that applying NMS is completly unnecesary.
+    may exist such case that applying NMS is completely unnecesary.
 
     Besides applying NMS it also filters the top N results, both for classes
     and in general. These values are easily modifiable in the configuration
@@ -88,8 +88,8 @@ class SSDProposal(snt.AbstractModule):
             (x_min, y_min, x_max, y_max) = tf.unstack(
                 clipped_proposals, axis=1)
             proposal_filter = tf.greater(
-                tf.maximum(x_max - x_min, .0) * tf.maximum(y_max - y_min, .0),
-                .0
+                tf.maximum(x_max - x_min, 0.) * tf.maximum(y_max - y_min, 0.),
+                0.
             )
             class_proposals = tf.boolean_mask(
                 clipped_proposals, proposal_filter)

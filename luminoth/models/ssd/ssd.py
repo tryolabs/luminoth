@@ -3,6 +3,7 @@ import sonnet as snt
 import tensorflow as tf
 
 from sonnet.python.modules.conv import Conv2D
+
 from luminoth.models.ssd.ssd_feature_extractor import SSDFeatureExtractor
 from luminoth.models.ssd.ssd_proposal import SSDProposal
 from luminoth.models.ssd.ssd_target import SSDTarget
@@ -11,7 +12,6 @@ from luminoth.models.ssd.ssd_utils import (
 )
 from luminoth.utils.losses import smooth_l1_loss
 from luminoth.utils.vars import get_saver
-
 from luminoth.utils.bbox_transform import clip_boxes
 
 
@@ -21,7 +21,7 @@ class SSD(snt.AbstractModule):
 
     def __init__(self, config, name='ssd'):
         super(SSD, self).__init__(name=name)
-        self._config = config
+        self._config = config.model
         self._num_classes = config.model.network.num_classes
         self._debug = config.train.debug
         self._seed = config.train.seed
@@ -67,7 +67,7 @@ class SSD(snt.AbstractModule):
 
         # Generate feature maps from image
         self.feature_extractor = SSDFeatureExtractor(
-            self._config.model.base_network, parent_name=self.module_name
+            self._config.base_network, parent_name=self.module_name
         )
         feature_maps = self.feature_extractor(image, is_training=is_training)
 
@@ -96,7 +96,7 @@ class SSD(snt.AbstractModule):
             class_scores_list.append(class_scores_flattened)
         bbox_offsets = tf.concat(bbox_offsets_list, axis=0)
         class_scores = tf.concat(class_scores_list, axis=0)
-        class_probabilities = tf.nn.softmax(class_scores)
+        class_probabilities = tf.nn.softmax(class_scores, axis=-1)
 
         # Generate anchors (generated only once, therefore we use numpy)
         raw_anchors_per_featmap = generate_raw_anchors(
@@ -116,8 +116,7 @@ class SSD(snt.AbstractModule):
             clipped_bboxes = clip_boxes(scaled_bboxes, self.image_shape)
             anchors_list.append(clipped_bboxes)
         anchors = np.concatenate(anchors_list, axis=0)
-        # TODO: They were using float64, is all this precision necesary?
-        anchors = tf.convert_to_tensor(anchors, dtype=tf.float64)
+        anchors = tf.convert_to_tensor(anchors, dtype=tf.float32)
 
         # This is the dict we'll return after filling it with SSD's results
         prediction_dict = {}
@@ -128,18 +127,16 @@ class SSD(snt.AbstractModule):
 
             # Generate targets
             target_creator = SSDTarget(
-                self._num_classes, anchors.shape[0], self._config.model.target,
-                self._config.model.variances
+                self._num_classes, self._config.target, self._config.variances
             )
             class_targets, bbox_offsets_targets = target_creator(
-                class_probabilities, anchors, gt_boxes,
-                tf.cast(tf.shape(image), tf.float32)
+                class_probabilities, anchors, gt_boxes
             )
 
-            # Filter the predictions and targets that we will ignore
-            # during training due to hard negative mining.
-            # We use class_targets to know which ones to ignore (they
-            # are marked as -1 if they are to be ignored)
+            # Filter the predictions and targets that we will ignore during
+            # training due to hard negative mining. We use class_targets to
+            # know which ones to ignore (they are marked as -1 if they are to
+            # be ignored)
             with tf.name_scope('prepare_batch'):
                 predictions_filter = tf.greater_equal(class_targets, 0)
 
@@ -171,8 +168,8 @@ class SSD(snt.AbstractModule):
         # generating visualizations during training.
         if not is_training or self._debug:
             proposals_creator = SSDProposal(
-                self._num_classes, self._config.model.proposals,
-                self._config.model.variances
+                self._num_classes, self._config.proposals,
+                self._config.variances
             )
             proposals = proposals_creator(
                 class_probabilities, bbox_offsets, anchors,
@@ -184,10 +181,6 @@ class SSD(snt.AbstractModule):
         if self._debug:
             prediction_dict['all_anchors'] = anchors
             prediction_dict['cls_prob'] = class_probabilities
-            if gt_boxes is not None:
-                # TODO does it make sense to return this when its an input
-                # to our network and we do no changes to it?
-                prediction_dict['gt_boxes'] = gt_boxes
 
         return prediction_dict
 
@@ -312,7 +305,7 @@ class SSD(snt.AbstractModule):
         """Get trainable vars included in the module.
         """
         trainable_vars = snt.get_variables_in_module(self)
-        if self._config.model.base_network.trainable:
+        if self._config.base_network.trainable:
             pretrained_trainable_vars = (
                 self.feature_extractor.get_trainable_vars()
             )

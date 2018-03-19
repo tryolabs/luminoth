@@ -138,12 +138,12 @@ def resize_image_fixed(image, new_height, new_width, bboxes=None):
         return {
             'image': image,
             'bboxes': bboxes,
-            'scale_factor': [scale_factor_height, scale_factor_width],
+            'scale_factor': (scale_factor_height, scale_factor_width),
         }
 
     return {
         'image': image,
-        'scale_factor': [scale_factor_height, scale_factor_width],
+        'scale_factor': (scale_factor_height, scale_factor_width),
     }
 
 
@@ -585,7 +585,6 @@ def expand(image, bboxes=None, fill=0, min_ratio=1, max_ratio=4, seed=None):
             bboxes: Tensor with zoomed out bounding boxes with shape
                 (num_bboxes, 5).
     """
-    # image = tf.Print(image, [image], summarize=500, message='lol')
     image_shape = tf.to_float(tf.shape(image))
     height = image_shape[0]
     width = image_shape[1]
@@ -601,19 +600,18 @@ def expand(image, bboxes=None, fill=0, min_ratio=1, max_ratio=4, seed=None):
     pad_top = tf.random_uniform([1], minval=0,
                                 maxval=new_height-height, seed=seed)
     pad_bottom = new_height - height - pad_top
+
+    # TODO: use mean instead of 0 for filling the paddings
     paddings = tf.stack([tf.concat([pad_top, pad_bottom], axis=0),
                          tf.concat([pad_left, pad_right], axis=0),
                          tf.constant([0., 0.])])
     expanded_image = tf.pad(image, tf.to_int32(paddings), constant_values=fill)
 
     # Adjust bboxes
-    # bboxes = tf.Print(bboxes, [bboxes], summarize=300)
     shift_bboxes_by = tf.concat([pad_left, pad_top, pad_left, pad_top], axis=0)
     bbox_labels = tf.reshape(bboxes[:, 4], (-1, 1))
     bbox_adjusted_coords = bboxes[:, :4] + tf.to_int32(shift_bboxes_by)
     bbox_adjusted = tf.concat([bbox_adjusted_coords, bbox_labels], axis=1)
-
-    # TODO: use mean instead of 0 for fill
 
     # Return results
     return_dict = {'image': expanded_image}

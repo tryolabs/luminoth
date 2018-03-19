@@ -22,7 +22,7 @@ class RCNNTarget(snt.AbstractModule):
     A minibatch size determines how many targets are going to be generated and
     how many are going to be ignored. RCNNTarget is responsible for choosing
     which proposals and corresponding targets are included in the minibatch and
-    which ones are completly ignored.
+    which ones are completely ignored.
     """
     def __init__(self, num_classes, config, seed=None, name='rcnn_proposal'):
         """
