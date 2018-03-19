@@ -33,15 +33,12 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
 
 def generate_anchors_reference(ratios, scales, num_anchors, feature_map_shape):
     """
-    For each ratio we will get an anchor TODO
-    Args: TODO
-    Returns: convention (x_min, y_min, x_max, y_max) TODO
+    Generate the default anchor for one feat map which we will later convolve
+    to generate all the anchors of that feat map.
     """
     heights = np.zeros(num_anchors)
     widths = np.zeros(num_anchors)
-    # Because the ratio of 1 we will use the scale sqrt(scale[i] * scale[i+1])
-    #  or sqrt(scale[i_max] * scale[i_max]). So we will have to use just
-    # `num_anchors` - 1 ratios to generate the anchors
+
     if len(scales) > 1:
         widths[0] = heights[0] = (np.sqrt(scales[0] * scales[1]) *
                                   feature_map_shape[0])

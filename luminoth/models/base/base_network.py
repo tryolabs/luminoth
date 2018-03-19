@@ -93,6 +93,14 @@ class BaseNetwork(snt.AbstractModule):
         return self._architecture.startswith('vgg')
 
     @property
+    def vgg_16_type(self):
+        return self._architecture.startswith('vgg_16')
+
+    @property
+    def vgg_19_type(self):
+        return self._architecture.startswith('vgg_19')
+
+    @property
     def resnet_type(self):
         return self._architecture.startswith('resnet')
 
@@ -107,8 +115,10 @@ class BaseNetwork(snt.AbstractModule):
     @property
     def default_image_size(self):
         # Usually 224, but depends on the architecture.
-        if self.vgg_type:
+        if self.vgg_16_type:
             return vgg.vgg_16.default_image_size
+        if self.vgg_19_type:
+            return vgg.vgg_19.default_image_size
         if self.resnet_v1_type:
             return resnet_v1.resnet_v1.default_image_size
         if self.resnet_v2_type:
@@ -189,6 +199,7 @@ class BaseNetwork(snt.AbstractModule):
             self._config['weights'] = get_checkpoint_file(self._architecture)
 
         if self.pretrained_weights_scope:
+            # We may have defined the base network in a particular scope
             module_variables = tf.get_collection(
                 tf.GraphKeys.MODEL_VARIABLES,
                 scope=self.pretrained_weights_scope

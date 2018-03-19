@@ -70,9 +70,13 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
 
         # Also overwrite `min_prob_threshold` in order to use all detections.
         config.model.rcnn.proposals.min_prob_threshold = 0.0
-    else:
+    elif config.model.type == 'ssd':
         config.model.proposals.total_max_detections = max_detections
         config.model.proposals.min_prob_threshold = 0.0
+    else:
+        raise ValueError(
+            "Model type '{}' not supported".format(config.model.type)
+        )
 
     # Only a single run over the dataset to calculate metrics.
     config.train.num_epochs = 1

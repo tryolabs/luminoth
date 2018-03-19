@@ -10,8 +10,6 @@ train:
   # Enables TensorFlow debug mode, which stops and lets you analyze Tensors
   # after each Session.run
   tf_debug: False
-  # Run name is used for better checkpoint and log hierarchy
-  run_name: ssd
   # Disables logging and saving checkpoints
   no_log: False
   # Displays debugging images with results every N steps. Debug mode must be
@@ -71,7 +69,7 @@ eval:
 dataset:
   type: tfrecord
   # From which directory to read the dataset
-  dir: /data/datasets/pascal-2007-2012/
+  dir: datasets/voc/tf
   # Which split of tfrecords to look for
   split: train
   image_preprocessing:
