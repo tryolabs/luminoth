@@ -4,10 +4,10 @@ import tensorflow as tf
 
 from sonnet.python.modules.conv import Conv2D
 
-from luminoth.models.ssd.ssd_feature_extractor import SSDFeatureExtractor
-from luminoth.models.ssd.ssd_proposal import SSDProposal
-from luminoth.models.ssd.ssd_target import SSDTarget
-from luminoth.models.ssd.ssd_utils import (
+from luminoth.models.ssd.feature_extractor import SSDFeatureExtractor
+from luminoth.models.ssd.proposal import SSDProposal
+from luminoth.models.ssd.target import SSDTarget
+from luminoth.models.ssd.utils import (
     generate_raw_anchors, adjust_bboxes
 )
 from luminoth.utils.losses import smooth_l1_loss
