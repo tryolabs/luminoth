@@ -45,10 +45,11 @@ Currently, we support the following models:
 
 * **Object Detection**
     * [Faster R-CNN](https://arxiv.org/abs/1506.01497)
+    * [SSD](https://arxiv.org/abs/1512.02325)
 
-We are planning on adding support for more models in the near future, such as [SSD](https://arxiv.org/abs/1512.02325), [YOLO](https://arxiv.org/abs/1506.02640) and [Mask R-CNN](https://arxiv.org/abs/1703.06870).
+We are planning on adding support for more models in the near future, such as [RetinaNet](https://arxiv.org/abs/1708.02002) and [Mask R-CNN](https://arxiv.org/abs/1703.06870).
 
-Moreover, we are also working on providing **pre-trained checkpoints** on popular datasets such as [Pascal VOC2012](http://host.robots.ox.ac.uk:8080/pascal/VOC/voc2012/index.html).
+Moreover, we are also working on providing **pre-trained checkpoints** on popular datasets such as [COCO](http://cocodataset.org/).
 
 # Usage
 
