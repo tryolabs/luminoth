@@ -15,13 +15,16 @@ def get_width_upright(bboxes):
         return width, height, urx, ury
 
 
-def encode(bboxes, gt_boxes, variances=[1, 1]):
+def encode(bboxes, gt_boxes, variances=None):
     with tf.name_scope('BoundingBoxTransform/encode'):
         (bboxes_width, bboxes_height,
          bboxes_urx, bboxes_ury) = get_width_upright(bboxes)
 
         (gt_boxes_width, gt_boxes_height,
          gt_boxes_urx, gt_boxes_ury) = get_width_upright(gt_boxes)
+
+        if variances is None:
+            variances = [1., 1.]
 
         targets_dx = (gt_boxes_urx - bboxes_urx)/(bboxes_width * variances[0])
         targets_dy = (gt_boxes_ury - bboxes_ury)/(bboxes_height * variances[0])
@@ -35,12 +38,15 @@ def encode(bboxes, gt_boxes, variances=[1, 1]):
         return targets
 
 
-def decode(roi, deltas, variances=[1, 1]):
+def decode(roi, deltas, variances=None):
     with tf.name_scope('BoundingBoxTransform/decode'):
         (roi_width, roi_height,
          roi_urx, roi_ury) = get_width_upright(roi)
 
         dx, dy, dw, dh = tf.split(deltas, 4, axis=1)
+
+        if variances is None:
+            variances = [1., 1.]
 
         pred_ur_x = dx * roi_width * variances[0] + roi_urx
         pred_ur_y = dy * roi_height * variances[0] + roi_ury

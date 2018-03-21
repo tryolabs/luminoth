@@ -228,8 +228,6 @@ model:
       minibatch_size: 256
       # Assign to get consistent "random" selection in batch.
       random_seed:  # Only to be used for debugging.
-      # Variances to normalize encoded targets with.
-      target_normalization_variances: [0.1, 0.2]
 
   rcnn:
     layer_sizes: []  # Could be e.g. `[4096, 4096]`.
@@ -240,6 +238,8 @@ model:
     l1_sigma: 1.0
     # Use average pooling before the last fully-connected layer.
     use_mean: True
+    # Variances to normalize encoded targets with.
+    target_normalization_variances: [0.1, 0.2]
 
     rcnn_initializer:
       _replace: True

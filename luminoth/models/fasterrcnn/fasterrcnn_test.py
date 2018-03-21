@@ -53,6 +53,7 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                     'l2_regularization_scale': 0.0005,
                     'l1_sigma': 3.0,
                     'use_mean': False,
+                    'target_normalization_variances': [1., 1.],
                     'rcnn_initializer': {
                         'type': 'variance_scaling_initializer',
                         'factor': 1.0,
@@ -89,7 +90,6 @@ class FasterRCNNNetworkTest(tf.test.TestCase):
                         'foreground_threshold': 0.5,
                         'background_threshold_high': 0.5,
                         'background_threshold_low': 0.1,
-                        'target_normalization_variances': [0.1, 0.2],
                     }
                 },
                 'rpn': {

@@ -45,6 +45,7 @@ class RCNN(snt.AbstractModule):
         self._activation = get_activation_function(config.activation_function)
         self._dropout_keep_prob = config.dropout_keep_prob
         self._use_mean = config.use_mean
+        self._variances = config.target_normalization_variances
 
         self._rcnn_initializer = get_initializer(
             config.rcnn_initializer, seed=seed
@@ -102,12 +103,14 @@ class RCNN(snt.AbstractModule):
         # RCNNTarget is used to define a minibatch and the correct values for
         # each of the proposals.
         self._rcnn_target = RCNNTarget(
-            self._num_classes, self._config.target, seed=self._seed
+            self._num_classes, self._config.target, variances=self._variances,
+            seed=self._seed
         )
         # RCNNProposal generates the final bounding boxes and tries to remove
         # duplicates.
         self._rcnn_proposal = RCNNProposal(
-            self._num_classes, self._config.proposals
+            self._num_classes, self._config.proposals,
+            variances=self._variances
         )
 
     def _build(self, conv_feature_map, proposals, im_shape, base_network,

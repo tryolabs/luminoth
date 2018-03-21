@@ -31,6 +31,7 @@ class RCNNTest(tf.test.TestCase):
             'dropout_keep_prob': 1.0,
             'activation_function': 'relu6',
             'use_mean': False,
+            'target_normalization_variances': [1., 1.],
             'rcnn_initializer': {
                 'type': 'variance_scaling_initializer',
                 'factor': 1.0,

@@ -23,7 +23,8 @@ class RCNNProposal(snt.AbstractModule):
     and in general. These values are easily modifiable in the configuration
     files.
     """
-    def __init__(self, num_classes, config, name='rcnn_proposal'):
+    def __init__(self, num_classes, config, variances=None,
+                 name='rcnn_proposal'):
         """
         Args:
             num_classes: Total number of classes RCNN is classifying.
@@ -31,6 +32,7 @@ class RCNNProposal(snt.AbstractModule):
         """
         super(RCNNProposal, self).__init__(name=name)
         self._num_classes = num_classes
+        self._variances = variances
 
         # Max number of object detections per class.
         self._class_max_detections = config.class_max_detections
@@ -77,7 +79,11 @@ class RCNNProposal(snt.AbstractModule):
             # obtain the current class' prediction.
             class_prob = cls_prob[:, class_id + 1]  # 0 is background class.
             class_bboxes = bbox_pred[:, (4 * class_id):(4 * class_id + 4)]
-            raw_class_objects = decode(proposals, class_bboxes)
+            raw_class_objects = decode(
+                proposals,
+                class_bboxes,
+                variances=self._variances,
+            )
 
             # Clip bboxes so they don't go out of the image.
             class_objects = clip_boxes(raw_class_objects, im_shape)

@@ -24,7 +24,8 @@ class RCNNTarget(snt.AbstractModule):
     which proposals and corresponding targets are included in the minibatch and
     which ones are completely ignored.
     """
-    def __init__(self, num_classes, config, seed=None, name='rcnn_proposal'):
+    def __init__(self, num_classes, config, seed=None, variances=None,
+                 name='rcnn_proposal'):
         """
         Args:
             num_classes: Number of possible classes.
@@ -32,10 +33,10 @@ class RCNNTarget(snt.AbstractModule):
         """
         super(RCNNTarget, self).__init__(name=name)
         self._num_classes = num_classes
+        self._variances = variances
         # Ratio of foreground vs background for the minibatch.
         self._foreground_fraction = config.foreground_fraction
         self._minibatch_size = config.minibatch_size
-        self._variances = config.target_normalization_variances
         # IoU lower threshold with a ground truth box to be considered that
         # specific class.
         self._foreground_threshold = config.foreground_threshold
