@@ -1,4 +1,4 @@
-__version__ = '0.1.0'
+__version__ = '0.1.0dev0'
 
 __title__ = 'Luminoth'
 __description__ = 'Computer vision toolkit based on TensorFlow'
