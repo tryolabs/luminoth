@@ -55,8 +55,14 @@ def resolve_files(path_or_dir):
     return paths
 
 
-def filter_classes(objects, ignore_classes):
-    return [o for o in objects if o['label'] not in ignore_classes]
+def filter_classes(objects, only_classes=None, ignore_classes=None):
+    if ignore_classes:
+        objects = [o for o in objects if o['label'] not in ignore_classes]
+
+    if only_classes:
+        objects = [o for o in objects if o['label'] in only_classes]
+
+    return objects
 
 
 def draw_bboxes_on_image(image, objects, min_prob):
@@ -106,8 +112,8 @@ def hex_to_rgb(x):
     return [int(x[i:i + 2], 16) for i in (0, 2, 4)]
 
 
-def predict_image(network, path, ignore_classes=False, min_prob=0.5,
-                  max_detections=100, save_path=None):
+def predict_image(network, path, only_classes=None, ignore_classes=None,
+                  min_prob=0.5, max_detections=100, save_path=None):
     click.echo('Predicting {}...'.format(path), nl=False)
 
     # Open and read the image to predict.
@@ -122,9 +128,12 @@ def predict_image(network, path, ignore_classes=False, min_prob=0.5,
     # Run image through the network.
     objects = network.predict_image(image)
 
-    # Filter results if required by user.
-    if ignore_classes:
-        objects = filter_classes(objects, ignore_classes)
+    # Filter the results according to the user input.
+    objects = filter_classes(
+        objects,
+        only_classes=only_classes,
+        ignore_classes=ignore_classes
+    )
 
     if max_detections:
         objects = objects[:max_detections]
@@ -138,8 +147,8 @@ def predict_image(network, path, ignore_classes=False, min_prob=0.5,
     return objects
 
 
-def predict_video(network, path, ignore_classes=False, min_prob=0.5,
-                  max_detections=100, save_path=None):
+def predict_video(network, path, only_classes=None, ignore_classes=None,
+                  min_prob=0.5, max_detections=100, save_path=None):
     # We hardcode the video ouput to mp4 for the time being.
     save_path = os.path.splitext(save_path)[0] + '.mp4'
     try:
@@ -167,9 +176,12 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
                 # Run image through network.
                 objects = network.predict_image(frame)
 
-                # Filter results if required by user.
-                if ignore_classes:
-                    objects = filter_classes(objects, ignore_classes)
+                # Filter the results according to the user input.
+                objects = filter_classes(
+                    objects,
+                    only_classes=only_classes,
+                    ignore_classes=ignore_classes
+                )
 
                 if max_detections:
                     objects = objects[:max_detections]
@@ -210,11 +222,12 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
 @click.option('--save-media-to', '-d', help='Directory to store media to.')
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
 @click.option('--max-detections', default=None, type=float, help='Maximum number of detections per image.')  # noqa
-@click.option('--ignore-class', '-C', default=None, multiple=True, help='Class to ignore when predicting.')  # noqa
+@click.option('--only-class', '-k', default=None, multiple=True, help='Class to ignore when predicting.')  # noqa
+@click.option('--ignore-class', '-K', default=None, multiple=True, help='Class to ignore when predicting.')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
 def predict(path_or_dir, config_files, checkpoint, override_params,
-            output_path, save_media_to, min_prob, max_detections, ignore_class,
-            debug):
+            output_path, save_media_to, min_prob, max_detections, only_class,
+            ignore_class, debug):
     """Obtain a model's predictions.
 
     Receives either `config_files` or `checkpoint` in order to load the correct
@@ -222,13 +235,19 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
     `path-or-dir`, returning predictions according to the format specified by
     `output`.
 
-    Additional model behavior may be modified with `min-prob` and
-    `ignore-classes`.
+    Additional model behavior may be modified with `min-prob`, `only-class` and
+    `ignore-class`.
     """
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
     else:
         tf.logging.set_verbosity(tf.logging.ERROR)
+
+    if only_class and ignore_class:
+        click.echo(
+            "Only one of `only-class` or `ignore-class` may be specified."
+        )
+        return
 
     # Process the input and get the actual files to predict.
     files = resolve_files(path_or_dir)
@@ -282,6 +301,7 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
 
         objects = predictor(
             network, file,
+            only_classes=only_class,
             ignore_classes=ignore_class,
             min_prob=min_prob,
             max_detections=max_detections,
