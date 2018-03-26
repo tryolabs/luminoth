@@ -25,8 +25,10 @@ class ImageVisHook(tf.train.SessionRunHook):
         self._output_dir = output_dir
         self._summary_writer = summary_writer
         self._image_visualization_mode = image_visualization_mode
-        self._image = image
-        self._gt_bboxes = gt_bboxes
+
+        # We'll visualize the first image of each batch
+        self._image = image[0]
+        self._gt_bboxes = gt_bboxes[0]
 
         tf.logging.info('ImageVisHook was created with mode = "{}"'.format(
             image_visualization_mode
@@ -65,7 +67,7 @@ class ImageVisHook(tf.train.SessionRunHook):
             prediction_dict = results.get('prediction_dict')
             if prediction_dict is not None:
                 summaries = image_vis_summaries(
-                    prediction_dict, config=self._config,
+                    prediction_dict[0], config=self._config,
                     image_visualization_mode=self._image_visualization_mode,
                     image=results.get('image'),
                     gt_bboxes=results.get('gt_bboxes')

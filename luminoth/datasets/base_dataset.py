@@ -14,6 +14,7 @@ class BaseDataset(snt.AbstractModule):
         self._split = config.dataset.split
         self._random_shuffle = config.train.random_shuffle
         self._seed = config.train.seed
+        self._batch_size = config.train.batch_size
 
         self._fixed_resize = (
             'fixed_height' in config.dataset.image_preprocessing and
@@ -51,26 +52,17 @@ class BaseDataset(snt.AbstractModule):
         values, dtypes, names = self.read_record(raw_record)
 
         if self._random_shuffle:
-            queue = tf.RandomShuffleQueue(
+            return tf.train.shuffle_batch(
+                values,
                 capacity=100,
-                min_after_dequeue=0,
-                dtypes=dtypes,
-                names=names,
-                name='tfrecord_random_queue',
-                seed=self._seed
-            )
+                batch_size=self._batch_size,
+                dynamic_pad=True,
+                num_threads=self._total_queue_ops,
+                seed=self._seed)
         else:
-            queue = tf.FIFOQueue(
+            return tf.train.batch(
+                values,
                 capacity=100,
-                dtypes=dtypes,
-                names=names,
-                name='tfrecord_fifo_queue'
-            )
-
-        # Generate queueing ops for QueueRunner.
-        enqueue_ops = [queue.enqueue(values)] * self._total_queue_ops
-        self.queue_runner = tf.train.QueueRunner(queue, enqueue_ops)
-
-        tf.train.add_queue_runner(self.queue_runner)
-
-        return queue.dequeue()
+                batch_size=self._batch_size,
+                dynamic_pad=True,
+                num_threads=self._total_queue_ops)

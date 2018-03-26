@@ -48,6 +48,52 @@ def bbox_overlap_tf(bboxes1, bboxes2):
         return iou
 
 
+def bbox_overlap_tf_batch(bboxes1, bboxes2):
+    """Calculate Intersection over Union (IoU) between two sets of bounding
+    boxes.
+
+    Args:
+        bboxes1: shape (batch_size, total_bboxes1, 4)
+            with x1, y1, x2, y2 point order.
+        bboxes2: shape (batch_size, total_bboxes2, 4)
+            with x1, y1, x2, y2 point order.
+
+        p1 *-----
+           |     |
+           |_____* p2
+
+    Returns:
+        Tensor with shape (total_bboxes1, total_bboxes2)
+        with the IoU (intersection over union) of bboxes1[i] and bboxes2[j]
+        in [i, j].
+    """
+    with tf.name_scope('bbox_overlap'):
+        x11, y11, x12, y12 = tf.split(bboxes1, 4, axis=2)
+        x21, y21, x22, y22 = tf.split(bboxes2, 4, axis=2)
+
+        xI1 = tf.maximum(x11, tf.transpose(x21, perm=(0, 2, 1)))
+        yI1 = tf.maximum(y11, tf.transpose(y21, perm=(0, 2, 1)))
+
+        xI2 = tf.minimum(x12, tf.transpose(x22, perm=(0, 2, 1)))
+        yI2 = tf.minimum(y12, tf.transpose(y22, perm=(0, 2, 1)))
+
+        intersection = (
+            tf.maximum(xI2 - xI1 + 1., 0.) *
+            tf.maximum(yI2 - yI1 + 1., 0.)
+        )
+
+        bboxes1_area = (x12 - x11 + 1) * (y12 - y11 + 1)
+        bboxes2_area = (x22 - x21 + 1) * (y22 - y21 + 1)
+
+        union = (bboxes1_area +
+                 tf.transpose(bboxes2_area, perm=(0, 2, 1)) -
+                 intersection)
+
+        iou = tf.maximum(intersection / union, 0)
+
+        return iou
+
+
 def bbox_overlap(bboxes1, bboxes2):
     """Calculate Intersection of Union between two sets of bounding boxes.
 

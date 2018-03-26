@@ -33,6 +33,8 @@ train:
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
+  # Batch size
+  batch_size: 32
   # Clip gradients by norm, making sure the maximum value is 10.
   clip_by_norm: False
   # Learning rate config.

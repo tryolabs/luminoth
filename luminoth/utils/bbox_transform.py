@@ -20,7 +20,7 @@ def get_bbox_properties(bboxes):
     return bboxes_widths, bboxes_heights, bboxes_center_x, bboxes_center_y
 
 
-def encode(proposals, gt_boxes):
+def encode(proposals, gt_boxes, variances=None):
     """Encode the different adjustments needed to transform it to its
     corresponding ground truth box.
 
@@ -36,6 +36,8 @@ def encode(proposals, gt_boxes):
             deltas are with regards to the center, width and height of the
             two boxes.
     """
+    if not variances:
+        variances = [1, 1]
 
     (proposal_widths, proposal_heights,
      proposal_center_x, proposal_center_y) = get_bbox_properties(proposals)
@@ -44,17 +46,23 @@ def encode(proposals, gt_boxes):
 
     # We need to apply targets as specified by the paper parametrization
     # Faster RCNN 3.1.2
-    targets_x = (gt_center_x - proposal_center_x) / proposal_widths
-    targets_y = (gt_center_y - proposal_center_y) / proposal_heights
-    targets_w = np.log(gt_widths / proposal_widths)
-    targets_h = np.log(gt_heights / proposal_heights)
+    targets_x = (
+        (gt_center_x - proposal_center_x) /
+        (proposal_widths * variances[0])
+    )
+    targets_y = (
+        (gt_center_y - proposal_center_y) /
+        (proposal_heights * variances[0])
+    )
+    targets_w = np.log(gt_widths / proposal_widths) / variances[1]
+    targets_h = np.log(gt_heights / proposal_heights) / variances[1]
 
     targets = np.column_stack((targets_x, targets_y, targets_w, targets_h))
 
     return targets
 
 
-def decode(bboxes, deltas):
+def decode(bboxes, deltas, variances=None):
     """
     Args:
         boxes: numpy array of bounding boxes of shape: (num_boxes, 4) following
@@ -67,6 +75,9 @@ def decode(bboxes, deltas):
         bboxes: bounding boxes transformed to (x1, y1, x2, y2) coordinates. It
             has the same shape as bboxes.
     """
+    if not variances:
+        variances = [1, 1]
+
     widths, heights, ctr_x, ctr_y = get_bbox_properties(bboxes)
 
     # The dx, dy deltas are relative while the dw, dh deltas are "log relative"
@@ -80,12 +91,12 @@ def decode(bboxes, deltas):
     dh = deltas[:, 3]
 
     # We get the center of the real box as center anchor + relative width
-    pred_ctr_x = dx * widths + ctr_x
-    pred_ctr_y = dy * heights + ctr_y
+    pred_ctr_x = dx * widths * variances[1] + ctr_x
+    pred_ctr_y = dy * heights * variances[1] + ctr_y
 
     # New width and height using exp
-    pred_w = np.exp(dw) * widths
-    pred_h = np.exp(dh) * heights
+    pred_w = np.exp(dw * variances[1]) * widths
+    pred_h = np.exp(dh * variances[1]) * heights
 
     # Calculate (x_min, y_min, x_max, y_max) and pack them together.
     pred_boxes = np.column_stack((

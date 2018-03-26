@@ -17,6 +17,7 @@ def get_width_upright(bboxes):
 
 def encode(bboxes, gt_boxes, variances=[1, 1]):
     with tf.name_scope('BoundingBoxTransform/encode'):
+
         (bboxes_width, bboxes_height,
          bboxes_urx, bboxes_ury) = get_width_upright(bboxes)
 

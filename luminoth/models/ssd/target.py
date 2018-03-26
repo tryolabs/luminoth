@@ -17,7 +17,7 @@ class SSDTarget(snt.AbstractModule):
     Bounding box targets are just the encoded coordinates that anchors labeled
     as foreground should target.
     """
-    def __init__(self, num_classes, config, variances, seed=None,
+    def __init__(self, config, variances, seed=None,
                  name='ssd_target'):
         """
         Args:
@@ -25,7 +25,6 @@ class SSDTarget(snt.AbstractModule):
             config: Configuration object for RCNNTarget.
         """
         super(SSDTarget, self).__init__(name=name)
-        self._num_classes = num_classes
         self._hard_negative_ratio = config.hard_negative_ratio
         self._foreground_threshold = config.foreground_threshold
         self._background_threshold_high = config.background_threshold_high
@@ -50,14 +49,27 @@ class SSDTarget(snt.AbstractModule):
                 other anchors we return zeros.
                 The shape of the Tensor is (num_anchors, 4).
         """
+        # import ipdb; ipdb.set_trace()
+        # all_anchors = tf.cast(all_anchors, tf.float32)
+        # all_anchors = tf.constant(all_anchors, dtype=tf.float32)
 
-        all_anchors = tf.cast(all_anchors, tf.float32)
-        gt_boxes = tf.cast(gt_boxes, tf.float32)
+        # probs = tf.squeeze(probs)
+        # all_anchors = tf.squeeze(all_anchors)
+
+        # Some gt_boxes where created as padding during the creation of
+        # our training batch, here we filter them out
+        pad_gt_boxes_mask = tf.not_equal(tf.reduce_sum(gt_boxes, axis=1), 0)
+        pad_gt_boxes_idx = tf.where(pad_gt_boxes_mask)
+        pad_gt_boxes_idx = tf.squeeze(pad_gt_boxes_idx, axis=1)
+        gt_boxes = tf.gather(gt_boxes, pad_gt_boxes_idx)
 
         # We are going to label each anchor based on the IoU with
         # `gt_boxes`. Start by filling the labels with -1, marking them as
         # unknown.
-        anchors_label_shape = tf.gather(tf.shape(all_anchors), [0])
+        # import ipdb; ipdb.set_trace()
+        anchors_label_shape = tf.constant([all_anchors.get_shape()[0].value])
+        # import ipdb; ipdb.set_trace()
+        # anchors_label_shape = tf.gather(tf.shape(all_anchors), [0])
         anchors_label = tf.fill(
             dims=anchors_label_shape,
             value=-1.
@@ -114,8 +126,8 @@ class SSDTarget(snt.AbstractModule):
             name="update_labels_for_bestbox_anchors"
         )
 
-        # Use the worst backgrounds (the bgs whose probability of being fg is
-        # the greatest).
+        # Use the worst backgrounds (the bgs whose probability of being fg
+        # is the greatest).
         cls_probs = probs[:, 1:]
         max_cls_probs = tf.reduce_max(cls_probs, axis=1)
 

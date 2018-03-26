@@ -35,15 +35,15 @@ class SSD(snt.AbstractModule):
         # TODO: Why not use the default LOSSES collection?
         self._losses_collections = ['ssd_losses']
 
-    def _build(self, image, gt_boxes=None, is_training=False):
+    def _build(self, image_batch, gt_boxes_batch=None, is_training=False):
         """
         Returns bounding boxes and classification probabilities.
 
         Args:
-            image: A tensor with the image.
-                Its shape should be `(height, width, 3)`.
-            gt_boxes: A tensor with all the ground truth boxes of that image.
-                Its shape should be `(num_gt_boxes, 5)`
+            images: A tensor with a batch of images. Its shape should
+                be `(batch_size, height, width, 3)`.
+            gt_boxes: A tensor with all the ground truth boxes for the images.
+                Its shape should be `(batch_size, num_gt_boxes, 5)`
                 Where for each gt box we have (x1, y1, x2, y2, label),
                 in that order.
             is_training: A boolean to whether or not it is used for training.
@@ -60,16 +60,19 @@ class SSD(snt.AbstractModule):
             bbox_offsets: A tensor with the predicted bbox_offsets
             class_scores: A tensor with the predicted classes scores
         """
-        # Reshape image
-        self.image_shape.append(3)  # Add channels to shape
-        image.set_shape(self.image_shape)
-        image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
+        # This is the dict we'll return after filling it with SSD's predictions
+        sample_prediction_dict_list = []
 
-        # Generate feature maps from image
+        # Safer to infer batch size instead of getting it from config file
+        self._batch_size = image_batch.get_shape()[0]
+
+        # Generate feature maps from images
         self.feature_extractor = SSDFeatureExtractor(
             self._config.base_network, parent_name=self.module_name
         )
-        feature_maps = self.feature_extractor(image, is_training=is_training)
+        feature_maps = self.feature_extractor(
+            image_batch, is_training=is_training
+        )
 
         # Build a MultiBox predictor on top of each feature layer and collect
         # the bounding box offsets and the category score logits they produce
@@ -82,7 +85,9 @@ class SSD(snt.AbstractModule):
             bbox_offsets_layer = Conv2D(
                 num_anchors * 4, [3, 3], name=feat_map_name + '_offsets_conv'
             )(feat_map)
-            bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
+            bbox_offsets_flattened = tf.reshape(
+                bbox_offsets_layer, [self._batch_size, -1, 4]
+            )
             bbox_offsets_list.append(bbox_offsets_flattened)
 
             # Predict class scores
@@ -91,12 +96,13 @@ class SSD(snt.AbstractModule):
                 name=feat_map_name + '_classes_conv',
             )(feat_map)
             class_scores_flattened = tf.reshape(
-                class_scores_layer, [-1, self._num_classes + 1]
+                class_scores_layer,
+                [self._batch_size, -1, self._num_classes + 1]
             )
             class_scores_list.append(class_scores_flattened)
-        bbox_offsets = tf.concat(bbox_offsets_list, axis=0)
-        class_scores = tf.concat(class_scores_list, axis=0)
-        class_probabilities = tf.nn.softmax(class_scores, axis=-1)
+        bbox_offsets_batch = tf.concat(bbox_offsets_list, axis=1)
+        class_scores_batch = tf.concat(class_scores_list, axis=1)
+        class_probs_batch = tf.nn.softmax(class_scores_batch, axis=-1)
 
         # Generate anchors (generated only once, therefore we use numpy)
         raw_anchors_per_featmap = generate_raw_anchors(
@@ -115,76 +121,117 @@ class SSD(snt.AbstractModule):
             )
             clipped_bboxes = clip_boxes(scaled_bboxes, self.image_shape)
             anchors_list.append(clipped_bboxes)
-        anchors = np.concatenate(anchors_list, axis=0)
-        anchors = tf.convert_to_tensor(anchors, dtype=tf.float32)
+        anchors_numpy = np.concatenate(anchors_list, axis=0)
+        # anchors = tf.convert_to_tensor(anchors, dtype=tf.float32)
+        # TODO DELETE THIS!
+        # We tile the anchors along the batch axis because each sample
+        # in the batch may perform a different filtering of these
+        # anchors
+        # anchors = tf.tile(tf.expand_dims(anchors, axis=0), [32, 1, 1])
 
-        # This is the dict we'll return after filling it with SSD's results
-        prediction_dict = {}
+        # We'll process each sample in the batch separately from now on.
+        # This will only affect target generation, proposal generation and loss
+        # calculation, which are not really performance bottlenecks, so this
+        # shouldn't affect SSD's performance
+        bbox_offsets_sample_list = tf.split(
+            bbox_offsets_batch, bbox_offsets_batch.shape[0]
+        )
+        class_scores_sample_list = tf.split(
+            class_scores_batch, class_scores_batch.shape[0]
+        )
+        class_probs_sample_list = tf.split(
+            class_probs_batch, class_probs_batch.shape[0]
+        )
+        gt_boxes_sample_list = tf.split(
+            gt_boxes_batch, gt_boxes_batch.shape[0]
+        )
+        batch_iter = zip(
+            bbox_offsets_sample_list, class_scores_sample_list,
+            class_probs_sample_list, gt_boxes_sample_list
+        )
 
-        # Generate targets for training
-        if gt_boxes is not None:
-            gt_boxes = tf.cast(gt_boxes, tf.float32)
+        for (bbox_offsets, class_scores, class_probs, gt_boxes) in batch_iter:
+            # We'll fill this prediction_dict for this sample
+            prediction_dict = {}
 
-            # Generate targets
-            target_creator = SSDTarget(
-                self._num_classes, self._config.target, self._config.variances
-            )
-            class_targets, bbox_offsets_targets = target_creator(
-                class_probabilities, anchors, gt_boxes
-            )
+            # Create a new anchors tensor for each sample because each sample
+            # filters anchors differently and the tensor would get reused
+            # on all samples
+            anchors = tf.constant(anchors_numpy, dtype=tf.float32)
 
-            # Filter the predictions and targets that we will ignore during
-            # training due to hard negative mining. We use class_targets to
-            # know which ones to ignore (they are marked as -1 if they are to
-            # be ignored)
-            with tf.name_scope('prepare_batch'):
-                predictions_filter = tf.greater_equal(class_targets, 0)
+            # Remove batch dimention
+            bbox_offsets = tf.squeeze(bbox_offsets, axis=0)
+            class_scores = tf.squeeze(class_scores, axis=0)
+            class_probs = tf.squeeze(class_probs, axis=0)
+            gt_boxes = tf.squeeze(gt_boxes, axis=0)
 
-                anchors = tf.boolean_mask(
-                    anchors, predictions_filter)
-                bbox_offsets_targets = tf.boolean_mask(
-                    bbox_offsets_targets, predictions_filter)
-                class_targets = tf.boolean_mask(
-                    class_targets, predictions_filter)
-                class_scores = tf.boolean_mask(
-                    class_scores, predictions_filter)
-                class_probabilities = tf.boolean_mask(
-                    class_probabilities, predictions_filter)
-                bbox_offsets = tf.boolean_mask(
-                    bbox_offsets, predictions_filter)
+            # Generate targets for training
+            if gt_boxes is not None:
+                gt_boxes = tf.cast(gt_boxes, tf.float32)
 
-            # Add target tensors to prediction dict
-            prediction_dict['target'] = {
-                'cls': class_targets,
-                'bbox_offsets': bbox_offsets_targets,
-                'anchors': anchors
-            }
+                # Generate targets
+                target_creator = SSDTarget(
+                    self._config.target, self._config.variances
+                )
+                # import ipdb; ipdb.set_trace()
+                class_targets, bbox_offsets_targets = target_creator(
+                    class_probs, anchors, gt_boxes
+                )
 
-        # Add network's raw output to prediction dict
-        prediction_dict['cls_pred'] = class_scores
-        prediction_dict['loc_pred'] = bbox_offsets
+                # Filter the predictions and targets that we will ignore during
+                # training due to hard negative mining. We use class_targets to
+                # know which ones to ignore (they are marked as -1 if they are
+                # to be ignored)
+                with tf.name_scope('prepare_batch'):  # TODO: change scope name
+                    predictions_filter = tf.greater_equal(class_targets, 0)
 
-        # We generate proposals when predicting, or when debug=True for
-        # generating visualizations during training.
-        if not is_training or self._debug:
-            proposals_creator = SSDProposal(
-                self._num_classes, self._config.proposals,
-                self._config.variances
-            )
-            proposals = proposals_creator(
-                class_probabilities, bbox_offsets, anchors,
-                tf.cast(tf.shape(image)[1:3], tf.float32)
-            )
-            prediction_dict['classification_prediction'] = proposals
+                    anchors = tf.boolean_mask(
+                        anchors, predictions_filter)
+                    bbox_offsets_targets = tf.boolean_mask(
+                        bbox_offsets_targets, predictions_filter)
+                    class_targets = tf.boolean_mask(
+                        class_targets, predictions_filter)
+                    class_scores = tf.boolean_mask(
+                        class_scores, predictions_filter)
+                    class_probs = tf.boolean_mask(
+                        class_probs, predictions_filter)
+                    bbox_offsets = tf.boolean_mask(
+                        bbox_offsets, predictions_filter)
 
-        # Add some non essential metrics for debugging
-        if self._debug:
-            prediction_dict['all_anchors'] = anchors
-            prediction_dict['cls_prob'] = class_probabilities
+                # Add target tensors to prediction dict
+                prediction_dict['target'] = {
+                    'cls': class_targets,
+                    'bbox_offsets': bbox_offsets_targets,
+                    'anchors': anchors
+                }
 
-        return prediction_dict
+            # Add network's raw output to prediction dict
+            prediction_dict['cls_pred'] = class_scores
+            prediction_dict['loc_pred'] = bbox_offsets
 
-    def loss(self, prediction_dict, return_all=False):
+            # We generate proposals when predicting, or when debug=True for
+            # generating visualizations during training.
+            if not is_training or self._debug:
+                proposals_creator = SSDProposal(
+                    self._num_classes, self._config.proposals,
+                    self._config.variances
+                )
+                proposals = proposals_creator(
+                    class_probs, bbox_offsets, anchors,
+                    tf.cast(image_batch.get_shape()[1:3], tf.float32)
+                )
+                prediction_dict['classification_prediction'] = proposals
+
+            # Add some non essential metrics for debugging
+            if self._debug:
+                prediction_dict['all_anchors'] = anchors
+                prediction_dict['cls_prob'] = class_probs
+
+            sample_prediction_dict_list.append(prediction_dict)
+
+        return sample_prediction_dict_list
+
+    def loss(self, sample_prediction_dict_list, return_all=False):
         """Compute the loss for SSD.
 
         Args:
@@ -202,77 +249,93 @@ class SSD(snt.AbstractModule):
 
         with tf.name_scope('losses'):
 
-            cls_pred = prediction_dict['cls_pred']
-            cls_target = tf.cast(
-                prediction_dict['target']['cls'], tf.int32
-            )
-            # Transform to one-hot vector
-            cls_target_one_hot = tf.one_hot(
-                cls_target, depth=self._num_classes + 1,
-                name='cls_target_one_hot'
-            )
+            sample_final_loss_list = []
+            sample_cls_loss_list = []
+            sample_bbox_loss_list = []
 
-            # We get cross entropy loss of each proposal.
-            # TODO: Optimization opportunity: We calculate the probabilities
-            #       earlier in the program, so if we used those instead of the
-            #       logits we would not have the need to do softmax here too.
-            cross_entropy_per_proposal = (
-                tf.nn.softmax_cross_entropy_with_logits(
-                    labels=cls_target_one_hot, logits=cls_pred
+            for prediction_dict in sample_prediction_dict_list:
+
+                cls_pred = prediction_dict['cls_pred']
+                cls_target = tf.cast(
+                    prediction_dict['target']['cls'], tf.int32
                 )
-            )
-            # Second we need to calculate the smooth l1 loss between
-            # `bbox_offsets` and `bbox_offsets_targets`.
-            bbox_offsets = prediction_dict['loc_pred']
-            bbox_offsets_targets = (
-                prediction_dict['target']['bbox_offsets']
-            )
+                # Transform to one-hot vector
+                cls_target_one_hot = tf.one_hot(
+                    cls_target, depth=self._num_classes + 1,
+                    name='cls_target_one_hot'
+                )
 
-            # We only want the non-background labels bounding boxes.
-            not_ignored = tf.reshape(tf.greater(cls_target, 0), [-1])
-            bbox_offsets_positives = tf.boolean_mask(
-                bbox_offsets, not_ignored, name='bbox_offsets_positives')
-            bbox_offsets_target_positives = tf.boolean_mask(
-                bbox_offsets_targets, not_ignored,
-                name='bbox_offsets_target_positives'
-            )
+                # We get cross entropy loss of each proposal.
+                # TODO: Optimization opportunity: We calculate the probabilities
+                #       earlier in the program, so if we used those instead of the
+                #       logits we would not have the need to do softmax here too.
+                cross_entropy_per_proposal = (
+                    tf.nn.softmax_cross_entropy_with_logits(
+                        labels=cls_target_one_hot, logits=cls_pred
+                    )
+                )
+                # Second we need to calculate the smooth l1 loss between
+                # `bbox_offsets` and `bbox_offsets_targets`.
+                bbox_offsets = prediction_dict['loc_pred']
+                bbox_offsets_targets = (
+                    prediction_dict['target']['bbox_offsets']
+                )
 
-            # Calculate the smooth l1 regression loss between the flatten
-            # bboxes offsets  and the labeled targets.
-            reg_loss_per_proposal = smooth_l1_loss(
-                bbox_offsets_positives, bbox_offsets_target_positives)
+                # We only want the non-background labels bounding boxes.
+                not_ignored = tf.reshape(tf.greater(cls_target, 0), [-1])
+                bbox_offsets_positives = tf.boolean_mask(
+                    bbox_offsets, not_ignored, name='bbox_offsets_positives')
+                bbox_offsets_target_positives = tf.boolean_mask(
+                    bbox_offsets_targets, not_ignored,
+                    name='bbox_offsets_target_positives'
+                )
 
-            cls_loss = tf.reduce_sum(cross_entropy_per_proposal)
-            bbox_loss = tf.reduce_sum(reg_loss_per_proposal)
+                # Calculate the smooth l1 regression loss between the flatten
+                # bboxes offsets  and the labeled targets.
+                reg_loss_per_proposal = smooth_l1_loss(
+                    bbox_offsets_positives, bbox_offsets_target_positives)
 
-            # Following the paper, set loss to 0 if there are 0 bboxes
-            # assigned as foreground targets.
-            safety_condition = tf.not_equal(
-                tf.shape(bbox_offsets_positives)[0], 0
-            )
-            final_loss = tf.cond(
-                safety_condition,
-                true_fn=lambda: (
-                    (cls_loss + bbox_loss * self._loc_loss_weight) /
-                    tf.cast(tf.shape(bbox_offsets_positives)[0], tf.float32)
-                ),
-                false_fn=lambda: 0.0
-            )
-            tf.losses.add_loss(final_loss)
+                cls_loss = tf.reduce_sum(cross_entropy_per_proposal)
+                sample_cls_loss_list.append(cls_loss)
+                bbox_loss = tf.reduce_sum(reg_loss_per_proposal)
+                sample_bbox_loss_list.append(bbox_loss)
+
+                # Following the paper, set loss to 0 if there are 0 bboxes
+                # assigned as foreground targets.
+                safety_condition = tf.not_equal(
+                    tf.shape(bbox_offsets_positives)[0], 0
+                )
+                final_loss = tf.cond(
+                    safety_condition,
+                    true_fn=lambda: (
+                        (cls_loss + bbox_loss * self._loc_loss_weight) /
+                        tf.cast(tf.shape(bbox_offsets_positives)[0], tf.float32)
+                    ),
+                    false_fn=lambda: 0.0
+                )
+                sample_final_loss_list.append(final_loss)
+
+            batch_final_loss = tf.add_n(sample_final_loss_list)
+            batch_cls_loss = tf.add_n(sample_cls_loss_list)
+            batch_bbox_loss = tf.add_n(sample_bbox_loss_list)
+
+            # TODO why do we do this? Isn't this redundant?
+            tf.losses.add_loss(batch_final_loss)
             total_loss = tf.losses.get_total_loss()
 
-            prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
-            prediction_dict['cls_loss_per_proposal'] = (
-                cross_entropy_per_proposal
-            )
+            # # TODO do these two do anythin? We don't return this dict
+            # prediction_dict['reg_loss_per_proposal'] = reg_loss_per_proposal
+            # prediction_dict['cls_loss_per_proposal'] = (
+            #     cross_entropy_per_proposal
+            # )
 
             tf.summary.scalar(
-                'cls_loss', cls_loss,
+                'cls_loss', batch_cls_loss,
                 collections=self._losses_collections
             )
 
             tf.summary.scalar(
-                'bbox_loss', bbox_loss,
+                'bbox_loss', batch_bbox_loss,
                 collections=self._losses_collections
             )
 
@@ -283,8 +346,8 @@ class SSD(snt.AbstractModule):
             if return_all:
                 return {
                     'total_loss': total_loss,
-                    'cls_loss': cls_loss,
-                    'bbox_loss': bbox_loss
+                    'cls_loss': batch_cls_loss,
+                    'bbox_loss': batch_bbox_loss
                 }
             else:
                 return total_loss

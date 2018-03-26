@@ -105,14 +105,14 @@ summaries_fn = {
         'debug': {
             'draw_object_prediction': None,
             'draw_ssd_target_proposals': None,
-            'draw_ssd_cls_loss': [
-                {'foreground': True, 'topn': 10, 'worst': True},
-                {'foreground': True, 'topn': 10, 'worst': False},
-                {'foreground': False, 'topn': 10, 'worst': True},
-                {'foreground': False, 'topn': 10, 'worst': False},
-            ],
+            # 'draw_ssd_cls_loss': [
+            #     {'foreground': True, 'topn': 10, 'worst': True},
+            #     {'foreground': True, 'topn': 10, 'worst': False},
+            #     {'foreground': False, 'topn': 10, 'worst': True},
+            #     {'foreground': False, 'topn': 10, 'worst': False},
+            # ],
             'draw_ssd_final_pred_anchors': None,
-            'draw_ssd_bbox_pred': [{'top_k': 1}, {'top_k': 5}, {'top_k': 10}],
+            # 'draw_ssd_bbox_pred': [{'top_k': 1}, {'top_k': 5}, {'top_k': 10}],
             'draw_ssd_top_k_anchors_per_gt': None
         }
     }
