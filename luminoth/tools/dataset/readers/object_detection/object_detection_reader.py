@@ -23,7 +23,8 @@ class ObjectDetectionReader(BaseReader):
             Iterate over all records.
     """
     def __init__(self, only_classes=None, only_images=None,
-                 limit_examples=None, limit_classes=None, seed=None, **kwargs):
+                 limit_examples=None, limit_classes=None, merge_classes=False,
+                 seed=None, **kwargs):
         """
         Args:
             - only_classes: string or list of strings used as a class
@@ -47,6 +48,7 @@ class ObjectDetectionReader(BaseReader):
 
         self._limit_examples = limit_examples
         self._limit_classes = limit_classes
+        self.merge_classes = merge_classes
         random.seed(seed)
 
         self._total = None
