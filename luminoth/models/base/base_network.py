@@ -45,6 +45,8 @@ class BaseNetwork(snt.AbstractModule):
         self._architecture = config.get('architecture')
         self._config = config
 
+        self.pretrained_weights_scope = None
+
     @property
     def arg_scope(self):
         arg_scope_kwargs = self._config.get('arg_scope', {})
