@@ -65,14 +65,11 @@ def filter_classes(objects, only_classes=None, ignore_classes=None):
     return objects
 
 
-def draw_bboxes_on_image(image, objects, min_prob):
+def draw_bboxes_on_image(image, objects):
     # Open as 'RGBA' in order to draw translucent boxes.
     draw = ImageDraw.Draw(image, 'RGBA')
 
     for ind, obj in enumerate(objects):
-        if obj['prob'] < min_prob:
-            continue
-
         # Choose colors for bbox, the 60 and 255 correspond to transparency.
         color = get_color(str(obj['label']))
         fill = tuple(color + [60])
@@ -113,7 +110,7 @@ def hex_to_rgb(x):
 
 
 def predict_image(network, path, only_classes=None, ignore_classes=None,
-                  min_prob=0.5, max_detections=100, save_path=None):
+                  save_path=None):
     click.echo('Predicting {}...'.format(path), nl=False)
 
     # Open and read the image to predict.
@@ -135,12 +132,9 @@ def predict_image(network, path, only_classes=None, ignore_classes=None,
         ignore_classes=ignore_classes
     )
 
-    if max_detections:
-        objects = objects[:max_detections]
-
     # Save predicted image.
     if save_path:
-        draw_bboxes_on_image(image, objects, min_prob)
+        draw_bboxes_on_image(image, objects)
         image.save(save_path)
 
     click.echo(' done.')
@@ -148,7 +142,7 @@ def predict_image(network, path, only_classes=None, ignore_classes=None,
 
 
 def predict_video(network, path, only_classes=None, ignore_classes=None,
-                  min_prob=0.5, max_detections=100, save_path=None):
+                  save_path=None):
     # We hardcode the video ouput to mp4 for the time being.
     save_path = os.path.splitext(save_path)[0] + '.mp4'
     try:
@@ -183,9 +177,6 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
                     ignore_classes=ignore_classes
                 )
 
-                if max_detections:
-                    objects = objects[:max_detections]
-
                 objects_per_frame.append({
                     'frame': idx,
                     'objects': objects
@@ -193,7 +184,7 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
 
                 # Draw the image and write it to the video file.
                 image = Image.fromarray(frame)
-                draw_bboxes_on_image(image, objects, min_prob)
+                draw_bboxes_on_image(image, objects)
                 writer.writeFrame(np.array(image))
             stop_time = time.time()
             click.echo(
@@ -221,7 +212,7 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
 @click.option('output_path', '--output', '-f', default='-', help='Output file.')  # noqa
 @click.option('--save-media-to', '-d', help='Directory to store media to.')
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
-@click.option('--max-detections', default=None, type=float, help='Maximum number of detections per image.')  # noqa
+@click.option('--max-detections', default=100, type=int, help='Maximum number of detections per image.')  # noqa
 @click.option('--only-class', '-k', default=None, multiple=True, help='Class to ignore when predicting.')  # noqa
 @click.option('--ignore-class', '-K', default=None, multiple=True, help='Class to ignore when predicting.')  # noqa
 @click.option('--debug', is_flag=True, help='Set debug level logging.')
@@ -285,6 +276,21 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
     if override_params:
         config = override_config_params(config, override_params)
 
+    # Filter bounding boxes according to `min_prob` and `max_detections`.
+    if config.model.type == 'fasterrcnn':
+        if config.model.network.with_rcnn:
+            config.model.rcnn.proposals.total_max_detections = max_detections
+        else:
+            config.model.rpn.proposals.post_nms_top_n = max_detections
+        config.model.rcnn.proposals.min_prob_threshold = min_prob
+    elif config.model.type == 'ssd':
+        config.model.proposals.total_max_detections = max_detections
+        config.model.proposals.min_prob_threshold = min_prob
+    else:
+        raise ValueError(
+            "Model type '{}' not supported".format(config.model.type)
+        )
+
     # Instantiate the model indicated by the config.
     network = PredictorNetwork(config)
 
@@ -303,8 +309,6 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
             network, file,
             only_classes=only_class,
             ignore_classes=ignore_class,
-            min_prob=min_prob,
-            max_detections=max_detections,
             save_path=save_path,
         )
 
