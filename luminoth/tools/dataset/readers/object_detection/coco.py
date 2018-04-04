@@ -45,14 +45,21 @@ class COCOReader(ObjectDetectionReader):
         for annotation in annotations_json['annotations']:
             image_id = annotation['image_id']
             x, y, width, height = annotation['bbox']
+
+            # If the class is not in `classes`, it was filtered.
+            try:
+                annotation_class = self.classes.index(
+                    category_to_name[annotation['category_id']]
+                )
+            except ValueError:
+                continue
+
             self._image_to_bboxes.setdefault(image_id, []).append({
                 'xmin': x,
                 'ymin': y,
                 'xmax': x + width,
                 'ymax': y + height,
-                'label': self.classes.index(
-                    category_to_name[annotation['category_id']]
-                ),
+                'label': annotation_class,
             })
 
         self._image_to_details = {}
@@ -87,6 +94,12 @@ class COCOReader(ObjectDetectionReader):
             width = image_details['width']
             height = image_details['height']
 
+            gt_boxes = self._image_to_bboxes.get(image_id, [])
+            if len(gt_boxes) == 0:
+                continue
+
+            # Read the image *after* checking whether any ground truth box is
+            # present.
             try:
                 image_path = self._get_image_path(filename)
                 image = read_image(image_path)
@@ -95,10 +108,6 @@ class COCOReader(ObjectDetectionReader):
                     'Error reading image or annotation for "{}".'.format(
                         image_id))
                 self.errors += 1
-                continue
-
-            gt_boxes = self._image_to_bboxes.get(image_id, [])
-            if len(gt_boxes) == 0:
                 continue
 
             self.yielded_records += 1
