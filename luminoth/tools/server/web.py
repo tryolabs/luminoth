@@ -94,7 +94,14 @@ def web(config_files, checkpoint, override_params, host, port, debug):
 
     # Bounding boxes will be filtered by frontend (using slider), so we set a
     # low threshold.
-    config.model.rcnn.proposals.min_prob_threshold = 0.01
+    if config.model.type == 'fasterrcnn':
+        config.model.rcnn.proposals.min_prob_threshold = 0.01
+    elif config.model.type == 'ssd':
+        config.model.proposals.min_prob_threshold = 0.01
+    else:
+        raise ValueError(
+            "Model type '{}' not supported".format(config.model.type)
+        )
 
     # Initialize model
     global NETWORK_START_THREAD
