@@ -342,10 +342,10 @@ def list():
         click.echo('No checkpoints available.')
         return
 
-    template = '| {:>12} | {:>20} | {:>15} | {:>15} | {:>10} | {:>14} |'
+    template = '| {:>12} | {:>21} | {:>11} | {:>6} | {:>14} |'
 
     header = template.format(
-        'id', 'name', 'dataset', 'alias', 'source', 'status'
+        'id', 'name', 'alias', 'source', 'status'
     )
     click.echo('=' * len(header))
     click.echo(header)
@@ -355,7 +355,6 @@ def list():
         line = template.format(
             checkpoint['id'],
             checkpoint['name'],
-            checkpoint['dataset']['name'],
             checkpoint['alias'],
             checkpoint['source'],
             checkpoint['status'],
