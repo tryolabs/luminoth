@@ -16,6 +16,8 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
+from luminoth import __version__ as lumi_version  # noqa
+
 
 # -- Project information -----------------------------------------------------
 
@@ -26,7 +28,7 @@ author = 'Tryolabs'
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '0.0.4dev0'
+release = lumi_version
 
 
 # -- General configuration ---------------------------------------------------
