@@ -54,42 +54,42 @@ class SSDFeatureExtractor(BaseNetwork):
             inputs, is_training=is_training)['end_points']
 
         if self.vgg_16_type:
-            # The original SSD paper uses a modified version of the vgg16
-            # network, which we'll modify here
-            vgg_network_truncation_endpoint = base_net_endpoints[
-                scope + '/vgg_16/conv5/conv5_3']
-
             # As it is pointed out in SSD and ParseNet papers, `conv4_3` has a
             # different features scale compared to other layers, to adjust it
             # we need to add a spatial normalization before adding the
             # predictors.
-            vgg_conv4_3_name = scope + '/vgg_16/conv4/conv4_3'
-            vgg_conv4_3 = base_net_endpoints[vgg_conv4_3_name]
-            with tf.variable_scope(vgg_conv4_3_name + '_norm'):
-                inputs_shape = vgg_conv4_3.shape
-                inputs_rank = inputs_shape.ndims
-                dtype = vgg_conv4_3.dtype.base_dtype
-                norm_dim = tf.range(inputs_rank - 1, inputs_rank)
-                params_shape = inputs_shape[-1:]
-
-                # Normalize.
+            vgg_conv4_3 = base_net_endpoints[scope + '/vgg_16/conv4/conv4_3']
+            tf.summary.histogram('conv4_3_hist', vgg_conv4_3)
+            with tf.variable_scope('conv_4_3_norm'):
+                # Normalize through channels dimension (dim=3)
                 vgg_conv4_3_norm = tf.nn.l2_normalize(
-                    vgg_conv4_3, norm_dim, epsilon=1e-12
+                    vgg_conv4_3, 3, epsilon=1e-12
                 )
-
                 # Scale.
-                # TODO use tf.get_variable and initialize
-                #      to 20 as described in paper
-                scale = variables.model_variable(
-                    'gamma', shape=params_shape, dtype=dtype,
-                    initializer=init_ops.ones_initializer()
+                scale_initializer = tf.ones(
+                    [1, 1, 1, vgg_conv4_3.shape[3]]
+                ) * 20.0  # They initialize to 20.0 in paper
+                scale = tf.get_variable(
+                    'gamma',
+                    dtype=vgg_conv4_3.dtype.base_dtype,
+                    initializer=scale_initializer
                 )
                 vgg_conv4_3_norm = tf.multiply(vgg_conv4_3_norm, scale)
+                tf.summary.histogram('conv4_3_normalized_hist', vgg_conv4_3)
             tf.add_to_collection('FEATURE_MAPS', vgg_conv4_3_norm)
 
+            # The original SSD paper uses a modified version of the vgg16
+            # network, which we'll modify here
+            vgg_network_truncation_endpoint = base_net_endpoints[
+                scope + '/vgg_16/conv5/conv5_3']
+            tf.summary.histogram(
+                'conv5_3_hist',
+                vgg_network_truncation_endpoint
+            )
+
             # Extra layers for vgg16 as detailed in paper
-            self._init_vgg16_extra_layers()
             with tf.variable_scope('extra_feature_layers'):
+                self._init_vgg16_extra_layers()
                 net = tf.nn.max_pool(
                     vgg_network_truncation_endpoint, [1, 3, 3, 1],
                     padding='SAME', strides=[1, 1, 1, 1], name='pool5'
@@ -98,26 +98,31 @@ class SSDFeatureExtractor(BaseNetwork):
                 net = self.activation_fn(net)
                 net = self.conv7(net)
                 net = self.activation_fn(net)
+                tf.summary.histogram('conv7_hist', net)
                 tf.add_to_collection('FEATURE_MAPS', net)
                 net = self.conv8_1(net)
                 net = self.activation_fn(net)
                 net = self.conv8_2(net)
                 net = self.activation_fn(net)
+                tf.summary.histogram('conv8_hist', net)
                 tf.add_to_collection('FEATURE_MAPS', net)
                 net = self.conv9_1(net)
                 net = self.activation_fn(net)
                 net = self.conv9_2(net)
                 net = self.activation_fn(net)
+                tf.summary.histogram('conv9_hist', net)
                 tf.add_to_collection('FEATURE_MAPS', net)
                 net = self.conv10_1(net)
                 net = self.activation_fn(net)
                 net = self.conv10_2(net)
                 net = self.activation_fn(net)
+                tf.summary.histogram('conv10_hist', net)
                 tf.add_to_collection('FEATURE_MAPS', net)
                 net = self.conv11_1(net)
                 net = self.activation_fn(net)
                 net = self.conv11_2(net)
                 net = self.activation_fn(net)
+                tf.summary.histogram('conv11_hist', net)
                 tf.add_to_collection('FEATURE_MAPS', net)
 
             # This parameter determines onto which variables we try to load the
