@@ -4,7 +4,8 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from tensorflow.contrib.slim.nets import vgg, resnet_v2, resnet_v1
+from tensorflow.contrib.slim.nets import resnet_v2, resnet_v1
+from . import truncated_vgg_16 as vgg
 
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
 
