@@ -70,15 +70,23 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
 
         optimizer = get_optimizer(config.train, global_step)
 
-        trainable_vars = model.get_trainable_vars()
+        # Create saver for loading pretrained checkpoint into base network
+        init_saver = tf.train.Saver(
+            model.get_base_checkpoint_vars(),
+            name='base_net_checkpoint_loader'
+        )
 
+        # We'll send this fn to Scaffold init_fn
+        def load_base_net_checkpoint(_, session):
+            init_saver.restore(session, model.get_checkpoint_file()) 
+
+        # Compute, clip and apply gradients
+        trainable_vars = model.get_trainable_vars()
         with tf.name_scope('gradients'):
-            # Compute, clip and apply gradients
             grads_and_vars = optimizer.compute_gradients(
                 total_loss, trainable_vars
             )
 
-            # Clip by norm.
             if config.train.clip_by_norm:
                 grads_and_vars = clip_gradients_by_norm(grads_and_vars)
 
@@ -96,15 +104,6 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
             trace_level=tf.RunOptions.FULL_TRACE
         )
 
-    if is_chief:
-        # Load pretrained weights needs to be called before defining the train
-        # op. After it, variables for the optimizer are created.
-        with tf.control_dependencies([tf.global_variables_initializer()]):
-            with tf.control_dependencies([model.load_pretrained_weights()]):
-                init_op = tf.no_op(name='global_init_load_pretrained')
-    else:
-        init_op = tf.no_op()
-
     # Create custom Scaffold to make sure we run our own init_op when model
     # is not restored from checkpoint.
     summary_op = [model.summary]
@@ -114,11 +113,12 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
     summary_op = tf.summary.merge(summary_op)
 
     scaffold = tf.train.Scaffold(
-        # Initialize local and global variables.
-        init_op=init_op,
+        # Initialize global variables.
+        init_op=tf.global_variables_initializer() if is_chief else tf.no_op(),
         # Queue-related variables need a special initializer.
         local_init_op=tf.local_variables_initializer(),
         summary_op=summary_op,
+        init_fn=load_base_net_checkpoint,
     )
 
     # Custom hooks for our session

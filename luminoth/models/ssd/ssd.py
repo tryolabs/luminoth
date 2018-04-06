@@ -63,40 +63,50 @@ class SSD(snt.AbstractModule):
         # Reshape image
         self.image_shape.append(3)  # Add channels to shape
         image.set_shape(self.image_shape)
-        image = tf.expand_dims(image, 0)  # TODO: batch size is hardcoded to 1
+        image = tf.expand_dims(image, 0, name='hardcode_batch_size_to_1')
 
         # Generate feature maps from image
         self.feature_extractor = SSDFeatureExtractor(
             self._config.base_network, parent_name=self.module_name
         )
         feature_maps = self.feature_extractor(image, is_training=is_training)
+        # import ipdb; ipdb.set_trace()
 
         # Build a MultiBox predictor on top of each feature layer and collect
         # the bounding box offsets and the category score logits they produce
         bbox_offsets_list = []
         class_scores_list = []
-        for i, (feat_map_name, feat_map) in enumerate(feature_maps.items()):
-            num_anchors = self._anchors_per_point[i]
+        for i, feat_map in enumerate(feature_maps.values()):
+            multibox_predictor_name = 'MultiBox_{}'.format(i)
+            with tf.name_scope(multibox_predictor_name):
+                num_anchors = self._anchors_per_point[i]
 
-            # Predict bbox offsets
-            bbox_offsets_layer = Conv2D(
-                num_anchors * 4, [3, 3], name=feat_map_name + '_offsets_conv'
-            )(feat_map)
-            bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
-            bbox_offsets_list.append(bbox_offsets_flattened)
+                # Predict bbox offsets
+                bbox_offsets_layer = Conv2D(
+                    num_anchors * 4, [3, 3],
+                    name=multibox_predictor_name + '_offsets_conv'
+                )(feat_map)
+                bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
+                bbox_offsets_list.append(bbox_offsets_flattened)
 
-            # Predict class scores
-            class_scores_layer = Conv2D(
-                num_anchors * (self._num_classes + 1), [3, 3],
-                name=feat_map_name + '_classes_conv',
-            )(feat_map)
-            class_scores_flattened = tf.reshape(
-                class_scores_layer, [-1, self._num_classes + 1]
-            )
-            class_scores_list.append(class_scores_flattened)
-        bbox_offsets = tf.concat(bbox_offsets_list, axis=0)
-        class_scores = tf.concat(class_scores_list, axis=0)
-        class_probabilities = tf.nn.softmax(class_scores, axis=-1)
+                # Predict class scores
+                class_scores_layer = Conv2D(
+                    num_anchors * (self._num_classes + 1), [3, 3],
+                    name=multibox_predictor_name + '_classes_conv',
+                )(feat_map)
+                class_scores_flattened = tf.reshape(
+                    class_scores_layer, [-1, self._num_classes + 1]
+                )
+                class_scores_list.append(class_scores_flattened)
+        bbox_offsets = tf.concat(
+            bbox_offsets_list, axis=0, name='concatenate_all_bbox_offsets'
+        )
+        class_scores = tf.concat(
+            class_scores_list, axis=0, name='concatenate_all_class_scores'
+        )
+        class_probabilities = tf.nn.softmax(
+            class_scores, axis=-1, name='class_probabilities_softmax'
+        )
 
         # Generate anchors (generated only once, therefore we use numpy)
         raw_anchors_per_featmap = generate_raw_anchors(
@@ -137,7 +147,7 @@ class SSD(snt.AbstractModule):
             # training due to hard negative mining. We use class_targets to
             # know which ones to ignore (they are marked as -1 if they are to
             # be ignored)
-            with tf.name_scope('prepare_batch'):
+            with tf.name_scope('hard_negative_mining_filter'):
                 predictions_filter = tf.greater_equal(class_targets, 0)
 
                 anchors = tf.boolean_mask(
@@ -317,15 +327,14 @@ class SSD(snt.AbstractModule):
 
         return trainable_vars
 
+    def get_base_checkpoint_vars(self):
+        return self.feature_extractor.get_base_checkpoint_vars()
+
     def get_saver(self, ignore_scope=None):
         """Get an instance of tf.train.Saver for all modules and submodules.
         """
         return get_saver((self, self.feature_extractor),
                          ignore_scope=ignore_scope)
 
-    def load_pretrained_weights(self):
-        """Get operation to load pretrained weights from file.
-        """
-        with tf.control_dependencies([tf.global_variables_initializer()]):
-            res = self.feature_extractor.load_weights()
-        return res
+    def get_checkpoint_file(self):
+        return self.feature_extractor.get_checkpoint_file()

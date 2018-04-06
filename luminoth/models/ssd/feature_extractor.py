@@ -1,3 +1,4 @@
+import sonnet as snt
 import tensorflow as tf
 
 from sonnet.python.modules.conv import Conv2D
@@ -131,3 +132,23 @@ class SSDFeatureExtractor(BaseNetwork):
 
         # It's actually an ordered dict
         return utils.convert_collection_to_dict('FEATURE_MAPS')
+
+    def get_trainable_vars(self):
+        """
+        Returns a list of the variables that are trainable.
+
+        Returns:
+            trainable_variables: a tuple of `tf.Variable`.
+        """
+        # TODO hacer que esto filtre las fully connected de VGG!
+        return snt.get_variables_in_module(self)
+
+    def get_base_checkpoint_vars(self):
+        variable_scope_len = len(self.variable_scope.name) + 1
+        var_list = super(SSDFeatureExtractor, self).get_base_network_vars()
+        var_map = {}
+        for var in var_list:
+            var_name = var.op.name
+            checkpoint_var_name = var_name[variable_scope_len:]
+            var_map[checkpoint_var_name] = var
+        return var_map
