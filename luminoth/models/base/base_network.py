@@ -176,30 +176,10 @@ class BaseNetwork(snt.AbstractModule):
         inputs = (inputs - 0.5) * 2.
         return inputs
 
-    def load_weights(self):
-        """
-        Creates operations to load weights from checkpoint for each of the
-        variables defined in the module. It is assumed that all variables
-        of the module are included in the checkpoint but with a different
-        prefix.
+    def get_checkpoint_file(self):
+        return get_checkpoint_file(self._architecture)
 
-        Returns:
-            load_op: Load weights operation or no_op.
-        """
-        if self._config.get('weights') is None and \
-           not self._config.get('download'):
-            return tf.no_op(name='not_loading_base_network')
-
-        if self._config.get('weights') is None:
-            # Download the weights (or used cached) if not specified in the
-            # config file.
-            # Weights are downloaded by default to the $LUMI_HOME folder if
-            # running locally, or to the job bucket if running in Google Cloud.
-
-            # TODO: Shouldn't _config['weights'] be called weights_path or
-            # something similar?
-            self._config['weights'] = get_checkpoint_file(self._architecture)
-
+    def get_base_network_vars(self):
         if self.pretrained_weights_scope:
             # We may have defined the base network in a particular scope
             module_variables = tf.get_collection(
@@ -211,28 +191,7 @@ class BaseNetwork(snt.AbstractModule):
                 self, tf.GraphKeys.MODEL_VARIABLES
             )
         assert len(module_variables) > 0
-
-        load_variables = []
-        variables = [(v, v.op.name) for v in module_variables]
-        variable_scope_len = len(self.variable_scope.name) + 1
-        for var, var_name in variables:
-            checkpoint_var_name = var_name[variable_scope_len:]
-            var_value = tf.contrib.framework.load_variable(
-                self._config['weights'], checkpoint_var_name
-            )
-            load_variables.append(
-                tf.assign(var, var_value)
-            )
-
-        tf.logging.info(
-            'Constructing op to load {} variables from pretrained '
-            'checkpoint {}'.format(
-                len(load_variables), self._config['weights']
-            ))
-
-        load_op = tf.group(*load_variables)
-
-        return load_op
+        return module_variables
 
     def get_trainable_vars(self):
         """

@@ -15,7 +15,6 @@ def adjust_bboxes(bboxes, old_height, old_width, new_height, new_width):
         Tensor with shape (num_bboxes, 4), with the adjusted bboxes.
     """
     # x_min, y_min, x_max, y_max = np.split(bboxes, 4, axis=1)
-    # import ipdb; ipdb.set_trace()
     x_min = bboxes[:, 0] / old_width
     y_min = bboxes[:, 1] / old_height
     x_max = bboxes[:, 2] / old_width
