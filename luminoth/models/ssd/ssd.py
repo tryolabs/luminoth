@@ -330,11 +330,5 @@ class SSD(snt.AbstractModule):
     def get_base_checkpoint_vars(self):
         return self.feature_extractor.get_base_checkpoint_vars()
 
-    def get_saver(self, ignore_scope=None):
-        """Get an instance of tf.train.Saver for all modules and submodules.
-        """
-        return get_saver((self, self.feature_extractor),
-                         ignore_scope=ignore_scope)
-
     def get_checkpoint_file(self):
         return self.feature_extractor.get_checkpoint_file()
