@@ -70,18 +70,29 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
 
         optimizer = get_optimizer(config.train, global_step)
 
+        # Create saver for saving/restoring model
+        model_saver = tf.train.Saver(
+            name='model_saver',
+            max_to_keep=config.get('checkpoints_keep_amount', 1),
+        )
+
         # Create saver for loading pretrained checkpoint into base network
-        init_saver = tf.train.Saver(
+        base_net_checkpoint_saver = tf.train.Saver(
             model.get_base_checkpoint_vars(),
-            name='base_net_checkpoint_loader'
+            name='base_net_checkpoint_saver'
         )
 
         # We'll send this fn to Scaffold init_fn
         def load_base_net_checkpoint(_, session):
-            init_saver.restore(session, model.get_checkpoint_file()) 
+            base_net_checkpoint_saver.restore(
+                session, model.get_checkpoint_file()
+            )
+
+        # TODO: Is this necesarry? Couldn't we just get them from the
+        # trainable vars collection?
+        trainable_vars = model.get_trainable_vars()
 
         # Compute, clip and apply gradients
-        trainable_vars = model.get_trainable_vars()
         with tf.name_scope('gradients'):
             grads_and_vars = optimizer.compute_gradients(
                 total_loss, trainable_vars
@@ -113,6 +124,7 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
     summary_op = tf.summary.merge(summary_op)
 
     scaffold = tf.train.Scaffold(
+        saver=model_saver,
         # Initialize global variables.
         init_op=tf.global_variables_initializer() if is_chief else tf.no_op(),
         # Queue-related variables need a special initializer.

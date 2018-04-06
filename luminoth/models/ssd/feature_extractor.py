@@ -3,8 +3,6 @@ import tensorflow as tf
 
 from sonnet.python.modules.conv import Conv2D
 from tensorflow.contrib.layers.python.layers import utils
-from tensorflow.contrib.framework.python.ops import variables
-from tensorflow.python.ops import init_ops
 
 from luminoth.models.base import BaseNetwork
 
