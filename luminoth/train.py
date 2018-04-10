@@ -70,24 +70,6 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
 
         optimizer = get_optimizer(config.train, global_step)
 
-        # Create saver for saving/restoring model
-        model_saver = tf.train.Saver(
-            name='model_saver',
-            max_to_keep=config.get('checkpoints_keep_amount', 1),
-        )
-
-        # Create saver for loading pretrained checkpoint into base network
-        base_net_checkpoint_saver = tf.train.Saver(
-            model.get_base_checkpoint_vars(),
-            name='base_net_checkpoint_saver'
-        )
-
-        # We'll send this fn to Scaffold init_fn
-        def load_base_net_checkpoint(_, session):
-            base_net_checkpoint_saver.restore(
-                session, model.get_checkpoint_file()
-            )
-
         # TODO: Is this necesarry? Couldn't we just get them from the
         # trainable vars collection?
         trainable_vars = model.get_trainable_vars()
@@ -107,6 +89,25 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
                 grads_and_vars, global_step=global_step
             )
 
+        # Create saver for saving/restoring model
+        model_saver = tf.train.Saver(
+            tf.trainable_variables() + [global_step],
+            name='model_saver',
+            max_to_keep=config.get('checkpoints_keep_amount', 1),
+        )
+
+        # Create saver for loading pretrained checkpoint into base network
+        base_net_checkpoint_saver = tf.train.Saver(
+            model.get_base_checkpoint_vars(),
+            name='base_net_checkpoint_saver'
+        )
+
+        # We'll send this fn to Scaffold init_fn
+        def load_base_net_checkpoint(_, session):
+            base_net_checkpoint_saver.restore(
+                session, model.get_checkpoint_file()
+            )
+
     tf.logging.info('{}Starting training for {}'.format(log_prefix, model))
 
     run_options = None
@@ -123,12 +124,23 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
         summary_op.append(summaries)
     summary_op = tf.summary.merge(summary_op)
 
+    # Create custom init for slots in optimizer, as we don't save them to our
+    # checkpoints. An example of slots in an optimizer is the Momentum
+    # variables in MomentumOptimizer.
+    slot_init = tf.variables_initializer(
+        [optimizer.get_slot(var, name) for name in optimizer.get_slot_names()
+         for var in tf.trainable_variables()],
+        name='optimizer_slots_initializer'
+    )
+
+    # `ready_for_local_init_op` is hardcoded to 'ready' as local init doesn't
+    # depend on global init and `local_init_op` only runs when it is set as
+    # 'ready' (an empty string tensor sets it as ready).
     scaffold = tf.train.Scaffold(
         saver=model_saver,
-        # Initialize global variables.
         init_op=tf.global_variables_initializer() if is_chief else tf.no_op(),
-        # Queue-related variables need a special initializer.
-        local_init_op=tf.local_variables_initializer(),
+        local_init_op=tf.group(tf.initialize_local_variables(), slot_init),
+        ready_for_local_init_op=tf.constant([], dtype=tf.string),
         summary_op=summary_op,
         init_fn=load_base_net_checkpoint,
     )
