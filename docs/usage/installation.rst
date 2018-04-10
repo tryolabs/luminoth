@@ -1,3 +1,5 @@
+.. _usage/installation:
+
 Installation
 ============
 
@@ -21,7 +23,7 @@ Luminoth by issuing::
 You can see more details into installing Tensorflow manually `here
 <https://www.tensorflow.org/install/>`_, including how to use CUDA and cuDNN.
 
-ffmpeg
+FFmpeg
 ^^^^^^
 
 Luminoth leverages `FFmpeg <https://www.ffmpeg.org>`_ in order to support
