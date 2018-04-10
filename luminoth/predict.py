@@ -1,3 +1,4 @@
+import time
 import click
 import json
 import numpy as np
@@ -159,11 +160,20 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
     )
 
     objects_per_frame = []
+    i = 0
+    frame_time = []
+    model_time = []
     with video_progress_bar as bar:
         try:
+            tic = time.time()
             for idx, frame in enumerate(bar):
                 # Run image through network.
+                i += 1
+                tec = time.time()
                 objects = network.predict_image(frame)
+                tac = time.time()
+                model_time.append(tac-tec)
+                print('model {}'.format(tac - tec))
 
                 # Filter results if required by user.
                 if ignore_classes:
@@ -179,8 +189,13 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
 
                 # Draw the image and write it to the video file.
                 image = Image.fromarray(frame)
+                tuuc = time.time()
                 draw_bboxes_on_image(image, objects, min_prob)
+                tuic = time.time()
                 writer.writeFrame(np.array(image))
+                tuc = time.time()
+                print(tuuc- tac, tuic-tuuc, tuc-tuic)
+                frame_time.append(tuc-tec)
         except RuntimeError as e:
             click.echo()  # Error prints next to progress bar otherwise.
             click.echo('Error while processing {}: {}'.format(path, e))
@@ -189,7 +204,10 @@ def predict_video(network, path, ignore_classes=False, min_prob=0.5,
                     save_path
                 )
             )
-
+        toc = time.time()
+    print('model_time', sum(model_time) / len(model_time))
+    print('frame_time', sum(frame_time) / len(frame_time))
+    print('total {}'.format(i / (toc - tic)))
     writer.close()
 
     return objects_per_frame

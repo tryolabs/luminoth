@@ -98,8 +98,8 @@ class PredictorNetwork(object):
             }
 
             # If in debug mode, return the full prediction dictionary.
-            if config.train.debug:
-                self.fetches['_debug'] = pred_dict
+            # if config.train.debug:
+            #     self.fetches['_debug'] = pred_dict
 
     def predict_image(self, image):
         fetched = self.session.run(self.fetches, feed_dict={

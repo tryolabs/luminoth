@@ -1,6 +1,7 @@
 train:
   # Run on debug mode (which enables more logging)
   debug: True
+  clip_by_norm: True
   # Seed for random operations
   seed:
   # Training batch size for images.

@@ -175,12 +175,11 @@ class SSD(snt.AbstractModule):
             }
 
         # Get the proposals and save the result
-        proposals_creator = SSDProposal(target_anchors.shape[0],
-                                        self._num_classes,
+        proposals_creator = SSDProposal(self._num_classes,
                                         self._config.model.proposals,
                                         debug=self._debug)
         proposal_prediction = proposals_creator(
-            class_probabilities, bbox_offsets, target_anchors,
+            class_probabilities, bbox_offsets, all_anchors,
             tf.cast(tf.shape(image)[1:3], tf.float32)
         )
 
