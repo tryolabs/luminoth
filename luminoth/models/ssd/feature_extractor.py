@@ -140,13 +140,3 @@ class SSDFeatureExtractor(BaseNetwork):
         """
         # TODO hacer que esto filtre las fully connected de VGG!
         return snt.get_variables_in_module(self)
-
-    def get_base_checkpoint_vars(self):
-        variable_scope_len = len(self.variable_scope.name) + 1
-        var_list = super(SSDFeatureExtractor, self).get_base_network_vars()
-        var_map = {}
-        for var in var_list:
-            var_name = var.op.name
-            checkpoint_var_name = var_name[variable_scope_len:]
-            var_map[checkpoint_var_name] = var
-        return var_map

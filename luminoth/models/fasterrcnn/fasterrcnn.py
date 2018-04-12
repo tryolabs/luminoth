@@ -357,12 +357,8 @@ class FasterRCNN(snt.AbstractModule):
 
         return trainable_vars
 
-    def get_saver(self, ignore_scope=None):
-        """Get an instance of tf.train.Saver for all modules and submodules.
-        """
-        return get_saver((self, self.base_network), ignore_scope=ignore_scope)
+    def get_base_checkpoint_vars(self):
+        return self.base_network.get_base_checkpoint_vars()
 
-    def load_pretrained_weights(self):
-        """Get operation to load pretrained weights from file.
-        """
-        return self.base_network.load_weights()
+    def get_checkpoint_file(self):
+        return self.base_network.get_checkpoint_file()

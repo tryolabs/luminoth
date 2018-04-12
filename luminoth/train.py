@@ -71,7 +71,8 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
         optimizer = get_optimizer(config.train, global_step)
 
         # TODO: Is this necesarry? Couldn't we just get them from the
-        # trainable vars collection?
+        # trainable vars collection? We should probably improve our
+        # usage of collections.
         trainable_vars = model.get_trainable_vars()
 
         # Compute, clip and apply gradients
@@ -89,9 +90,21 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
                 grads_and_vars, global_step=global_step
             )
 
+        # Create custom init for slots in optimizer, as we don't save them to our
+        # checkpoints. An example of slots in an optimizer are the Momentum
+        # variables in MomentumOptimizer.
+        slot_variables = [
+            optimizer.get_slot(var, name) for name in optimizer.get_slot_names()
+            for var in trainable_vars
+        ]
+        slot_init = tf.variables_initializer(
+            slot_variables,
+            name='optimizer_slots_initializer'
+        )
+
         # Create saver for saving/restoring model
         model_saver = tf.train.Saver(
-            tf.trainable_variables() + [global_step],
+            set(tf.global_variables()) - set(slot_variables),
             name='model_saver',
             max_to_keep=config.get('checkpoints_keep_amount', 1),
         )
@@ -123,15 +136,6 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
     if summaries is not None:
         summary_op.append(summaries)
     summary_op = tf.summary.merge(summary_op)
-
-    # Create custom init for slots in optimizer, as we don't save them to our
-    # checkpoints. An example of slots in an optimizer is the Momentum
-    # variables in MomentumOptimizer.
-    slot_init = tf.variables_initializer(
-        [optimizer.get_slot(var, name) for name in optimizer.get_slot_names()
-         for var in tf.trainable_variables()],
-        name='optimizer_slots_initializer'
-    )
 
     # `ready_for_local_init_op` is hardcoded to 'ready' as local init doesn't
     # depend on global init and `local_init_op` only runs when it is set as
