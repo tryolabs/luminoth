@@ -25,7 +25,7 @@ additional information::
 
 We'll start by downloading a checkpoint. Luminoth provides already-trained
 models so you can run predictions and get reasonable results in no time (and
-eventually be able to use for fine-tuning). In order to access these
+eventually be able to use them for fine-tuning). In order to access these
 checkpoints, we first need to download the remote index with the available
 models.
 
@@ -70,7 +70,8 @@ currently two ways to do this:
   detections in the image.
 - Using the web app provided for testing purposes. This will start a web server
   that, when connected, allows you to upload the image. Also useful to run on
-  a remote GPU (note, however, that this is **not** production-ready).
+  a remote GPU. (Note, however, that using Luminoth through the web interface is
+  **not** production-ready and will not scale.)
 
 Let's start with the first, by running it on an image aptly named
 ``image.png``::

@@ -5,7 +5,7 @@ Training your own model
 
 In order to train your own model, two things are required:
 
-* An dataset ready to be consumed by Luminoth (see :ref:`usage/dataset`).
+* A dataset ready to be consumed by Luminoth (see :ref:`usage/dataset`).
 * A configuration file for the run.
 
 We'll start by covering the configuration file, then proceed to the training
@@ -44,7 +44,7 @@ file.
 Training
 --------
 
-The model training itself can either be run locally (on the CPU or GPUs
+The model training itself can either be run locally (on the CPU or GPU
 available) or in Google Cloud's Cloud ML Engine.
 
 Locally
@@ -65,7 +65,9 @@ The ``lumi train`` CLI tool provides the following options related to training.
   (e.g.: ``-o model.rpn.proposals.nms_threshold=0.8``).
 
 If you're using a CUDA-based GPU, you can select the GPU to use by setting the
-``CUDA_VISIBLE_DEVICES`` environment variable.
+``CUDA_VISIBLE_DEVICES`` environment variable. (See the `NVIDIA site
+<https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#env-vars>`_
+for more information.)
 
 You can run `Tensorboard
 <https://www.tensorflow.org/programmers_guide/summaries_and_tensorboard>`_ on
@@ -144,7 +146,7 @@ Options:
 Results
 ```````
 
-Everything related to a job is stored on its own folder on the bucket provided
+Everything related to a job is stored in its own folder on the bucket provided
 under the name ``lumi_{job_id}``. This folder has the following structure:
 
 ``lumi_{job_id}/``

@@ -3,18 +3,17 @@
 Adapting a dataset
 ==================
 
-If a pre-trained model for the task you want to perform is not available, you
-can train Luminoth with an existing open dataset, or even your own.
+If a pre-trained checkpoint for the task you want to perform is not available,
+you can train Luminoth with an existing open dataset, or even your own.
 
-The first step in training Luminoth to convert your dataset to TensorFlow's
-``.tfrecords`` format. This ensures that no matter what image or annotation
-formats the original dataset uses, it will be transformed to something that
-Luminoth can understand and process efficiently, either while training locally
-or in the cloud.
+The first step before training a model with Luminoth is to convert your dataset
+to TensorFlow's ``.tfrecords`` format. This ensures that no matter what image or
+annotation formats the original dataset uses, it will be transformed into
+something that Luminoth can understand and process efficiently, either while
+training locally or in the cloud.
 
 For this purpose, Luminoth provides a conversion tool which includes support for
-some of the most well-known datasets for object detection and classification
-tasks.
+some of the most well-known datasets for the object detection task.
 
 Conversion tool
 ---------------
@@ -52,9 +51,9 @@ instance, in the case of the ``pascal`` dataset type, this will be the
 ``VOCdevkit/VOC2007`` directory obtained from extracting the tar file provided
 by the dataset page.
 
-The output directory is specified with the ``--output-dir`` option. This is the
-path where the TFrecords files will be stored, so make sure there's enough space
-in the disk.
+The output directory is specified with the ``--output-dir`` option. Inside it,
+one TFrecords file per dataset split will be stored. This file may be very, very
+large, depending on the dataset, so make sure there's enough space in the disk.
 
 You can also specify which dataset splits (i.e. train, validation or test) to
 convert, whenever that information is available. You can do so by using the
@@ -64,7 +63,7 @@ transform more than one split at the same time.
 Limiting the dataset
 ^^^^^^^^^^^^^^^^^^^^
 
-For datasets with many classes you might want to ignore certain classes when
+For datasets with many classes, you might want to ignore some of them when
 training a custom detector. For instance, if you want to train a traffic
 detector, you could start with the COCO dataset but only use, out of the eighty
 classes present in it, cars, trucks, buses and motorcycles. You can do so with
@@ -89,20 +88,20 @@ dir::
           --output-dir datasets/pascal/tf/ \
           --split train --split val
 
-If we wanted to use COCO to create a traffic-specific dataset, we could use the
-following command::
+If we wanted to use COCO to create a dataset with vehicles and people (say, for
+our up-and-coming self-driving car), we could use the following command::
 
   $ lumi dataset transform \
           --type coco \
           --data-dir datasets/coco/ \
           --output-dir datasets/coco/tf/ \
           --split train --split val
-          --only-classes=car,truck,bus,motorcycle,bicycle
+          --only-classes=car,truck,bus,motorcycle,bicycle,person
 
 .. _custom-conversion:
 
-Supporting your own dataset
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Supporting your own dataset format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 TODO: Guidelines on how to write your own dataset reader.
 
