@@ -19,7 +19,7 @@ BASE_NETWORK_FILENAMES = {
     'resnet_v2_101': 'resnet_v2_101_2017_04_14.tar.gz',
     'resnet_v2_152': 'resnet_v2_152_2017_04_14.tar.gz',
     'vgg_16': 'vgg_16_2016_08_28.tar.gz',
-    'vgg_19': 'vgg_19_2016_08_28.tar.gz',
+    'truncated_vgg_16': 'vgg_16_2016_08_28.tar.gz',
 }
 
 
@@ -74,8 +74,10 @@ def download_checkpoint(network, network_filename, checkpoint_path,
     tmp_tarball = tf.gfile.Open(tarball_path, 'rb')
     # Open tarfile object
     tar_obj = tarfile.open(fileobj=tmp_tarball)
+    # Get checkpoint file name
+    checkpoint_file_name = tar_obj.getnames()[0]
     # Create buffer with extracted network checkpoint
-    checkpoint_fp = tar_obj.extractfile(network_filename)
+    checkpoint_fp = tar_obj.extractfile(checkpoint_file_name)
     # Define where to save.
     checkpoint_file = tf.gfile.Open(checkpoint_filename, 'wb')
     # Write extracted checkpoint to file
