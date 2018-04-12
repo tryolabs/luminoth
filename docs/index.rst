@@ -9,9 +9,9 @@ Welcome to
 .. image:: images/luminoth-logo.png
 
 `Luminoth <https://luminoth.ai>`_ is an open source toolkit for computer vision.
-Currently, we support object detection and image classification, but we are
-aiming for much more. It's built in Python, using `TensorFlow
-<https://tensorflow.org>`_ and `Sonnet <https://github.com/deepmind/sonnet>`_.
+Currently, we support object detection, but we are aiming for much more. It's
+built in Python, using `TensorFlow <https://tensorflow.org>`_ and `Sonnet
+<https://github.com/deepmind/sonnet>`_.
 
 The code is open source and `available on GitHub
 <https://github.com/tryolabs/luminoth>`_.
