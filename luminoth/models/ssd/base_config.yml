@@ -107,7 +107,7 @@ model:
 
   base_network:
     # Which type of pretrained network to use
-    architecture: vgg_16
+    architecture: truncated_vgg_16
     # Should we train the pretrained network
     trainable: True
     # From which file to load the weights

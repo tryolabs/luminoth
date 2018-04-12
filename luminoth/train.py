@@ -110,16 +110,21 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
         )
 
         # Create saver for loading pretrained checkpoint into base network
-        base_net_checkpoint_saver = tf.train.Saver(
-            model.get_base_checkpoint_vars(),
-            name='base_net_checkpoint_saver'
-        )
-
-        # We'll send this fn to Scaffold init_fn
-        def load_base_net_checkpoint(_, session):
-            base_net_checkpoint_saver.restore(
-                session, model.get_checkpoint_file()
+        base_checkpoint_vars = model.get_base_checkpoint_vars()
+        checkpoint_file = model.get_checkpoint_file()
+        if base_checkpoint_vars and checkpoint_file:
+            base_net_checkpoint_saver = tf.train.Saver(
+                base_checkpoint_vars,
+                name='base_net_checkpoint_saver'
             )
+
+            # We'll send this fn to Scaffold init_fn
+            def load_base_net_checkpoint(_, session):
+                base_net_checkpoint_saver.restore(
+                    session, checkpoint_file
+                )
+        else:
+            load_base_net_checkpoint = None
 
     tf.logging.info('{}Starting training for {}'.format(log_prefix, model))
 

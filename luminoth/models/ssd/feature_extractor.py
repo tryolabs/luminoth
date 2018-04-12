@@ -8,7 +8,7 @@ from luminoth.models.base import BaseNetwork
 
 
 VALID_SSD_ARCHITECTURES = set([
-    'vgg_16',
+    'truncated_vgg_16',
 ])
 
 
@@ -52,7 +52,7 @@ class SSDFeatureExtractor(BaseNetwork):
         base_net_endpoints = super(SSDFeatureExtractor, self)._build(
             inputs, is_training=is_training)['end_points']
 
-        if self.vgg_16_type:
+        if self.truncated_vgg_16_type:
             # As it is pointed out in SSD and ParseNet papers, `conv4_3` has a
             # different features scale compared to other layers, to adjust it
             # we need to add a spatial normalization before adding the

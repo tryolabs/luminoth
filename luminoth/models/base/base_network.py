@@ -4,8 +4,8 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
-from tensorflow.contrib.slim.nets import resnet_v2, resnet_v1
-from . import truncated_vgg_16 as vgg
+from tensorflow.contrib.slim.nets import resnet_v2, resnet_v1, vgg
+from . import truncated_vgg
 
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
 
@@ -23,7 +23,7 @@ VALID_ARCHITECTURES = set([
     'resnet_v2_101',
     'resnet_v2_152',
     'vgg_16',
-    'vgg_19',
+    'truncated_vgg_16',
 ])
 
 
@@ -55,6 +55,9 @@ class BaseNetwork(snt.AbstractModule):
         if self.vgg_type:
             return vgg.vgg_arg_scope(**arg_scope_kwargs)
 
+        if self.truncated_vgg_type:
+            return truncated_vgg.vgg_arg_scope(**arg_scope_kwargs)
+
         if self.resnet_type:
             # It's the same arg_scope for v1 or v2.
             return resnet_v2.resnet_utils.resnet_arg_scope(**arg_scope_kwargs)
@@ -70,6 +73,13 @@ class BaseNetwork(snt.AbstractModule):
                 is_training=is_training,
                 spatial_squeeze=self._config.get('spatial_squeeze', False)
             )
+        elif self.truncated_vgg_type:
+            return functools.partial(
+                getattr(truncated_vgg, self._architecture),
+                is_training=is_training,
+                spatial_squeeze=self._config.get('spatial_squeeze', False)
+            )
+
         elif self.resnet_v1_type:
             output_stride = self._config.get('output_stride')
             train_batch_norm = (
@@ -100,8 +110,12 @@ class BaseNetwork(snt.AbstractModule):
         return self._architecture.startswith('vgg_16')
 
     @property
-    def vgg_19_type(self):
-        return self._architecture.startswith('vgg_19')
+    def truncated_vgg_type(self):
+        return self._architecture.startswith('truncated_vgg')
+
+    @property
+    def truncated_vgg_16_type(self):
+        return self._architecture.startswith('truncated_vgg_16')
 
     @property
     def resnet_type(self):
@@ -120,8 +134,8 @@ class BaseNetwork(snt.AbstractModule):
         # Usually 224, but depends on the architecture.
         if self.vgg_16_type:
             return vgg.vgg_16.default_image_size
-        if self.vgg_19_type:
-            return vgg.vgg_19.default_image_size
+        if self.truncated_vgg_16_type:
+            return vgg.truncated_vgg_16.default_image_size
         if self.resnet_v1_type:
             return resnet_v1.resnet_v1.default_image_size
         if self.resnet_v2_type:

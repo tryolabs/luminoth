@@ -41,7 +41,6 @@ Usage:
 
 @@vgg_a
 @@vgg_16
-@@vgg_19
 """
 
 from __future__ import absolute_import
@@ -77,16 +76,16 @@ def vgg_arg_scope(weight_decay=0.0005):
             return arg_sc
 
 
-def vgg_16(inputs,
-           num_classes=1000,
-           is_training=True,
-           dropout_keep_prob=0.5,
-           spatial_squeeze=True,
-           scope='vgg_16'):
+def truncated_vgg_16(inputs,
+                     num_classes=1000,
+                     is_training=True,
+                     dropout_keep_prob=0.5,
+                     spatial_squeeze=True,
+                     scope='vgg_16'):
     """Oxford Net VGG 16-Layers version D Example.
 
-    Note: All the fully_connected layers have been transformed to conv2d layers.
-          To use in classification mode, resize input to 224x224.
+    Note: All the fully_connected layers have been transformed to conv2d
+          layers. To use in classification mode, resize input to 224x224.
 
     Args:
       inputs: a tensor of size [batch_size, height, width, channels].
@@ -128,8 +127,10 @@ def vgg_16(inputs,
                 net, 3, layers.conv2d, 512, [3, 3], scope='conv5'
             )
             # Convert end_points_collection into a end_point dict.
-            end_points = utils.convert_collection_to_dict(end_points_collection)
+            end_points = utils.convert_collection_to_dict(
+                end_points_collection
+            )
             return net, end_points
 
 
-vgg_16.default_image_size = 224
+truncated_vgg_16.default_image_size = 224

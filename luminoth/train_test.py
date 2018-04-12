@@ -31,6 +31,12 @@ class MockFasterRCNN(snt.AbstractModule):
     def load_pretrained_weights(self):
         return tf.no_op()
 
+    def get_base_checkpoint_vars(self):
+        return None
+
+    def get_checkpoint_file(self):
+        return None
+
     @property
     def summary(self):
         return tf.summary.scalar('dummy', 1, collections=['rcnn'])
