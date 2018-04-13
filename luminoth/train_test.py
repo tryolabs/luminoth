@@ -28,9 +28,6 @@ class MockFasterRCNN(snt.AbstractModule):
     def get_trainable_vars(self):
         return snt.get_variables_in_module(self)
 
-    def load_pretrained_weights(self):
-        return tf.no_op()
-
     def get_base_checkpoint_vars(self):
         return None
 
@@ -137,23 +134,27 @@ class TrainTest(tf.test.TestCase):
 
         config = self.get_config(model_type, override_params=override_params)
 
-        step = run(
-            config,
-            get_dataset_fn=self.get_dataset, get_model_fn=self.get_model
-        )
-        self.assertEqual(step, 2)
+        run(config, get_dataset_fn=self.get_dataset,
+            get_model_fn=self.get_model)
 
-        # We have to reset the graph to avoid having duplicate names.
+        # Create new graph which will load previously saved checkpoint
         tf.reset_default_graph()
-        step = run(
-            config,
-            get_dataset_fn=self.get_dataset, get_model_fn=self.get_model
+        new_session = tf.Session()
+        new_saver = tf.train.import_meta_graph(
+            tmp_job_dir + '/test_runname/model.ckpt-3.meta'
+        )
+        new_saver.restore(
+            new_session, tmp_job_dir + '/test_runname/model.ckpt-3'
         )
 
-        # This is because of a MonitoredTrainingSession "bug".
-        # When ending training it saves a checkpoint as the next step.
-        # That causes that we are one step ahead when loading it.
-        self.assertEqual(step, 5)
+        # Get tensor from graph and run it in session
+        w_tensor = tf.get_default_graph().get_tensor_by_name(
+            "mockfasterrcnn/w:0"
+        )
+        w_numpy = new_session.run(w_tensor)
+
+        # Assert we correctly loaded the weight
+        self.assertArrayNear(w_numpy, [2.5, 3.0], err=0.01)
 
 
 if __name__ == '__main__':
