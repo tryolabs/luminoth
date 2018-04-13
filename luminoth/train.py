@@ -90,11 +90,12 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
                 grads_and_vars, global_step=global_step
             )
 
-        # Create custom init for slots in optimizer, as we don't save them to our
-        # checkpoints. An example of slots in an optimizer are the Momentum
+        # Create custom init for slots in optimizer, as we don't save them to
+        # our checkpoints. An example of slots in an optimizer are the Momentum
         # variables in MomentumOptimizer.
         slot_variables = [
-            optimizer.get_slot(var, name) for name in optimizer.get_slot_names()
+            optimizer.get_slot(var, name)
+            for name in optimizer.get_slot_names()
             for var in trainable_vars
         ]
         slot_init = tf.variables_initializer(
