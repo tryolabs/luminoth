@@ -11,7 +11,6 @@ from luminoth.models.ssd.utils import (
     generate_raw_anchors, adjust_bboxes
 )
 from luminoth.utils.losses import smooth_l1_loss
-from luminoth.utils.vars import get_saver
 from luminoth.utils.bbox_transform import clip_boxes
 
 
@@ -86,7 +85,9 @@ class SSD(snt.AbstractModule):
                     num_anchors * 4, [3, 3],
                     name=multibox_predictor_name + '_offsets_conv'
                 )(feat_map)
-                bbox_offsets_flattened = tf.reshape(bbox_offsets_layer, [-1, 4])
+                bbox_offsets_flattened = tf.reshape(
+                    bbox_offsets_layer, [-1, 4]
+                )
                 bbox_offsets_list.append(bbox_offsets_flattened)
 
                 # Predict class scores

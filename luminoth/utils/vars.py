@@ -1,6 +1,4 @@
 import tensorflow as tf
-import sonnet as snt
-import collections
 
 
 VALID_INITIALIZERS = {
@@ -88,43 +86,3 @@ def get_activation_function(activation_function):
     except AttributeError:
         raise ValueError(
             'Invalid activation function "{}"'.format(activation_function))
-
-
-def get_saver(modules, var_collections=(tf.GraphKeys.GLOBAL_VARIABLES,),
-              ignore_scope=None, **kwargs):
-    """Get tf.train.Saver instance for module.
-
-    Args:
-        - modules: Sonnet module or list of Sonnet modules from where to
-            extract variables.
-        - var_collections: Collections from where to take variables.
-        - ignore_scope (str): Ignore variables that contain scope in name.
-        - kwargs: Keyword arguments to pass to creation of `tf.train.Saver`.
-
-    Returns:
-        - saver: tf.train.Saver instance.
-    """
-    if not isinstance(modules, collections.Iterable):
-        modules = [modules]
-
-    variable_map = {}
-    for module in modules:
-        for collection in var_collections:
-            model_variables = snt.get_normalized_variable_map(
-                module, collection
-            )
-            total_model_variables = len(model_variables)
-            if ignore_scope:
-                model_variables = {
-                    k: v for k, v in model_variables.items()
-                    if ignore_scope not in k
-                }
-                new_total_model_variables = len(model_variables)
-                tf.logging.info(
-                    'Not loading/saving {} variables with scope "{}"'.format(
-                        total_model_variables - new_total_model_variables,
-                        ignore_scope))
-
-            variable_map.update(model_variables)
-
-    return tf.train.Saver(var_list=variable_map, **kwargs)

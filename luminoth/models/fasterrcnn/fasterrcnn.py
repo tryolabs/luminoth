@@ -6,7 +6,7 @@ from luminoth.models.fasterrcnn.rcnn import RCNN
 from luminoth.models.fasterrcnn.rpn import RPN
 from luminoth.models.base import TruncatedBaseNetwork
 from luminoth.utils.anchors import generate_anchors_reference
-from luminoth.utils.vars import VAR_LOG_LEVELS, variable_summaries, get_saver
+from luminoth.utils.vars import VAR_LOG_LEVELS, variable_summaries
 
 
 class FasterRCNN(snt.AbstractModule):
