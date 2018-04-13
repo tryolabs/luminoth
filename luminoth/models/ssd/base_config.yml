@@ -96,8 +96,8 @@ dataset:
           lower: 0.5
           upper: 1.5
         prob: 0.5
-#   - expand:
-#       prob: 0.5
+   - expand:
+       prob: 0.5
 
 model:
   type: ssd

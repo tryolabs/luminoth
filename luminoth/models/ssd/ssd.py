@@ -69,7 +69,6 @@ class SSD(snt.AbstractModule):
             self._config.base_network, parent_name=self.module_name
         )
         feature_maps = self.feature_extractor(image, is_training=is_training)
-        # import ipdb; ipdb.set_trace()
 
         # Build a MultiBox predictor on top of each feature layer and collect
         # the bounding box offsets and the category score logits they produce
