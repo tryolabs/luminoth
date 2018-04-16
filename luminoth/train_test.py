@@ -28,7 +28,7 @@ class MockFasterRCNN(snt.AbstractModule):
     def get_trainable_vars(self):
         return snt.get_variables_in_module(self)
 
-    def get_base_checkpoint_vars(self):
+    def get_base_network_checkpoint_vars(self):
         return None
 
     def get_checkpoint_file(self):

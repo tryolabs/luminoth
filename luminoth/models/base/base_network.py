@@ -71,13 +71,12 @@ class BaseNetwork(snt.AbstractModule):
             return functools.partial(
                 getattr(vgg, self._architecture),
                 is_training=is_training,
-                spatial_squeeze=self._config.get('spatial_squeeze', False)
+                spatial_squeeze=self._config.get('spatial_squeeze', False),
             )
         elif self.truncated_vgg_type:
             return functools.partial(
                 getattr(truncated_vgg, self._architecture),
                 is_training=is_training,
-                spatial_squeeze=self._config.get('spatial_squeeze', False)
             )
 
         elif self.resnet_v1_type:
@@ -194,7 +193,8 @@ class BaseNetwork(snt.AbstractModule):
     def get_checkpoint_file(self):
         return get_checkpoint_file(self._architecture)
 
-    def get_base_network_vars(self):
+    def _get_base_network_vars(self):
+        """Returns a list of all the base network's variables."""
         if self.pretrained_weights_scope:
             # We may have defined the base network in a particular scope
             module_variables = tf.get_collection(
@@ -240,9 +240,17 @@ class BaseNetwork(snt.AbstractModule):
 
         return all_variables[index:]
 
-    def get_base_checkpoint_vars(self):
+    def get_base_network_checkpoint_vars(self):
+        """Returns the vars which the base network checkpoint will load into.
+
+        We return a dict which maps a variable name to a variable object. This
+        is needed because the base network may be created inside a particular
+        scope, which the checkpoint may not contain. Therefore we must map
+        each variable to its unscoped name in order to be able to find them in
+        the checkpoint file.
+        """
         variable_scope_len = len(self.variable_scope.name) + 1
-        var_list = self.get_base_network_vars()
+        var_list = self._get_base_network_vars()
         var_map = {}
         for var in var_list:
             var_name = var.op.name

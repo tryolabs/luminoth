@@ -357,8 +357,8 @@ class FasterRCNN(snt.AbstractModule):
 
         return trainable_vars
 
-    def get_base_checkpoint_vars(self):
-        return self.base_network.get_base_checkpoint_vars()
+    def get_base_network_checkpoint_vars(self):
+        return self.base_network.get_base_network_checkpoint_vars()
 
     def get_checkpoint_file(self):
         return self.base_network.get_checkpoint_file()

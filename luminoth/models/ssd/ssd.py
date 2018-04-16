@@ -327,8 +327,8 @@ class SSD(snt.AbstractModule):
 
         return trainable_vars
 
-    def get_base_checkpoint_vars(self):
-        return self.feature_extractor.get_base_checkpoint_vars()
+    def get_base_network_checkpoint_vars(self):
+        return self.feature_extractor.get_base_network_checkpoint_vars()
 
     def get_checkpoint_file(self):
         return self.feature_extractor.get_checkpoint_file()
