@@ -76,30 +76,18 @@ def vgg_arg_scope(weight_decay=0.0005):
             return arg_sc
 
 
-def truncated_vgg_16(inputs,
-                     num_classes=1000,
-                     is_training=True,
-                     dropout_keep_prob=0.5,
-                     spatial_squeeze=True,
-                     scope='vgg_16'):
+def truncated_vgg_16(inputs, is_training=True, scope='vgg_16'):
     """Oxford Net VGG 16-Layers version D Example.
 
-    Note: All the fully_connected layers have been transformed to conv2d
-          layers. To use in classification mode, resize input to 224x224.
+    For use in SSD object detection network, which has this particular
+    truncated version of VGG16 detailed in its paper.
 
     Args:
       inputs: a tensor of size [batch_size, height, width, channels].
-      num_classes: number of predicted classes.
-      is_training: whether or not the model is being trained.
-      dropout_keep_prob: the probability that activations are kept in the
-        dropout layers during training.
-      spatial_squeeze: whether or not should squeeze the spatial dimensions of
-        the outputs. Useful to remove unnecessary dimensions for
-        classification.
       scope: Optional scope for the variables.
 
     Returns:
-      the last op containing the log predictions and end_points dict.
+      the last op containing the conv5 tensor and end_points dict.
     """
     with variable_scope.variable_scope(scope, 'vgg_16', [inputs]) as sc:
         end_points_collection = sc.original_name_scope + '_end_points'

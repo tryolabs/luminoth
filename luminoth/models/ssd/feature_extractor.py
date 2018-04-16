@@ -138,5 +138,4 @@ class SSDFeatureExtractor(BaseNetwork):
         Returns:
             trainable_variables: a tuple of `tf.Variable`.
         """
-        # TODO hacer que esto filtre las fully connected de VGG!
         return snt.get_variables_in_module(self)

@@ -92,7 +92,8 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
 
         # Create custom init for slots in optimizer, as we don't save them to
         # our checkpoints. An example of slots in an optimizer are the Momentum
-        # variables in MomentumOptimizer.
+        # variables in MomentumOptimizer. We do this because slot variables can
+        # effectively duplicate the size of your checkpoint!
         slot_variables = [
             optimizer.get_slot(var, name)
             for name in optimizer.get_slot_names()
@@ -111,7 +112,7 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
         )
 
         # Create saver for loading pretrained checkpoint into base network
-        base_checkpoint_vars = model.get_base_checkpoint_vars()
+        base_checkpoint_vars = model.get_base_network_checkpoint_vars()
         checkpoint_file = model.get_checkpoint_file()
         if base_checkpoint_vars and checkpoint_file:
             base_net_checkpoint_saver = tf.train.Saver(
