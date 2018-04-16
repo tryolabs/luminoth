@@ -13,10 +13,10 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+import pkg_resources
 import sys
-sys.path.insert(0, os.path.abspath('..'))
 
-from luminoth import __version__ as lumi_version  # noqa
+sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- Project information -----------------------------------------------------
@@ -25,10 +25,19 @@ project = 'Luminoth'
 copyright = '2018, Tryolabs'
 author = 'Tryolabs'
 
-# The short X.Y version
-version = ''
-# The full version, including alpha/beta/rc tags
-release = lumi_version
+try:
+    # The full version, including alpha/beta/rc tags.
+    release = pkg_resources.get_distribution('luminoth').version
+except pkg_resources.DistributionNotFound:
+    print('Luminoth must be installed to build the documentation.')
+    sys.exit(1)
+
+if 'dev' in release:
+    # Trim everything after `dev`, if present.
+    release = ''.join(release.partition('dev')[:2])
+
+# The short X.Y version.
+version = '.'.join(release.split('.')[:2])
 
 
 # -- General configuration ---------------------------------------------------
