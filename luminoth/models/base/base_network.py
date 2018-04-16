@@ -5,8 +5,8 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.slim.nets import resnet_v2, resnet_v1, vgg
-from . import truncated_vgg
 
+from luminoth.models.base import truncated_vgg
 from luminoth.utils.checkpoint_downloader import get_checkpoint_file
 
 
