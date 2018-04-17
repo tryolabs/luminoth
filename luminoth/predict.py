@@ -143,16 +143,22 @@ def predict_image(network, path, only_classes=None, ignore_classes=None,
 
 def predict_video(network, path, only_classes=None, ignore_classes=None,
                   save_path=None):
-    # We hardcode the video ouput to mp4 for the time being.
-    save_path = os.path.splitext(save_path)[0] + '.mp4'
-    try:
-        writer = skvideo.io.FFmpegWriter(save_path)
-    except AssertionError as e:
-        tf.logging.error(e)
-        tf.logging.error(
-            'Please install ffmpeg before making video predictions.'
+    if save_path:
+        # We hardcode the video ouput to mp4 for the time being.
+        save_path = os.path.splitext(save_path)[0] + '.mp4'
+        try:
+            writer = skvideo.io.FFmpegWriter(save_path)
+        except AssertionError as e:
+            tf.logging.error(e)
+            tf.logging.error(
+                'Please install ffmpeg before making video predictions.'
+            )
+            exit()
+    else:
+        click.echo(
+            'Video not being saved. Note that for the time being, no JSON '
+            'output is being generated. Did you mean to specify `--save-path`?'
         )
-        exit()
 
     num_of_frames = int(skvideo.io.ffprobe(path)['video']['@nb_frames'])
 
@@ -185,7 +191,9 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
                 # Draw the image and write it to the video file.
                 image = Image.fromarray(frame)
                 draw_bboxes_on_image(image, objects)
-                writer.writeFrame(np.array(image))
+                if save_path:
+                    writer.writeFrame(np.array(image))
+
             stop_time = time.time()
             click.echo(
                 'fps: {0:.1f}'.format(num_of_frames / (stop_time - start_time))
@@ -193,13 +201,15 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
         except RuntimeError as e:
             click.echo()  # Error prints next to progress bar otherwise.
             click.echo('Error while processing {}: {}'.format(path, e))
-            click.echo(
-                'Partially processed video file saved in {}'.format(
-                    save_path
+            if save_path:
+                click.echo(
+                    'Partially processed video file saved in {}'.format(
+                        save_path
+                    )
                 )
-            )
 
-    writer.close()
+    if save_path:
+        writer.close()
 
     return objects_per_frame
 
