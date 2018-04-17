@@ -26,9 +26,9 @@ def get_output_subfolder(only_classes, only_images, limit_examples,
 
 
 @click.command()
-@click.option('dataset_reader', '--type', type=click.Choice(READERS.keys()))  # noqa
-@click.option('--data-dir', help='Where to locate the original data.')
-@click.option('--output-dir', help='Where to save the transformed data.')
+@click.option('dataset_reader', '--type', type=click.Choice(READERS.keys()), required=True)  # noqa
+@click.option('--data-dir', required=True, help='Where to locate the original data.')
+@click.option('--output-dir', required=True, help='Where to save the transformed data.')
 @click.option('splits', '--split', required=True, multiple=True, help='Which splits to transform.')  # noqa
 @click.option('--only-classes', help='Whitelist of classes.')
 @click.option('--only-images', help='Create dataset with specific examples.')
