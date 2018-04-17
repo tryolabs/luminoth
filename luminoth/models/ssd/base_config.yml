@@ -153,11 +153,8 @@ model:
     # NMS threshold used to remove "almost duplicate" of the same class
     class_nms_threshold: 0.45
     # Minimum prob to be used as proposed object
-    # Setting it to 0.01 is for precision-recall scoring purposes though,
-    # in order to get some usable final predictions, the confidence
-    # threshold must be set higher, e.g. to 0.5.
     # ( Acording to: https://github.com/pierluigiferrari/ssd_keras/blob/d1b4e7e218af7d31314b9927c08e735e54f5af30/ssd300_training.ipynb#L548 )
-    min_prob_threshold: 0.00001
+    min_prob_threshold: 0.5
     # Filter proposals from anchors partially outside the image.
     filter_outside_anchors: True
 
