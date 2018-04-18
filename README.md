@@ -6,7 +6,9 @@
 [![codecov](https://codecov.io/gh/tryolabs/luminoth/branch/master/graph/badge.svg)](https://codecov.io/gh/tryolabs/luminoth)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-Luminoth is an open source toolkit for **computer vision**. Currently, we support object detection and image classification, but we are aiming for much more. It is built in Python, using [TensorFlow](https://www.tensorflow.org/) and [Sonnet](https://github.com/deepmind/sonnet).
+Luminoth is an open source toolkit for **computer vision**. Currently, we support object detection, but we are aiming for much more. It is built in Python, using [TensorFlow](https://www.tensorflow.org/) and [Sonnet](https://github.com/deepmind/sonnet).
+
+Read the full documentation [here](http://luminoth.readthedocs.io/).
 
 ![Example of Object Detection with Faster R-CNN](https://user-images.githubusercontent.com/1590959/36434494-e509be42-163d-11e8-99c1-d1aa728929ec.jpg)
 
@@ -50,7 +52,7 @@ Currently, we support the following models:
 
 We are planning on adding support for more models in the near future, such as [RetinaNet](https://arxiv.org/abs/1708.02002) and [Mask R-CNN](https://arxiv.org/abs/1703.06870).
 
-Moreover, we are also working on providing **pre-trained checkpoints** on popular datasets such as [COCO](http://cocodataset.org/).
+We also provide **pre-trained checkpoints** for the above models trained on popular datasets such as [COCO](http://cocodataset.org/) and [Pascal](http://host.robots.ox.ac.uk/pascal/VOC/).
 
 # Usage
 
@@ -61,11 +63,11 @@ There is one main command line interface which you can use with the `lumi` comma
 and a list of available options with descriptions will show up.
 
 ## Working with datasets
-See [DATASETS](./docs/DATASETS.md).
+See [Adapting a dataset](http://luminoth.readthedocs.io/en/latest/usage/dataset.html).
 
 ## Training
 
-Check our [TRAINING](./docs/TRAINING.md) on how to train locally or in Google Cloud.
+See [Training your own model](http://luminoth.readthedocs.io/en/latest/usage/training.html) to learn how to train locally or in Google Cloud.
 
 ## Visualizing results
 
