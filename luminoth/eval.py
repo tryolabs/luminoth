@@ -428,6 +428,14 @@ def evaluate_once(config, writer, saver, ops, checkpoint,
                 )
             )
 
+            assert len(ap_per_class) == len(class_labels), (
+                "Model built using {} classes but dataset used in eval has {}"
+                " classes. Did you forget to define the number of classes in"
+                " your config .yml file?".format(
+                    len(ap_per_class), len(class_labels)
+                )
+            )
+
             for idx, val in enumerate(ap_per_class[:, 0]):
                 class_label = '{} ({})'.format(
                     class_labels[idx], idx
