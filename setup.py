@@ -48,6 +48,7 @@ INSTALL_REQUIRES = [
     'Flask>=0.12',
     'six>=1.11',
     'sk-video',
+    'pyasn1>=0.4.2',
 ]
 TEST_REQUIRES = []
 
