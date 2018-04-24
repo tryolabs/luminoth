@@ -9,6 +9,7 @@ from luminoth.models.base import BaseNetwork
 
 VALID_SSD_ARCHITECTURES = set([
     'truncated_vgg_16',
+    'resnet_v1_101',
 ])
 
 
@@ -29,6 +30,14 @@ class SSDFeatureExtractor(BaseNetwork):
         self.conv7 = Conv2D(1024, [1, 1], name='conv7')
         self.conv8_1 = Conv2D(256, [1, 1], name='conv8_1')
         self.conv8_2 = Conv2D(512, [3, 3], stride=2, name='conv8_2')
+        self.conv9_1 = Conv2D(128, [1, 1], name='conv9_1')
+        self.conv9_2 = Conv2D(256, [3, 3], stride=2, name='conv9_2')
+        self.conv10_1 = Conv2D(128, [1, 1], name='conv10_1')
+        self.conv10_2 = Conv2D(256, [3, 3], padding='VALID', name='conv10_2')
+        self.conv11_1 = Conv2D(128, [1, 1], name='conv11_1')
+        self.conv11_2 = Conv2D(256, [3, 3], padding='VALID', name='conv11_2')
+
+    def _init_resnet101_extra_layers(self):
         self.conv9_1 = Conv2D(128, [1, 1], name='conv9_1')
         self.conv9_2 = Conv2D(256, [3, 3], stride=2, name='conv9_2')
         self.conv10_1 = Conv2D(128, [1, 1], name='conv10_1')
@@ -128,8 +137,77 @@ class SSDFeatureExtractor(BaseNetwork):
             # pretrained weights
             self.pretrained_weights_scope = scope + '/vgg_16'
 
-        # It's actually an ordered dict
-        return utils.convert_collection_to_dict('FEATURE_MAPS')
+        elif self.resnet_type:
+            # Select which resnet layers will be used as feature maps
+            feat_map_1 = base_net_endpoints[
+                scope + '/resnet_v1_101/block1/unit_3/bottleneck_v1/conv1']
+            tf.add_to_collection('FEATURE_MAPS', feat_map_1)
+            tf.summary.histogram('block1_conv1_hist', feat_map_1)
+
+            feat_map_2 = base_net_endpoints[
+                scope + '/resnet_v1_101/block1']
+            tf.add_to_collection('FEATURE_MAPS', feat_map_2)
+            tf.summary.histogram('block1_hist', feat_map_2)
+
+            feat_map_3 = base_net_endpoints[
+                scope + '/resnet_v1_101/block2']
+            tf.add_to_collection('FEATURE_MAPS', feat_map_3)
+            tf.summary.histogram('block2_hist', feat_map_3)
+
+            feat_map_4 = base_net_endpoints[
+                scope + '/resnet_v1_101/block3']
+            tf.add_to_collection('FEATURE_MAPS', feat_map_4)
+            tf.summary.histogram('block3_hist', feat_map_4)
+
+            # Select truncation resnet layer
+            resnet_truncation_endpoint = base_net_endpoints[
+                scope + '/resnet_v1_101/block4']
+            tf.add_to_collection('FEATURE_MAPS', resnet_truncation_endpoint)
+            tf.summary.histogram('block4_hist', resnet_truncation_endpoint)
+
+            # Add new feature map layers
+            with tf.variable_scope('extra_feature_layers'):
+                self._init_resnet101_extra_layers()
+
+                net = self.conv9_1(resnet_truncation_endpoint)
+                net = self.activation_fn(net)
+                net = self.conv9_2(net)
+                net = self.activation_fn(net)
+                tf.summary.histogram('conv9_hist', net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+
+                net = self.conv10_1(net)
+                net = self.activation_fn(net)
+                net = self.conv10_2(net)
+                net = self.activation_fn(net)
+                tf.summary.histogram('conv10_hist', net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+
+                net = self.conv11_1(net)
+                net = self.activation_fn(net)
+                net = self.conv11_2(net)
+                net = self.activation_fn(net)
+                tf.summary.histogram('conv11_hist', net)
+                tf.add_to_collection('FEATURE_MAPS', net)
+
+            # This parameter determines onto which variables we try to load the
+            # pretrained weights
+            self.pretrained_weights_scope = scope + '/resnet_v1_101'
+
+        # NOTE: I resort to this ugly hack cause tensors with aliases are
+        #       getting added twice to the feature maps collection. This seems
+        #       to be a tensorflow problem.
+        feat_map_dict = utils.convert_collection_to_dict('FEATURE_MAPS')
+        feat_map_dict.pop('ssd/ssd_feature_extractor/resnet_v1_101/'
+                          'block1/unit_3/bottleneck_v1')
+        feat_map_dict.pop('ssd/ssd_feature_extractor/resnet_v1_101/'
+                          'block2/unit_4/bottleneck_v1')
+        feat_map_dict.pop('ssd/ssd_feature_extractor/resnet_v1_101/'
+                          'block3/unit_23/bottleneck_v1')
+        feat_map_dict.pop('ssd/ssd_feature_extractor/resnet_v1_101/'
+                          'block4/unit_3/bottleneck_v1')
+
+        return feat_map_dict  # It's actually an ordered dict
 
     def get_trainable_vars(self):
         """
