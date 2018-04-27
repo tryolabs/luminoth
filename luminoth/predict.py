@@ -6,11 +6,15 @@ import skvideo.io
 import sys
 import time
 import tensorflow as tf
+import uuid
+import random
 
 from PIL import Image, ImageDraw
 from luminoth.tools.checkpoint import get_checkpoint_config
 from luminoth.utils.config import get_config, override_config_params
 from luminoth.utils.predicting import PredictorNetwork
+
+from luminoth.utils.bbox_overlap import bbox_overlap
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
 VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
@@ -71,7 +75,7 @@ def draw_bboxes_on_image(image, objects):
 
     for ind, obj in enumerate(objects):
         # Choose colors for bbox, the 60 and 255 correspond to transparency.
-        color = get_color(str(obj['label']))
+        color = get_color(str(obj['tag']))
         fill = tuple(color + [60])
         outline = tuple(color + [255])
 
@@ -80,7 +84,27 @@ def draw_bboxes_on_image(image, objects):
         # Draw the object's label.
         prob = '{:.2f}'.format(obj['prob'])
         label = '{} - {}'.format(obj['label'], prob) if obj['label'] else prob
-        draw.text(obj['bbox'][:2], label)
+        feat_norm = np.linalg.norm(obj['feat'])
+
+        # -----PICK A LABEL------
+
+        # 1) THIS LABEL SHOWS A COMPARISON OF RANDOM vs CONFUSED vs SAME embedding distances
+        label = "{:.1f} - {:.1f} - {:.1f}".format(
+            obj['rand_dist'], obj['dist'], obj['min_dist']
+        ) if obj.get('dist') else str(feat_norm)
+
+        # 2) THIS LABEL SHOWS WHICH OBJECTS ARE CAUSING THE CONFUSION
+        label = "{} - {}".format(
+            obj['tag'][:6], obj['confused_with'][:6]
+        ) if obj.get('confused_with') else "{}".format(obj['tag'][:6])
+
+        if obj.get('confused_with'):
+            text_color = get_color(str(obj['confused_with']))
+            text_fill = tuple(text_color + [60])
+        else:
+            text_fill = fill
+
+        draw.text(obj['bbox'][:2], label, fill=text_fill)
 
 
 def get_color(class_label):
@@ -177,15 +201,30 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
                     ignore_classes=ignore_classes
                 )
 
+                # Save detected objects in this frame
                 objects_per_frame.append({
                     'frame': idx,
                     'objects': objects
                 })
 
+                # Apply random tags to objects on first frame and skip it
+                if idx == 0:
+                    for object_ in objects:
+                        object_['tag'] = uuid.uuid4().hex
+                    last_frame_objects = objects
+                    continue
+
+                # Provide tags to current frame objects
+                tag_objects(objects, last_frame_objects)
+
                 # Draw the image and write it to the video file.
                 image = Image.fromarray(frame)
                 draw_bboxes_on_image(image, objects)
                 writer.writeFrame(np.array(image))
+
+                # Save this frame for comparison with next frame
+                last_frame_objects = objects
+
             stop_time = time.time()
             click.echo(
                 'fps: {0:.1f}'.format(num_of_frames / (stop_time - start_time))
@@ -202,6 +241,62 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
     writer.close()
 
     return objects_per_frame
+
+
+def tag_objects(objects, last_frame_objects):
+    last_frame_bboxes = np.array(
+        [object['bbox'] for object in last_frame_objects]
+    )
+
+    for idx, object_ in enumerate(objects):
+        # current_bbox_broadcasted = np.broadcast_to(
+        #     object_['bbox'], last_frame_bboxes.shape
+        # )
+
+        bbox_overlaps = bbox_overlap(
+            np.array([object_['bbox']]), last_frame_bboxes
+        )
+        # bbox_distances = bbox_distance(
+        #     np.array(object_['bbox']), last_frame_bboxes
+        # )
+        if np.max(bbox_overlaps) > 0.5:
+            closest_last_frame_object = last_frame_objects[
+                np.argmax(bbox_overlaps)
+            ]
+            if closest_last_frame_object['label'] == object_['label']:
+                object_['tag'] = closest_last_frame_object['tag']
+
+                object_['dist'] = np.linalg.norm(
+                    closest_last_frame_object['feat'] - object_['feat']
+                )
+
+                object_['rand_dist'] = np.linalg.norm(
+                    random.choice(last_frame_objects)['feat'] - object_['feat']
+                )
+
+                distances = []
+                for lf_o in last_frame_objects:
+                    distances.append(
+                        np.linalg.norm(lf_o['feat'] - object_['feat'])
+                    )
+                min_dist_obj = last_frame_objects[np.argmin(distances)]
+                object_['min_dist'] = min(distances)
+                if object_['min_dist'] != object_['dist']:
+                    object_['confused_with'] = min_dist_obj['tag']
+            else:
+                object_['tag'] = uuid.uuid4().hex
+        else:
+            object_['tag'] = uuid.uuid4().hex
+
+
+def bbox_distance(bbox1, bboxes2):
+    centers_1 = np.vstack(
+        [bbox1[2] - bbox1[0], bbox1[3] - bbox1[1]]
+    )
+    centers_2 = np.vstack(
+        [bboxes2[:, 2] - bboxes2[:, 0], bboxes2[:, 3] - bboxes2[:, 1]]
+    )
+    return np.linalg.norm(centers_1 - centers_2, axis=0)
 
 
 @click.command(help="Obtain a model's predictions.")
