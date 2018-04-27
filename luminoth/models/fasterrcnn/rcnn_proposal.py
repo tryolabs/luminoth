@@ -43,7 +43,7 @@ class RCNNProposal(snt.AbstractModule):
         # Threshold probability
         self._min_prob_threshold = config.min_prob_threshold or 0.0
 
-    def _build(self, proposals, bbox_pred, cls_prob, im_shape):
+    def _build(self, proposals, bbox_pred, cls_prob, im_shape, raw_features):
         """
         Args:
             proposals: Tensor with the RPN proposals bounding boxes.
@@ -70,6 +70,7 @@ class RCNNProposal(snt.AbstractModule):
         selected_boxes = []
         selected_probs = []
         selected_labels = []
+        selected_features = []
 
         # For each class, take the proposals with the class-specific
         # predictions (class scores and bbox regression) and filter accordingly
@@ -105,6 +106,8 @@ class RCNNProposal(snt.AbstractModule):
 
             class_objects = tf.boolean_mask(class_objects, object_filter)
             class_prob = tf.boolean_mask(class_prob, object_filter)
+            # raw_features = tf.Print(raw_features, [raw_features], summarize=300, message=str(class_id))
+            features = tf.boolean_mask(raw_features, object_filter)
 
             # We have to use the TensorFlow's bounding box convention to use
             # the included function for NMS.
@@ -119,6 +122,7 @@ class RCNNProposal(snt.AbstractModule):
             # Using NMS resulting indices, gather values from Tensors.
             class_objects_tf = tf.gather(class_objects_tf, class_selected_idx)
             class_prob = tf.gather(class_prob, class_selected_idx)
+            features = tf.gather(features, class_selected_idx)
 
             # Revert to our bbox convention.
             class_objects = change_order(class_objects_tf)
@@ -127,6 +131,7 @@ class RCNNProposal(snt.AbstractModule):
             # transformed to a proper Tensor.
             selected_boxes.append(class_objects)
             selected_probs.append(class_prob)
+            selected_features.append(features)
             # In the case of the class_id, since it is a loop on classes, we
             # already have a fixed class_id. We use `tf.tile` to create that
             # Tensor with the total number of indices returned by the NMS.
@@ -139,6 +144,7 @@ class RCNNProposal(snt.AbstractModule):
         objects = tf.concat(selected_boxes, axis=0)
         proposal_label = tf.concat(selected_labels, axis=0)
         proposal_label_prob = tf.concat(selected_probs, axis=0)
+        proposal_features = tf.concat(selected_features, axis=0)
 
         tf.summary.histogram(
             'proposal_cls_scores', proposal_label_prob, ['rcnn']
@@ -153,12 +159,15 @@ class RCNNProposal(snt.AbstractModule):
         top_k_proposal_label_prob = top_k.values
         top_k_objects = tf.gather(objects, top_k.indices)
         top_k_proposal_label = tf.gather(proposal_label, top_k.indices)
+        top_k_proposal_features = tf.gather(proposal_features, top_k.indices)
 
         return {
             'objects': top_k_objects,
             'proposal_label': top_k_proposal_label,
             'proposal_label_prob': top_k_proposal_label_prob,
+            'proposal_features': top_k_proposal_features,
             'selected_boxes': selected_boxes,
             'selected_probs': selected_probs,
             'selected_labels': selected_labels,
+            'selected_features': selected_features,
         }

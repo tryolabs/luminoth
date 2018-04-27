@@ -190,7 +190,7 @@ class RCNN(snt.AbstractModule):
         # We treat num proposals as batch number so that when flattening we
         # get a (num_proposals, flatten_pooled_feature_map_size) Tensor.
         flatten_features = tf.contrib.layers.flatten(features)
-        net = tf.identity(flatten_features)
+        net = tf.identity(flatten_features)  # TODO: Why?
 
         if is_training:
             net = tf.nn.dropout(net, keep_prob=self._dropout_keep_prob)
@@ -230,13 +230,14 @@ class RCNN(snt.AbstractModule):
         # Get final objects proposals based on the probabilty, the offsets and
         # the original proposals.
         proposals_pred = self._rcnn_proposal(
-            proposals, bbox_offsets, cls_prob, im_shape)
+            proposals, bbox_offsets, cls_prob, im_shape, flatten_features)
 
         # objects, objects_labels, and objects_labels_prob are the only keys
         # that matter for drawing objects.
         prediction_dict['objects'] = proposals_pred['objects']
         prediction_dict['labels'] = proposals_pred['proposal_label']
         prediction_dict['probs'] = proposals_pred['proposal_label_prob']
+        prediction_dict['features'] = proposals_pred['proposal_features']
 
         if self._debug:
             prediction_dict['_debug']['proposal'] = proposals_pred
