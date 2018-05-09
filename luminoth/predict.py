@@ -17,15 +17,15 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
 VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
-FRAME_BUFFERLENGTH = 20
+FRAME_BUFFERLENGTH = 10
 BUFFER_MATCH_THRESHOLD = 3
 BUFFER_BBOX_OVERLAP = 0.1
 MAX_OBJECT_AREA = 250 * 250
 MIN_OBJECT_AREA = 20 * 20
-NORM_OVERLAP = 0.1
-NORM_DISTANCE = 30  # TODO: convert to a ratio and make proportional to frame size
-NORM_EMB_DIST = 4
-FPS = 4
+NORM_OVERLAP = 0.3
+NORM_DISTANCE = 80  # TODO: convert to a ratio and make proportional to frame size
+NORM_EMB_DIST = 80
+FPS = 6  # Can be None
 
 
 def get_file_type(filename):
@@ -94,7 +94,6 @@ def draw_bboxes_on_image(image, objects):
     draw = ImageDraw.Draw(image, 'RGBA')
 
     for ind, obj in enumerate(objects):
-        draw.rectangle(obj['bbox'])
         # Choose colors for bbox, the 60 and 255 correspond to transparency.
         if obj.get('tag'):
             color = get_color(str(obj['tag']))
@@ -126,9 +125,26 @@ def draw_bboxes_on_image(image, objects):
             # else:
             #     text_fill = fill
 
-            label = str(obj['tag'][:9])
-            draw.text(obj['bbox'][:2], label)
+            # if obj.get('score'):
+            #     label = '{:.2f} {:.2f} {:.2f}dsadasd {:.2f}'.format(obj['tag'][:4], obj['score'], obj['overlap'], obj['distance'], obj['emb_distance'])
+            # else:
+            #     label = str(obj['tag'][:4])
 
+            label = 's:{:.2f}o:{:.2f}d:{:.2f}e:{:.2f}\n{}'.format(
+                obj['debug']['score'], obj['debug']['overlap'],
+                obj['debug']['distance'], obj['debug']['emb_distance'],
+                obj['tag'][:3]
+            )
+
+            draw.text(obj['bbox'][:2], label)
+        else:
+            draw.rectangle(obj['bbox'])
+            if obj.get('debug'):
+                label = 's{:.2f} o{:.2f} d{:.2f} e{:.2f}'.format(
+                    obj['debug']['score'], obj['debug']['overlap'],
+                    obj['debug']['distance'], obj['debug']['emb_distance']
+                )
+                draw.text(obj['bbox'][:2], label)
 
 def get_color(class_label):
     """Rudimentary way to create color palette for plotting clases.
@@ -204,23 +220,30 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
     num_of_frames = int(skvideo.io.ffprobe(path)['video']['@nb_frames'])
     num, den = skvideo.io.ffprobe(path)['video']['@avg_frame_rate'].split('/')
     frame_rate = float(num) / float(den)
+    print('frame_rate: ', frame_rate)
+    frame_buffer_len = FRAME_BUFFERLENGTH if not FPS else (FRAME_BUFFERLENGTH * round((frame_rate / FPS)))
 
     video_progress_bar = click.progressbar(
         skvideo.io.vreader(path),
-        length=1000,
+        length=num_of_frames,
         label='Predicting {}'.format(path)
     )
 
     objects_per_frame = []
     frame_buffer = []
+    prediction_time = 0.0
+    predictions = 0
     with video_progress_bar as bar:
         try:
             start_time = time.time()
             for idx, frame in enumerate(bar):
-                if idx == 999: break
                 # Run image through network.
-                if idx % int(frame_rate / FPS) == 0:
+                if not FPS or idx % int(round(frame_rate / FPS)) == 0:
+                    start_pred_time = time.time()
                     objects = network.predict_image(frame)
+                    stop_pred_time = time.time()
+                    prediction_time += stop_pred_time - start_pred_time
+                    predictions += 1
 
                     # Filter the results according to the user input.
                     objects = filter_classes(
@@ -242,29 +265,38 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
                         'objects': objects
                     })
 
-                    # Load initial buffer with the first FRAME_BUFFERLENGTH frames
+                    # Load initial buffer with the first frame_buffer_idx frames
                     # TODO: We should probably take this out of this loop and use a
                     #       separate loop for this that runs before this one.
-                    if idx < FRAME_BUFFERLENGTH:
+                    if idx < frame_buffer_len:
                         frame_buffer.append(objects)
                         continue
 
                     # Provide tags to the current frame's objects
                     tag_objects(objects, frame_buffer)
 
+                    # Update buffer
+                    frame_buffer.append(objects)
+                    frame_buffer.pop(0)
+
                 # Draw the image and write it to the video file.
                 image = Image.fromarray(frame)
                 draw_bboxes_on_image(image, objects)
                 writer.writeFrame(np.array(image))
 
-                    # Update buffer
-                    frame_buffer.append(objects)
-                    frame_buffer.pop(0)
+                # # Update buffer
+                # frame_buffer.append(objects)
+                # frame_buffer.pop(0)
 
             stop_time = time.time()
             click.echo(
                 'fps: {0:.1f}'.format(num_of_frames / (stop_time - start_time))
             )
+            print('num_of_frames: ', num_of_frames)
+            print('prediction time: ', prediction_time)
+            print('predictions: ', predictions)
+            print('total time: ', stop_time - start_time)
+
         except RuntimeError as e:
             click.echo()  # Error prints next to progress bar otherwise.
             click.echo('Error while processing {}: {}'.format(path, e))
@@ -283,15 +315,24 @@ def tag_objects(current_frame_objects, frame_buffer):
     for idx, object_ in enumerate(current_frame_objects):
         object_match_chain = []
         last_matched_object = object_
+        # NOTE: This is some really disgustin programming, fix!
+        first_match = True
+        first_frame = True
 
         for frame_objects in frame_buffer[::-1]:
-            matching_object = get_matching_object(
+            matching_object, debug_dict = get_matching_object(
                 last_matched_object, frame_objects
             )
             if matching_object:
+                # TODO: Check that the objects in the chain have the same tag
                 object_match_chain.append(matching_object)
                 last_matched_object = matching_object
-
+                if first_match:
+                    object_['debug'] = debug_dict
+                    first_match = False
+            elif debug_dict and first_frame:
+                object_['debug'] = debug_dict
+                first_frame = False
         # ========================================================
         # object_['tag'] = closest_last_frame_object['tag']
 
@@ -314,7 +355,6 @@ def tag_objects(current_frame_objects, frame_buffer):
         #     object_['confused_with'] = min_dist_obj['tag']
         # ========================================================
 
-        print(len(object_match_chain))
         if len(object_match_chain) > BUFFER_MATCH_THRESHOLD:
             if object_match_chain[0].get('tag'):
                 object_['tag'] = object_match_chain[0]['tag']
@@ -328,53 +368,54 @@ def get_matching_object(last_matched_object, frame_objects):
         o for o in frame_objects if o['label'] == last_matched_object['label']
     ]
     if not frame_objects:
-        return
+        return None, None
 
     # Get bboxes
     object_bbox = np.array([last_matched_object['bbox']])
     frame_bboxes = np.array([object['bbox'] for object in frame_objects])
 
-    # Match criterion
-    try:
-        bbox_overlaps = bbox_overlap(object_bbox, frame_bboxes)[0]
-    except Exception as e:
-        import ipdb; ipdb.set_trace()
+    # Match criteria
+    bbox_overlaps = bbox_overlap(object_bbox, frame_bboxes)[0]
     bbox_distances = bbox_distance(object_bbox, frame_bboxes)
     object_embedding_distances = embedding_distance(
         last_matched_object, frame_objects
     )
 
-    match_scores = []
-    match_iter = zip(bbox_overlaps, bbox_distances, object_embedding_distances)
+    match_iter = zip(
+        bbox_overlaps, bbox_distances, object_embedding_distances,
+        frame_objects
+    )
     # TODO: Vectorize
-    for overlap, distance, embedding_dist in match_iter:
+    best_score = 0
+    for overlap, distance, embedding_dist, object_ in match_iter:
         # Match heuristic
-        normalized_overlap = max((overlap - NORM_OVERLAP) / NORM_OVERLAP, 0)
-        normalized_distance = max(
-            1 - (distance - NORM_DISTANCE) / NORM_DISTANCE, 0
-        )
-        normalized_emb_dist = max(
-            1 - (embedding_dist - NORM_EMB_DIST) / NORM_EMB_DIST, 0
-        )
-        match_scores.append(
-            (normalized_overlap +
-             normalized_distance +
-             normalized_emb_dist) / 2
-        )
+        # normalized_distance = max(
+        #     1 - (distance - NORM_DISTANCE) / NORM_DISTANCE, 0
+        # )
+        # normalized_emb_dist = max(
+        #     1 - (embedding_dist - NORM_EMB_DIST) / NORM_EMB_DIST, 0
+        # )
+        normalized_distance = max((distance * (-2/NORM_DISTANCE)) + 1, 0)
+        normalized_emb_dist = max((distance * (-2/NORM_EMB_DIST)) + 1, 0)
+        score = 1.2 * overlap + normalized_distance + normalized_emb_dist
 
-        # print(overlap)
-        # print(distance)
-        # print(embedding_dist)
-        # # print(match_score)
-        # print("==========")
+        if score > best_score:
+            best_object = object_
+            best_score = score
 
-    best_score = max(match_scores)
-    best_object = frame_objects[np.argmax(match_scores)]
-    if best_score > 2:
-        return best_object
+            debug_dict = {
+                'score': score,
+                'overlap': overlap,
+                'distance': normalized_distance,
+                'emb_distance': normalized_emb_dist,
+            }
+
+    if best_score > 1.7:
+        return best_object, debug_dict
+    elif best_score == 0:
+        return None, None
     else:
-        return None
-
+        return None, debug_dict
 
 def bbox_distance(bbox1, bboxes2):
     # Move to luminoth/utils and probably refactor
