@@ -8,6 +8,7 @@ import time
 import tensorflow as tf
 import uuid
 
+from collections import Counter
 from PIL import Image, ImageDraw
 from luminoth.tools.checkpoint import get_checkpoint_config
 from luminoth.utils.config import get_config, override_config_params
@@ -17,16 +18,29 @@ from luminoth.utils.bbox_overlap import bbox_overlap
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
 VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
-FRAME_BUFFERLENGTH = 10
-BUFFER_MATCH_THRESHOLD = 3
+
+# BEST
+FRAME_BUFFERLENGTH = 12
+BUFFER_MATCH_THRESHOLD = 5
 BUFFER_BBOX_OVERLAP = 0.1
 MAX_OBJECT_AREA = 250 * 250
 MIN_OBJECT_AREA = 20 * 20
 NORM_OVERLAP = 0.3
-NORM_DISTANCE = 80  # TODO: convert to a ratio and make proportional to frame size
-NORM_EMB_DIST = 80
+NORM_DISTANCE = 60  # TODO: convert to a ratio and make proportional to frame size
+NORM_EMB_DIST = 30
 FPS = 6  # Can be None
+SCORE_THRESHOLD = 1.7
 
+# FRAME_BUFFERLENGTH = 50
+# BUFFER_MATCH_THRESHOLD = 20
+# BUFFER_BBOX_OVERLAP = 0.1
+# MAX_OBJECT_AREA = 250 * 250
+# MIN_OBJECT_AREA = 20 * 20
+# NORM_OVERLAP = 0.3
+# NORM_DISTANCE = 60  # TODO: convert to a ratio and make proportional to frame size
+# NORM_EMB_DIST = 30
+# FPS = 6 # Can be None
+# SCORE_THRESHOLD = 2
 
 def get_file_type(filename):
     extension = filename.split('.')[-1].lower()
@@ -319,6 +333,7 @@ def tag_objects(current_frame_objects, frame_buffer):
         first_match = True
         first_frame = True
 
+        # Build object chains
         for frame_objects in frame_buffer[::-1]:
             matching_object, debug_dict = get_matching_object(
                 last_matched_object, frame_objects
@@ -333,33 +348,29 @@ def tag_objects(current_frame_objects, frame_buffer):
             elif debug_dict and first_frame:
                 object_['debug'] = debug_dict
                 first_frame = False
-        # ========================================================
-        # object_['tag'] = closest_last_frame_object['tag']
 
-        # object_['dist'] = np.linalg.norm(
-        #     closest_last_frame_object['feat'] - object_['feat']
-        # )
-
-        # object_['rand_dist'] = np.linalg.norm(
-        #     random.choice(last_frame_objects)['feat'] - object_['feat']
-        # )
-
-        # distances = []
-        # for lf_o in last_frame_objects:
-        #     distances.append(
-        #         np.linalg.norm(lf_o['feat'] - object_['feat'])
-        #     )
-        # min_dist_obj = last_frame_objects[np.argmin(distances)]
-        # object_['min_dist'] = min(distances)
-        # if object_['min_dist'] != object_['dist']:
-        #     object_['confused_with'] = min_dist_obj['tag']
-        # ========================================================
-
+        # Tag objects according to chain
         if len(object_match_chain) > BUFFER_MATCH_THRESHOLD:
-            if object_match_chain[0].get('tag'):
-                object_['tag'] = object_match_chain[0]['tag']
+            tag_chain = [o.get('tag') for o in object_match_chain if o.get('tag')]
+            if tag_chain:
+                object_['tag'] = tag_chain[0]
             else:
                 object_['tag'] = uuid.uuid4().hex
+
+    # Un-tag duplicated tags
+    tag_counter = Counter(
+        [t.get('tag') for t in current_frame_objects if t.get('tag')]
+    )
+    repeated_tags = [t for t, r in tag_counter.items() if r > 1]
+    for tag in repeated_tags:
+        objects_with_tag = [
+            o for o in current_frame_objects if o.get('tag') == tag
+        ]
+        instance_scores = [o['debug']['score'] for o in objects_with_tag]
+        objects_with_tag.pop(np.argmax(instance_scores))
+        # Un-tag non-best duplicated objects
+        for obj in objects_with_tag:
+            obj['tag'] = None
 
 
 def get_matching_object(last_matched_object, frame_objects):
@@ -389,15 +400,15 @@ def get_matching_object(last_matched_object, frame_objects):
     best_score = 0
     for overlap, distance, embedding_dist, object_ in match_iter:
         # Match heuristic
-        # normalized_distance = max(
-        #     1 - (distance - NORM_DISTANCE) / NORM_DISTANCE, 0
-        # )
-        # normalized_emb_dist = max(
-        #     1 - (embedding_dist - NORM_EMB_DIST) / NORM_EMB_DIST, 0
-        # )
-        normalized_distance = max((distance * (-2/NORM_DISTANCE)) + 1, 0)
-        normalized_emb_dist = max((distance * (-2/NORM_EMB_DIST)) + 1, 0)
-        score = 1.2 * overlap + normalized_distance + normalized_emb_dist
+        normalized_distance = max(
+            1 - (distance - NORM_DISTANCE) / NORM_DISTANCE, 0
+        )
+        normalized_emb_dist = max(
+            1 - (embedding_dist - NORM_EMB_DIST) / NORM_EMB_DIST, 0
+        )
+        # normalized_distance = max((distance * (-2/NORM_DISTANCE)) + 1, 0)
+        # normalized_emb_dist = max((distance * (-2/NORM_EMB_DIST)) + 1, 0)
+        score = 1.5 * overlap + normalized_distance + normalized_emb_dist
 
         if score > best_score:
             best_object = object_
@@ -410,7 +421,7 @@ def get_matching_object(last_matched_object, frame_objects):
                 'emb_distance': normalized_emb_dist,
             }
 
-    if best_score > 1.7:
+    if best_score > SCORE_THRESHOLD:
         return best_object, debug_dict
     elif best_score == 0:
         return None, None
