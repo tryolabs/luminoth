@@ -14,7 +14,7 @@ def get_output_subfolder(only_classes, only_images, limit_examples,
     Returns: subfolder name for records
     """
     if only_classes is not None:
-        return 'classes-{}'.format(only_classes)
+        return 'classes-{}'.format(only_classes.replace('/', ''))
     elif only_images is not None:
         return 'only-{}'.format(only_images)
     elif limit_examples is not None and limit_classes is not None:
