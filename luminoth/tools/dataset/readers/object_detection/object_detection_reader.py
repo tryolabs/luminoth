@@ -61,7 +61,7 @@ class ObjectDetectionReader(BaseReader):
     @property
     def classes(self):
         if self._classes is None:
-            self._classes = self._filter_classes(self.get_classes())
+            self._classes = self.get_classes()
         return self._classes
 
     @abc.abstractmethod
@@ -100,7 +100,7 @@ class ObjectDetectionReader(BaseReader):
                 random.sample(original_classes, total_classes)
             )
         else:
-            new_classes = original_classes
+            new_classes = list(original_classes) if original_classes else None
 
         return new_classes
 

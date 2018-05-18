@@ -15,9 +15,11 @@ from luminoth.tools.dataset.readers.object_detection import (
 )
 from luminoth.utils.dataset import read_image
 
-CLASSES_TRAINABLE = 'classes-bbox-trainable.txt'
-CLASSES_DESC = 'class-descriptions.csv'
-ANNOTATIONS_FILENAME = 'annotations-human-bbox.csv'
+# Compatible with OpenImages V4
+# Files available at: https://storage.googleapis.com/openimages/web/index.html
+CLASSES_TRAINABLE = 'train-annotations-human-imagelabels-boxable.csv'
+CLASSES_DESC = 'class-descriptions-boxable.csv'
+ANNOTATIONS_FILENAME = 'train-annotations-bbox.csv'
 IMAGES_LOCATION = 'gs://open-images-dataset'
 
 
@@ -60,13 +62,15 @@ class OpenImagesReader(ObjectDetectionReader):
         trainable_labels = set()
         try:
             with tf.gfile.Open(trainable_labels_file) as tl:
-                for label in tl:
-                    trainable_labels.add(label.strip())
+                reader = csv.reader(tl)
+                # Skip header
+                next(reader, None)
+                for line in reader:
+                    trainable_labels.add(line[2])
         except tf.errors.NotFoundError:
             raise InvalidDataDirectory(
                 'Missing label file "{}" from data_dir'.format(
                     CLASSES_TRAINABLE))
-
         self.trainable_labels = self._filter_classes(trainable_labels)
 
         labels_descriptions_file = os.path.join(
@@ -76,14 +80,14 @@ class OpenImagesReader(ObjectDetectionReader):
             with tf.gfile.Open(labels_descriptions_file) as ld:
                 reader = csv.reader(ld)
                 for line in reader:
-                    if line[0] in trainable_labels:
+                    if line[0] in self.trainable_labels:
                         desc_by_label[line[0]] = line[1]
         except tf.errors.NotFoundError:
             raise InvalidDataDirectory(
                 'Missing label description file "{}" from data_dir'.format(
                     CLASSES_DESC))
 
-        self._classes = [
+        return [
             desc for _, desc in
             sorted(desc_by_label.items(), key=lambda x: x[0])
         ]
