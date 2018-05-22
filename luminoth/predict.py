@@ -7,6 +7,8 @@ import sys
 import time
 import tensorflow as tf
 import uuid
+import random
+import math
 
 from collections import Counter
 from PIL import Image, ImageDraw
@@ -20,16 +22,17 @@ IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
 VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
 
 # BEST
-FRAME_BUFFERLENGTH = 12
-BUFFER_MATCH_THRESHOLD = 5
-BUFFER_BBOX_OVERLAP = 0.1
+FRAME_BUFFERLENGTH = 32
+BUFFER_MATCH_THRESHOLD = 3
+BUFFER_BBOX_OVERLAP = 0.2
 MAX_OBJECT_AREA = 250 * 250
 MIN_OBJECT_AREA = 20 * 20
-NORM_OVERLAP = 0.3
-NORM_DISTANCE = 60  # TODO: convert to a ratio and make proportional to frame size
-NORM_EMB_DIST = 30
-FPS = 6  # Can be None
-SCORE_THRESHOLD = 1.7
+NORM_DISTANCE = 11  # TODO: convert to a ratio and make proportional to frame size
+NORM_EMB_DIST = 3
+FPS = None  # Can be None
+SCORE_THRESHOLD = 1.4
+RANDOM = random.Random()
+RANDOM.seed(0)
 
 # FRAME_BUFFERLENGTH = 50
 # BUFFER_MATCH_THRESHOLD = 20
@@ -114,7 +117,8 @@ def draw_bboxes_on_image(image, objects):
             fill = tuple(color + [60])
             outline = tuple(color + [255])
 
-            draw.rectangle(obj['bbox'], fill=fill, outline=outline)
+            draw.rectangle(obj['bbox'], outline=outline)
+            draw.rectangle(obj['debug']['matched_object']['bbox'], fill=fill)
 
             # # Draw the object's label.
             # prob = '{:.2f}'.format(obj['prob'])
@@ -150,15 +154,32 @@ def draw_bboxes_on_image(image, objects):
                 obj['tag'][:3]
             )
 
+            # # TODO: deleteme
+            # label = '{:.2f}'.format(obj['debug']['score'])
+
             draw.text(obj['bbox'][:2], label)
+            label2 = str(obj['debug']['matched_object']['bbox'])
+            draw.text(obj['debug']['matched_object']['bbox'][2:], label2)
         else:
-            draw.rectangle(obj['bbox'])
             if obj.get('debug'):
-                label = 's{:.2f} o{:.2f} d{:.2f} e{:.2f}'.format(
+                import random
+                color = get_color(random.randint(1, 1000))
+                fill = tuple(color + [60])
+                outline = tuple(color + [255])
+
+                draw.rectangle(obj['bbox'], outline=outline)
+                draw.rectangle(obj['debug']['matched_object']['bbox'], fill=fill)
+            else:
+                draw.rectangle(obj['bbox'])
+            if obj.get('debug'):
+                label = 's{:.2f} o{:.2f} d{:.2f} e{:.2f}\nXXX{}'.format(
                     obj['debug']['score'], obj['debug']['overlap'],
-                    obj['debug']['distance'], obj['debug']['emb_distance']
+                    obj['debug']['distance'], obj['debug']['emb_distance'],
+                    obj['bbox']
                 )
                 draw.text(obj['bbox'][:2], label)
+                label2 = str(obj['debug']['matched_object']['bbox'])
+                draw.text(obj['debug']['matched_object']['bbox'][2:], label2)
 
 def get_color(class_label):
     """Rudimentary way to create color palette for plotting clases.
@@ -252,9 +273,11 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
             start_time = time.time()
             for idx, frame in enumerate(bar):
                 # Run image through network.
+                print()
                 if not FPS or idx % int(round(frame_rate / FPS)) == 0:
                     start_pred_time = time.time()
                     objects = network.predict_image(frame)
+                    odd_feat_shapes = [o['feat'].shape for o in objects if o['feat'].shape != (7, 7, 1024)]
                     stop_pred_time = time.time()
                     prediction_time += stop_pred_time - start_pred_time
                     predictions += 1
@@ -334,18 +357,25 @@ def tag_objects(current_frame_objects, frame_buffer):
         first_frame = True
 
         # Build object chains
+        print(f"new object: {object_['bbox']}")
+        FLAG = object_['bbox'] == [750, 520, 785, 595]
         for frame_objects in frame_buffer[::-1]:
+            if last_matched_object['bbox'] == [782, 527, 813, 597] and FLAG:
+                import ipdb; ipdb.set_trace()
             matching_object, debug_dict = get_matching_object(
                 last_matched_object, frame_objects
             )
+            # import ipdb; ipdb.set_trace()
             if matching_object:
                 # TODO: Check that the objects in the chain have the same tag
                 object_match_chain.append(matching_object)
                 last_matched_object = matching_object
                 if first_match:
+                    print('matched and changed debug dict')
                     object_['debug'] = debug_dict
                     first_match = False
-            elif debug_dict and first_frame:
+            elif debug_dict and first_frame and first_match:
+                print('changed debug dict')
                 object_['debug'] = debug_dict
                 first_frame = False
 
@@ -355,7 +385,8 @@ def tag_objects(current_frame_objects, frame_buffer):
             if tag_chain:
                 object_['tag'] = tag_chain[0]
             else:
-                object_['tag'] = uuid.uuid4().hex
+                # object_['tag'] = uuid.uuid4().hex
+                object_['tag'] = str(uuid.UUID(int=RANDOM.getrandbits(128)))
 
     # Un-tag duplicated tags
     tag_counter = Counter(
@@ -398,8 +429,9 @@ def get_matching_object(last_matched_object, frame_objects):
     )
     # TODO: Vectorize
     best_score = 0
+    # print("***** {} ******".format(last_matched_object['bbox']))
     for overlap, distance, embedding_dist, object_ in match_iter:
-        # Match heuristic
+        # Normalize -> TODO: Normalize when calculating the distances
         normalized_distance = max(
             1 - (distance - NORM_DISTANCE) / NORM_DISTANCE, 0
         )
@@ -408,7 +440,10 @@ def get_matching_object(last_matched_object, frame_objects):
         )
         # normalized_distance = max((distance * (-2/NORM_DISTANCE)) + 1, 0)
         # normalized_emb_dist = max((distance * (-2/NORM_EMB_DIST)) + 1, 0)
-        score = 1.5 * overlap + normalized_distance + normalized_emb_dist
+        # score = 1.5 * overlap + normalized_distance + normalized_emb_dist
+        score = normalized_distance
+        # print(object_.get('tag'), object_['bbox'])
+        # print(f"{distance:.2f} - {normalized_distance:.2f}")
 
         if score > best_score:
             best_object = object_
@@ -419,7 +454,23 @@ def get_matching_object(last_matched_object, frame_objects):
                 'overlap': overlap,
                 'distance': normalized_distance,
                 'emb_distance': normalized_emb_dist,
+                'matched_object': object_,
             }
+
+    # Frame finder!
+
+    # if (last_matched_object.get('tag') and
+    #     last_matched_object['tag'][:3] == '259' and
+    #     math.isclose(overlap, 0.06, abs_tol=0.01)):
+    #     print(1)
+    #     import ipdb; ipdb.set_trace()
+
+    # if ('debug_dict' in locals() and
+    #     math.isclose(debug_dict['score'], 1.42, abs_tol=0.01) and
+    #     math.isclose(debug_dict['overlap'], 0.06, abs_tol=0.01)):
+    #     print()
+    #     print(best_score)
+    #     import ipdb; ipdb.set_trace()
 
     if best_score > SCORE_THRESHOLD:
         return best_object, debug_dict
@@ -427,6 +478,7 @@ def get_matching_object(last_matched_object, frame_objects):
         return None, None
     else:
         return None, debug_dict
+
 
 def bbox_distance(bbox1, bboxes2):
     # Move to luminoth/utils and probably refactor
@@ -441,11 +493,14 @@ def bbox_distance(bbox1, bboxes2):
 
 
 def embedding_distance(last_matched_object, frame_objects):
-    matched_object_embedding = last_matched_object['feat']
-    frame_objects_embeddings = np.vstack([o['feat'] for o in frame_objects])
-    return np.linalg.norm(
-        matched_object_embedding - frame_objects_embeddings, axis=1
-    )
+    try:
+        matched_object_embedding = last_matched_object['feat']
+        frame_objects_embeddings = np.vstack([o['feat'] for o in frame_objects])
+        return np.linalg.norm(
+            matched_object_embedding - frame_objects_embeddings, axis=1
+        )
+    except:
+        import ipdb; ipdb.set_trace()
 
 
 @click.command(help="Obtain a model's predictions.")

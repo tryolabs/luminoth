@@ -230,7 +230,7 @@ class RCNN(snt.AbstractModule):
         # Get final objects proposals based on the probabilty, the offsets and
         # the original proposals.
         proposals_pred = self._rcnn_proposal(
-            proposals, bbox_offsets, cls_prob, im_shape, net)
+            proposals, bbox_offsets, cls_prob, im_shape, net)  # Change last argumet here bro
 
         # objects, objects_labels, and objects_labels_prob are the only keys
         # that matter for drawing objects.
