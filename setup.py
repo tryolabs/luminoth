@@ -49,6 +49,7 @@ INSTALL_REQUIRES = [
     'six>=1.11',
     'sk-video',
     'pyasn1>=0.4.2',
+    'oauth2client>=4.1.2',
 ]
 TEST_REQUIRES = []
 
