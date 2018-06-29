@@ -619,8 +619,9 @@ def expand(image, bboxes=None, fill=0, min_ratio=1, max_ratio=4, seed=None):
     return return_dict
 
 
-def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_padding=1.0,
-            right_padding=1.0, left_right=True, up_down=False):
+def fisheye(image, bboxes=None, min_top_padding=0.1, max_top_padding=1.0, min_bottom_padding=0.1,
+            max_bottom_padding=1.0, min_left_padding=0., max_left_padding=0.5, min_right_padding=0.,
+            max_right_padding=0.5):
     """
     Applies a fisheye effect transformation, taking the top-left corner as the fisheye
     center. This generates a quarter-fisheye image.
@@ -631,10 +632,14 @@ def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_paddin
         image: Tensor with image of shape (H, W, 3).
         bboxes: Optional Tensor with bounding boxes with shape (num_bboxes, 5).
             where we have (x_min, y_min, x_max, y_max, label) for each one.
-        top_padding: Fraction of image height to determine 0-padding on top of it.
-        bottom_padding: Fraction of image height to determine 0-padding below of it.
-        left_right: Wether to horizontally flip image or not.
-        up_down: Wether to vertically flip image or not.
+        min_top_padding: Min fraction of image height to determine 0-padding on top of it.
+        max_top_padding: Max fraction of image height to determine 0-padding on top of it.
+        min_bottom_padding: Min fraction of image height to determine 0-padding below of it.
+        max_bottom_padding: Max fraction of image height to determine 0-padding below of it.
+        min_left_padding: Min fraction of image width to determine 0-padding on left side.
+        max_left_padding: Max fraction of image widtht to determine 0-padding on left side.
+        min_right_padding: Min fraction of image width to determine 0-padding on right side.
+        max_right_padding: Max fraction of image width to determine 0-padding on right side.
 
 
     Returns:
@@ -650,6 +655,12 @@ def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_paddin
         + img[tf.floor(y) + 1, tf.floor(x)] * (y - tf.floor(y)) * (1 - (x - tf.floor(x)))
         + img[tf.floor(y) + 1, tf.floor(x) + 1] * (y - tf.floor(y)) * (x - tf.floor(x))
 
+    # Generate padding values
+    top_padding = tf.random_uniform([], min_top_padding, max_top_padding)
+    bottom_padding = tf.random_uniform([], min_bottom_padding, max_bottom_padding)
+    left_padding = tf.random_uniform([], min_left_padding, max_left_padding)
+    right_padding = tf.random_uniform([], min_right_padding, max_right_padding)
+
     image_shape = tf.to_float(tf.shape(image))
     height = image_shape[0]
     width = image_shape[1]
@@ -664,7 +675,7 @@ def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_paddin
     vertical_paddings_tensor = tf.stack([top_padding, bottom_padding])
     horizontal_paddings_tensor = tf.stack([left_padding, right_padding])
 
-    # Apply paddings on top and bottom of image
+    # Apply paddings on top, bottom and sides of image
     image = tf.pad(
         image, tf.stack([vertical_paddings_tensor, horizontal_paddings_tensor, [0, 0]]),
         'constant', constant_values=0
@@ -680,11 +691,7 @@ def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_paddin
 
     # Recompute image height and width with added padings
     height = tf.cast(height, tf.int32) + top_padding + bottom_padding
-    width = tf.cast(width, tf.int32) + left_padding + right_padding
-
-    # Flip image
-    return_dict = flip_image(image, bboxes, left_right, up_down)
-    image, bboxes = return_dict['image'], return_dict['bboxes']
+    width = width + tf.cast(left_padding + right_padding, tf.float32)
 
     out_width = out_height = tf.cast(height - bottom_padding, tf.float32)
 
@@ -731,7 +738,10 @@ def fisheye(image, bboxes=None, top_padding=1.0, bottom_padding=1.0, left_paddin
                                   y_min_dst, x_max_dst, y_max_dst]]
     bboxes = tf.stack([x_min, y_min, x_max, y_max, label], axis=1)
 
-    return_dict = {'image': tf.reshape(out_image, [height - bottom_padding, height - bottom_padding, 3])}
+    return_dict = {'image': tf.reshape(
+        out_image, [height - bottom_padding, height - bottom_padding, 3]
+        )
+    }
     if bboxes is not None:
         return_dict['bboxes'] = bboxes
     return return_dict
