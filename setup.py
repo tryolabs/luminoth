@@ -1,6 +1,7 @@
 import codecs
 import os
 import re
+import sys
 
 from setuptools import find_packages, setup
 
@@ -33,27 +34,33 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.6',
 ]
 
-MIN_TENSORFLOW_VERSION = '1.3.0'
+MIN_TENSORFLOW_VERSION = '1.5'
 
 INSTALL_REQUIRES = [
     'numpy',
     'Pillow',
     'lxml',
+    'requests',
     'dm-sonnet>=1.12',
     'click>=6.7,<7',
     'PyYAML>=3.12,<4',
     'easydict>=1.7,<2',
-    'google-api-python-client>=1.6.2,<2',
-    'google-cloud-storage>=1.2.0',
     'Flask>=0.12',
     'six>=1.11',
-    'sk-video',
-    'pyasn1>=0.4.2',
-    'oauth2client>=4.1.2',
+    'sk-video'
 ]
 TEST_REQUIRES = []
 
 # -------------------------------------------------------------
+
+# Check for a current TensorFlow installation.
+try:
+    import tensorflow
+except ImportError:
+    sys.exit("""Luminoth requires a TensorFlow >= {} installation.
+
+Depending on your use case, you should install either `tensorflow` or
+`tensorflow-gpu` packages manually or via PyPI.""".format(MIN_TENSORFLOW_VERSION))
 
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -84,17 +91,6 @@ def find_meta(meta):
     raise RuntimeError('Unable to find __{meta}__ string.'.format(meta=meta))
 
 
-#
-# If TensorFlow is not installed, install it using the CPU version by default.
-# If the user wants to use the version with GPU support, it must be installed
-# in advance.
-#
-try:
-    import tensorflow
-except ImportError:
-    INSTALL_REQUIRES += ['tensorflow>={}'.format(MIN_TENSORFLOW_VERSION)]
-
-
 setup(
     name=NAME,
     version=find_meta('version'),
@@ -114,9 +110,13 @@ setup(
     install_requires=INSTALL_REQUIRES,
     test_requires=TEST_REQUIRES,
     extras_require={
-        'gpu support': [
-            'tensorflow-gpu>={}'.format(MIN_TENSORFLOW_VERSION),
-        ],
+        'gcloud': [
+            'google-api-python-client>=1.6.2,<2',
+            'google-cloud-storage>=1.2.0',
+            'oauth2client>=4.1.2',
+            # See https://github.com/tryolabs/luminoth/issues/147
+            'pyasn1>=0.4.2',
+        ]
     },
     entry_points="""
         [console_scripts]
