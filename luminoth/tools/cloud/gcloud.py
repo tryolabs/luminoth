@@ -1,5 +1,4 @@
 import click
-import googleapiclient.discovery as discovery
 import json
 import os
 import shutil
@@ -9,14 +8,19 @@ import tempfile
 import tensorflow as tf
 import time
 
+from functools import wraps
 from datetime import datetime
-
-from google.cloud import storage
-from googleapiclient.errors import HttpError
-from oauth2client import service_account
 
 from luminoth.utils.config import get_config, dump_config
 from luminoth.utils.experiments import save_run
+
+MISSING_DEPENDENCIES = False
+try:
+    from google.cloud import storage
+    from googleapiclient import discovery, errors
+    from oauth2client import service_account
+except ImportError:
+    MISSING_DEPENDENCIES = True
 
 
 RUNTIME_VERSION = '1.4'
@@ -36,6 +40,25 @@ DEFAULT_PS_COUNT = 0
 
 DEFAULT_CONFIG_FILENAME = 'config.yml'
 DEFAULT_PACKAGES_PATH = 'packages'
+
+
+def check_dependencies(f):
+    """
+    Decorator for commands that will check if they have
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if MISSING_DEPENDENCIES:
+            raise click.ClickException(
+                'To use Google Cloud functionalities, you must install '
+                'Luminoth with the `gcloud` extras.\n\n'
+                ''
+                'Ie. `pip install luminoth[gcloud]`'
+            )
+
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 @click.group(help='Train models in Google Cloud ML')
@@ -147,7 +170,7 @@ def validate_region(region, project_id, credentials):
     )
     try:
         regionrequest.execute()
-    except HttpError as err:
+    except errors.HttpError as err:
         if err.resp.status == 404:
             click.echo(
                 'Error: Couldn\'t find region "{}" for project "{}".'.format(
@@ -176,6 +199,7 @@ def validate_region(region, project_id, credentials):
 @click.option('--worker-count', default=DEFAULT_WORKER_COUNT, type=int)
 @click.option('--parameter-server-type', default=DEFAULT_PS_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--parameter-server-count', default=DEFAULT_PS_COUNT, type=int)
+@check_dependencies
 def train(job_id, service_account_json, bucket_name, region, config_files,
           dataset, scale_tier, master_type, worker_type, worker_count,
           parameter_server_type, parameter_server_count):
@@ -283,6 +307,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 @click.option('--machine-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--rebuild', default=False, is_flag=True, help='Rebuild and upload package.')  # noqa
 @click.option('--postfix', default='eval', help='Postfix for the evaluation job name.')  # noqa
+@check_dependencies
 def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
              machine_type, rebuild, postfix):
     project_id = get_project_id(service_account_json)
@@ -358,6 +383,7 @@ def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
 @gc.command(help='List project jobs')
 @click.option('--service-account-json', required=True)
 @click.option('--running', is_flag=True, help='List only jobs that are running.')  # noqa
+@check_dependencies
 def jobs(service_account_json, running):
     project_id = get_project_id(service_account_json)
     if project_id is None:
@@ -398,6 +424,7 @@ def jobs(service_account_json, running):
 @click.argument('job_id')
 @click.option('--service-account-json', required=True)
 @click.option('--polling-interval', default=60, help='Polling interval in seconds.')  # noqa
+@check_dependencies
 def logs(job_id, service_account_json, polling_interval):
     project_id = get_project_id(service_account_json)
     if project_id is None:
