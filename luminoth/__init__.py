@@ -11,6 +11,21 @@ __email__ = 'luminoth@tryolabs.com'
 __license__ = 'BSD 3-Clause License'
 __copyright__ = 'Copyright (c) 2018 Tryolabs S.A.'
 
+__min_tf_version__ = '1.5'
+
+
+import sys
+
+# Check for a current TensorFlow installation.
+try:
+    import tensorflow
+except ImportError:
+    sys.exit("""Luminoth requires a TensorFlow >= {} installation.
+
+Depending on your use case, you should install either `tensorflow` or
+`tensorflow-gpu` packages manually or via PyPI.""".format(__min_tf_version__))
+
+
 # Import functions that are part of Luminoth's public interface.
 from luminoth.cli import cli  # noqa
 from luminoth.utils.predicting import PredictorNetwork  # noqa
