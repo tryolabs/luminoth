@@ -34,8 +34,6 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.6',
 ]
 
-MIN_TENSORFLOW_VERSION = '1.5'
-
 INSTALL_REQUIRES = [
     'numpy',
     'Pillow',
@@ -52,16 +50,6 @@ INSTALL_REQUIRES = [
 TEST_REQUIRES = []
 
 # -------------------------------------------------------------
-
-# Check for a current TensorFlow installation.
-try:
-    import tensorflow
-except ImportError:
-    sys.exit("""Luminoth requires a TensorFlow >= {} installation.
-
-Depending on your use case, you should install either `tensorflow` or
-`tensorflow-gpu` packages manually or via PyPI.""".format(MIN_TENSORFLOW_VERSION))
-
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -89,6 +77,9 @@ def find_meta(meta):
     if meta_match:
         return meta_match.group(1)
     raise RuntimeError('Unable to find __{meta}__ string.'.format(meta=meta))
+
+
+MIN_TF_VERSION = find_meta('min_tf_version')
 
 
 setup(
