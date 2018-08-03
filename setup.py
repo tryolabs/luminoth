@@ -101,6 +101,8 @@ setup(
     install_requires=INSTALL_REQUIRES,
     test_requires=TEST_REQUIRES,
     extras_require={
+        'tf': ['tensorflow>={}'.format(MIN_TF_VERSION)],
+        'tf-gpu': ['tensorflow-gpu>='.format(MIN_TF_VERSION)],
         'gcloud': [
             'google-api-python-client>=1.6.2,<2',
             'google-cloud-storage>=1.2.0',
