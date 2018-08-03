@@ -18,7 +18,7 @@ import sys
 
 # Check for a current TensorFlow installation.
 try:
-    import tensorflow
+    import tensorflow  # noqa: F401
 except ImportError:
     sys.exit("""Luminoth requires a TensorFlow >= {} installation.
 
