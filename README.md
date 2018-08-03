@@ -15,27 +15,39 @@ Read the full documentation [here](http://luminoth.readthedocs.io/).
 > **DISCLAIMER**: Luminoth is still alpha-quality release, which means the internal and external interfaces (such as command line) are very likely to change as the codebase matures.
 
 # Installation
+
 Luminoth currently supports Python 2.7 and 3.4–3.6.
 
 ## Pre-requisites
-If you want **GPU support**, you should install the GPU version of [TensorFlow](https://www.tensorflow.org/install/).
-If TensorFlow is is already installed, Luminoth will use that version (no matter if CPU or GPU versions).
+
+To use Luminoth, [TensorFlow](https://www.tensorflow.org/install/) must be installed beforehand. If you want **GPU support**, you should install the GPU version of TensorFlow with `pip install tensorflow-gpu`, or else you can use the CPU version using `pip install tensorflow`.
 
 ## Installing Luminoth
+
 Just install from PyPI:
 
 ```bash
-$ pip install luminoth
+pip install luminoth
+```
+
+Optionally, Luminoth can also install TensorFlow for you if you install it with `pip install luminoth[tf]` or `pip install luminoth[tf-gpu]`, depending on the version of TensorFlow you wish to use.
+
+### Google Cloud
+
+If you wish to train using **Google Cloud ML Engine**, the optional dependencies must be installed:
+
+```bash
+pip install luminoth[gcloud]
 ```
 
 ## Installing from source
 
 First, clone the repo on your machine and then install with `pip`:
 
-```
-$ git clone https://github.com/tryolabs/luminoth.git
-$ cd luminoth
-$ pip install -e .
+```bash
+git clone https://github.com/tryolabs/luminoth.git
+cd luminoth
+pip install -e .
 ```
 
 ## Check that the installation worked
@@ -47,8 +59,8 @@ Simply run `lumi --help`.
 Currently, we support the following models:
 
 * **Object Detection**
-    * [Faster R-CNN](https://arxiv.org/abs/1506.01497)
-    * [SSD](https://arxiv.org/abs/1512.02325)
+  * [Faster R-CNN](https://arxiv.org/abs/1506.01497)
+  * [SSD](https://arxiv.org/abs/1512.02325)
 
 We are planning on adding support for more models in the near future, such as [RetinaNet](https://arxiv.org/abs/1708.02002) and [Mask R-CNN](https://arxiv.org/abs/1703.06870).
 
@@ -63,6 +75,7 @@ There is one main command line interface which you can use with the `lumi` comma
 and a list of available options with descriptions will show up.
 
 ## Working with datasets
+
 See [Adapting a dataset](http://luminoth.readthedocs.io/en/latest/usage/dataset.html).
 
 ## Training
@@ -75,16 +88,18 @@ We strive to get useful and understandable summary and graph visualizations. We 
 
 By default summary and graph logs are saved to `jobs/` under the current directory. You can use TensorBoard by running:
 
-```
+```bash
 tensorboard --logdir path/to/jobs
 ```
 
 ## Why the name?
+
 > The Dark Visor is a Visor upgrade in Metroid Prime 2: Echoes. Designed by the **Luminoth** during the war, it was used by the Champion of Aether, A-Kul, to penetrate Dark Aether's haze in battle against the Ing.
 >
 > -- [Dark Visor - Wikitroid](http://metroid.wikia.com/wiki/Dark_Visor)
 >
 
 # License
+
 Copyright © 2018, [Tryolabs](https://tryolabs.com).
 Released under the [BSD 3-Clause](LICENSE).

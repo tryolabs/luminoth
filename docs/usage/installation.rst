@@ -6,21 +6,15 @@ Installation
 Before you start
 ----------------
 
-Tensorflow
+TensorFlow
 ^^^^^^^^^^
 
-All Luminoth dependencies will be downloaded automatically when you install
-Luminoth. However, `Tensorflow <https://tensorflow.org>`_, upon which Luminoth
-depends, provides two packages in PyPI: ``tensorflow`` (the CPU version) and
-``tensorflow-gpu`` (the GPU version).
+To use Luminoth, `TensorFlow <https://tensorflow.org>`_ must be installed beforehand.
+If you want **GPU support**, you should install the GPU version of TensorFlow with
+``pip install tensorflow-gpu``, or else you can use the CPU version using
+``pip install tensorflow``.
 
-Luminoth will default to the CPU version of the dependency. So, if you have a
-GPU, you should manually pre-install ``tensorflow-gpu`` before installing
-Luminoth by issuing::
-
-  $ pip install tensorflow-gpu
-
-You can see more details into installing Tensorflow manually `here
+You can see more details into installing TensorFlow manually `here
 <https://www.tensorflow.org/install/>`_, including how to use CUDA and cuDNN.
 
 FFmpeg
@@ -30,12 +24,22 @@ Luminoth leverages `FFmpeg <https://www.ffmpeg.org>`_ in order to support
 running predictions on videos. If you plan to use Luminoth with this end,
 FFmpeg should be installed as a system dependency.
 
+
 Installing from PyPI
 --------------------
 
 Use ``pip`` to install Luminoth, by running the following command::
 
   $ pip install luminoth
+
+Google Cloud
+^^^^^^^^^^^^
+
+If you wish to train using **Google Cloud ML Engine**, the optional dependencies
+must be installed::
+
+  $ pip install luminoth[gcloud]
+
 
 Installing from source
 ----------------------
