@@ -111,7 +111,6 @@ and fetch their logs.
 
 The following options are required by *all* ``lumi cloud gc`` sub-commands:
 
-* ``--project-id``: Id of the project created in step 1.
 * ``--service-account-json``: Path to the Service Account Key file created in
   step 5.
 
