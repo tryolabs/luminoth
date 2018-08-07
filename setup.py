@@ -35,17 +35,17 @@ CLASSIFIERS = [
 ]
 
 INSTALL_REQUIRES = [
-    'numpy',
     'Pillow',
     'lxml',
+    'numpy',
     'requests',
-    'dm-sonnet>=1.12',
-    'click>=6.7,<7',
-    'PyYAML>=3.12,<4',
-    'easydict>=1.7,<2',
+    'scikit-video',
     'Flask>=0.12',
+    'PyYAML>=3.12,<4',
+    'click>=6.7,<7',
+    'dm-sonnet>=1.12',
+    'easydict>=1.7,<2',
     'six>=1.11',
-    'sk-video'
 ]
 TEST_REQUIRES = []
 
