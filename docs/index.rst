@@ -28,6 +28,7 @@ Documentation
    usage/dataset
    usage/training
    usage/evaluation
+   usage/cloud
    usage/checkpoints
 
 .. toctree::
