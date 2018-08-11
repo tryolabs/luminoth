@@ -144,7 +144,7 @@ def predict_image(network, path, only_classes=None, ignore_classes=None,
 def predict_video(network, path, only_classes=None, ignore_classes=None,
                   save_path=None):
     if save_path:
-        # We hardcode the video ouput to mp4 for the time being.
+        # We hardcode the video output to mp4 for the time being.
         save_path = os.path.splitext(save_path)[0] + '.mp4'
         try:
             writer = skvideo.io.FFmpegWriter(save_path)

@@ -23,12 +23,15 @@ except ImportError:
     MISSING_DEPENDENCIES = True
 
 
-RUNTIME_VERSION = '1.4'
-SCALE_TIERS = ['BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'CUSTOM']
+RUNTIME_VERSION = '1.9'
+SCALE_TIERS = [
+    'BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'BASIC_TPU', 'CUSTOM'
+]
 MACHINE_TYPES = [
     'standard', 'large_model', 'complex_model_s', 'complex_model_m',
     'complex_model_l', 'standard_gpu', 'complex_model_m_gpu',
     'complex_model_l_gpu', 'standard_p100', 'complex_model_m_p100',
+    'cloud_tpu'
 ]
 
 DEFAULT_SCALE_TIER = 'BASIC_GPU'
@@ -59,11 +62,6 @@ def check_dependencies(f):
         return f(*args, **kwargs)
 
     return decorated_function
-
-
-@click.group(help='Train models in Google Cloud ML')
-def gc():
-    pass
 
 
 def build_package(bucket, base_path):
@@ -113,27 +111,71 @@ def build_package(bucket, base_path):
     return path
 
 
-def get_account_attribute(service_account_json, attr):
-    return json.load(
-        tf.gfile.GFile(service_account_json, 'r')
-    ).get(attr)
+class ServiceAccount(object):
+    """
+    Wrapper for handling Google services via the Service Account.
+    """
 
+    def __init__(self):
+        try:
+            data = json.load(
+                tf.gfile.GFile(
+                    os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'), 'r'
+                )
+            )
 
-def get_project_id(service_account_json):
-    return get_account_attribute(service_account_json, 'project_id')
+            self.project_id = data['project_id']
+            self.client_id = data['client_id']
 
+            self.credentials = service_account.ServiceAccountCredentials.\
+                from_json_keyfile_dict(data)
+        except (ValueError, tf.errors.NotFoundError):
+            raise ValueError(
+                'Make sure the GOOGLE_APPLICATION_CREDENTIALS environment '
+                'variable is set and points to a valid service account JSON '
+                'file.'
+            )
 
-def get_client_id(service_account_json):
-    return get_account_attribute(service_account_json, 'client_id')
+    def cloud_service(self, service, version='v1'):
+        return discovery.build(service, version, credentials=self.credentials)
 
+    def get_bucket(self, bucket_name):
+        # If not passed, will get credentials from env. This library (storage)
+        # doesn't work with self.credentials.
+        cli = storage.Client()
+        bucket = cli.lookup_bucket(bucket_name)
+        if not bucket:
+            bucket = cli.create_bucket(bucket_name)
+        return bucket
 
-def get_bucket(service_account_json, bucket_name):
-    storage_client = storage.Client.from_service_account_json(
-        service_account_json)
-    bucket = storage_client.lookup_bucket(bucket_name)
-    if not bucket:
-        bucket = storage_client.create_bucket(bucket_name)
-    return bucket
+    def validate_region(self, region):
+        regionrequest = self.cloud_service('compute').regions().get(
+            region=region, project=self.project_id
+        )
+        try:
+            regionrequest.execute()
+        except errors.HttpError as err:
+            if err.resp.status == 404:
+                click.echo(
+                    'Error: Couldn\'t find region "{}" for '
+                    'project "{}".'.format(region, self.project_id))
+            elif err.resp.status == 403:
+                click.echo('Error: Forbidden access to resources.')
+                click.echo('Raw response:\n{}\n'.format(err.content))
+                click.echo(
+                    'Make sure to enable the following APIs for the project:\n'
+                    '  * Compute Engine\n'
+                    '  * Cloud Machine Learning Engine\n'
+                    '  * Google Cloud Storage\n'
+                    'You can do it with the following command:\n'
+                    '  gcloud services enable compute.googleapis.com '
+                    'ml.googleapis.com storage-component.googleapis.com\n\n'
+                    'For information on how to enable these APIs, see here: '
+                    'https://support.google.com/cloud/answer/6158841'
+                )
+            else:
+                click.echo('Unknown error: {}'.format(err.resp))
+            sys.exit(1)
 
 
 def upload_data(bucket, file_path, data):
@@ -145,53 +187,23 @@ def upload_data(bucket, file_path, data):
 def upload_file(bucket, base_path, file_path):
     filename = os.path.basename(file_path)
     path = '{}/{}'.format(base_path, filename)
-    click.echo('Uploading file: "{}"\n          -> to "gs://{}/{}"'.format(
+    click.echo('Uploading file: "{}"\n\t-> to "gs://{}/{}"'.format(
         filename, bucket.name, path))
     blob = bucket.blob(path)
     blob.upload_from_file(tf.gfile.GFile(file_path, 'rb'))
     return path
 
 
-def get_credentials(file):
-    return service_account.ServiceAccountCredentials.from_json_keyfile_name(
-        file
-    )
-
-
-def cloud_service(credentials, service, version='v1'):
-    return discovery.build(service, version, credentials=credentials)
-
-
-def validate_region(region, project_id, credentials):
-    cloudcompute = cloud_service(credentials, 'compute')
-
-    regionrequest = cloudcompute.regions().get(
-        region=region, project=project_id
-    )
-    try:
-        regionrequest.execute()
-    except errors.HttpError as err:
-        if err.resp.status == 404:
-            click.echo(
-                'Error: Couldn\'t find region "{}" for project "{}".'.format(
-                    region, project_id))
-        elif err.resp.status == 403:
-            click.echo('Error: Forbidden access to resources.')
-            click.echo('Raw response:\n{}'.format(err.content))
-            click.echo(
-                'Make sure to enable "Cloud Compute API", "ML Engine" and '
-                '"Storage" for project.')
-        else:
-            click.echo('Unknown error: {}'.format(err.resp))
-        sys.exit(1)
+@click.group(help='Train models in Google Cloud ML')
+def gc():
+    pass
 
 
 @gc.command(help='Start a training job')
-@click.option('--job-id', help='JobId for saving models and logs.')
-@click.option('--service-account-json', required=True)
-@click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
+@click.option('--job-id', help='Job Id for naming the folder where checkpoints and logs will be stored.')  # noqa
+@click.option('--bucket', 'bucket_name', help='Bucket where to create the folder to save checkpoints and logs.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
-@click.option('--dataset', help='Bucket where the dataset is located.')  # noqa
+@click.option('--dataset', help='Complete path (bucket included) to the folder where the dataset is located (TFRecord files).')  # noqa
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Path to config to use in training.')  # noqa
 @click.option('--scale-tier', default=DEFAULT_SCALE_TIER, type=click.Choice(SCALE_TIERS))  # noqa
 @click.option('--master-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
@@ -200,27 +212,19 @@ def validate_region(region, project_id, credentials):
 @click.option('--parameter-server-type', default=DEFAULT_PS_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--parameter-server-count', default=DEFAULT_PS_COUNT, type=int)
 @check_dependencies
-def train(job_id, service_account_json, bucket_name, region, config_files,
-          dataset, scale_tier, master_type, worker_type, worker_count,
-          parameter_server_type, parameter_server_count):
-
-    project_id = get_project_id(service_account_json)
-    if project_id is None:
-        raise ValueError(
-            'Missing "project_id" in service_account_json "{}"'.format(
-                service_account_json))
+def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
+          master_type, worker_type, worker_count, parameter_server_type,
+          parameter_server_count):
+    account = ServiceAccount()
+    account.validate_region(region)
 
     if bucket_name is None:
-        client_id = get_client_id(service_account_json)
-        bucket_name = 'luminoth-{}'.format(client_id)
+        bucket_name = 'luminoth-{}'.formata(account.client_id)
         click.echo(
             'Bucket name not specified. Using "{}".'.format(bucket_name))
 
-    credentials = get_credentials(service_account_json)
-    validate_region(region, project_id, credentials)
-
     # Creates bucket for logs and models if it doesn't exist
-    bucket = get_bucket(service_account_json, bucket_name)
+    bucket = account.get_bucket(bucket_name)
 
     if not job_id:
         job_id = 'train_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
@@ -229,7 +233,7 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     base_path = 'lumi_{}'.format(job_id)
 
     package_path = build_package(bucket, base_path)
-    job_dir = 'gs://{}/{}/'.format(bucket_name, base_path)
+    job_dir = 'gs://{}'.format(os.path.join(bucket_name, base_path))
 
     override_params = [
         'train.job_dir={}'.format(job_dir),
@@ -242,7 +246,6 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
         override_params.append('dataset.dir={}'.format(dataset))
 
     config = get_config(config_files, override_params=override_params)
-    # We should validate config before submitting job
 
     # Update final config file to job bucket
     config_path = os.path.join(base_path, DEFAULT_CONFIG_FILENAME)
@@ -250,18 +253,18 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 
     args = ['--config', os.path.join(job_dir, DEFAULT_CONFIG_FILENAME)]
 
-    cloudml = cloud_service(credentials, 'ml')
+    cloudml = account.cloud_service('ml')
 
     training_inputs = {
         'scaleTier': scale_tier,
         'packageUris': [
-            'gs://{}/{}'.format(bucket_name, package_path)
+            'gs://{}'.format(os.path.join(bucket_name, package_path))
         ],
         'pythonModule': 'luminoth.train',
         'args': args,
         'region': region,
         'jobDir': job_dir,
-        'runtimeVersion': RUNTIME_VERSION,
+        'runtimeVersion': RUNTIME_VERSION
     }
 
     if scale_tier == 'CUSTOM':
@@ -280,14 +283,15 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
     }
 
     jobrequest = cloudml.projects().jobs().create(
-        body=job_spec, parent='projects/{}'.format(project_id))
+        body=job_spec, parent='projects/{}'.format(account.project_id))
 
     try:
         click.echo('Submitting training job.')
         res = jobrequest.execute()
-        click.echo('Job {} submitted successfully.'.format(job_id))
+        click.echo('Job submitted successfully.'.format(job_id))
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
+        click.echo('\nJob id: {}'.format(job_id))
 
         save_run(config, environment='gcloud', extra_config=job_spec)
 
@@ -299,79 +303,93 @@ def train(job_id, service_account_json, bucket_name, region, config_files,
 
 
 @gc.command(help='Start a evaluation job')
-@click.option('--job-id', required=True, help='JobId for saving models and logs.')  # noqa
-@click.option('--service-account-json', required=True)
-@click.option('--bucket', 'bucket_name', help='Where to save models and logs.')  # noqa
+@click.option('--job-id', help='Job Id for naming the folder where the results of the evaluation will be stored.')  # noqa
+@click.option('--train-folder', 'train_folder', required=True, help='Complete path (bucket included) where the training results are stored (config.yml should live here).')  # noqa
+@click.option('--bucket', 'bucket_name', help='The bucket where the evaluation results were stored.')  # noqa
 @click.option('dataset_split', '--split', default='val', help='Dataset split to use.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
 @click.option('--machine-type', default=DEFAULT_MASTER_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
-@click.option('--rebuild', default=False, is_flag=True, help='Rebuild and upload package.')  # noqa
-@click.option('--postfix', default='eval', help='Postfix for the evaluation job name.')  # noqa
+@click.option('--rebuild', default=False, is_flag=True, help='Rebuild Luminoth package for evaluation. If not, will use the same package that was used for training.')  # noqa
 @check_dependencies
-def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
-             machine_type, rebuild, postfix):
-    project_id = get_project_id(service_account_json)
-    if project_id is None:
-        raise ValueError(
-            'Missing "project_id" in service_account_json "{}"'.format(
-                service_account_json))
+def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
+             machine_type, rebuild):
+    account = ServiceAccount()
+    account.validate_region(region)
+
+    if not train_folder.startswith('gs://'):
+        train_folder = 'gs://{}'.format(train_folder)
+
+    if not job_id:
+        job_id = 'eval_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
 
     if bucket_name is None:
-        client_id = get_client_id(service_account_json)
-        bucket_name = 'luminoth-{}'.format(client_id)
+        bucket_name = 'luminoth-{}'.format(account.client_id)
         click.echo(
             'Bucket name not specified. Using "{}".'.format(bucket_name))
 
-    credentials = get_credentials(service_account_json)
-    validate_region(region, project_id, credentials)
-    job_folder = 'lumi_{}'.format(job_id)
-
     if rebuild:
-        bucket = get_bucket(service_account_json, bucket_name)
-        build_package(bucket, job_folder)
+        job_folder = 'lumi_{}'.format(job_id)
 
-    job_dir = 'gs://{}/{}'.format(bucket_name, job_folder)
+        # Make new package in the bucket for eval results
+        bucket = account.get_bucket(bucket_name)
+        package_path = build_package(bucket, job_folder)
+        full_package_path = 'gs://{}'.format(
+            os.path.join(bucket_name, package_path)
+        )
+    else:
+        # Get old training package from the training folder.
+        # There should only be one file ending in `.tar.gz`.
+        train_packages_dir = os.path.join(train_folder, DEFAULT_PACKAGES_PATH)
 
-    config_path = '{}/{}'.format(job_dir, DEFAULT_CONFIG_FILENAME)
-    package_dir = '{}/{}'.format(job_dir, DEFAULT_PACKAGES_PATH)
+        try:
+            package_files = tf.gfile.ListDirectory(train_packages_dir)
+            package_filename = [
+                n for n in package_files if n.endswith('tar.gz')
+            ][0]
+            full_package_path = os.path.join(
+                train_packages_dir, package_filename)
+        except (IndexError, tf.errors.NotFoundError):
+            click.echo(
+                'Could not find a `.tar.gz` Python package of Luminoth in '
+                '{}.\n\nCheck that the --train-folder parameter is '
+                'correct.'.format(train_packages_dir)
+            )
+            sys.exit(1)
 
-    package_files = tf.gfile.ListDirectory(package_dir)
-    package_filename = [n for n in package_files if n.endswith('tar.gz')][0]
-    package_path = '{}/{}'.format(package_dir, package_filename)
-
-    cloudml = cloud_service(credentials, 'ml')
+    train_config_path = os.path.join(train_folder, DEFAULT_CONFIG_FILENAME)
+    cloudml = account.cloud_service('ml')
 
     args = [
-        ['--config', config_path],
+        ['--config', train_config_path],
         ['--split', dataset_split],
     ]
 
     training_inputs = {
         'scaleTier': 'CUSTOM',
         'masterType': machine_type,
-        'packageUris': [package_path],
+        'packageUris': [full_package_path],
         'pythonModule': 'luminoth.eval',
         'args': args,
         'region': region,
-        'jobDir': job_dir,
+        # Don't need to pass jobDir since it will read it from config file.
         'runtimeVersion': RUNTIME_VERSION,
     }
 
-    evaluate_job_id = '{}_{}'.format(job_id, postfix)
     job_spec = {
-        'jobId': evaluate_job_id,
+        'jobId': job_id,
         'trainingInput': training_inputs
     }
 
     jobrequest = cloudml.projects().jobs().create(
-        body=job_spec, parent='projects/{}'.format(project_id))
+        body=job_spec, parent='projects/{}'.format(account.project_id))
 
     try:
         click.echo('Submitting evaluation job.')
         res = jobrequest.execute()
-        click.echo('Job {} submitted successfully.'.format(evaluate_job_id))
+        click.echo('Job submitted successfully.'.format(job_id))
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
+        click.echo('\nJob id: {}'.format(job_id))
 
     except Exception as err:
         click.echo(
@@ -381,20 +399,13 @@ def evaluate(job_id, service_account_json, bucket_name, dataset_split, region,
 
 
 @gc.command(help='List project jobs')
-@click.option('--service-account-json', required=True)
 @click.option('--running', is_flag=True, help='List only jobs that are running.')  # noqa
 @check_dependencies
-def jobs(service_account_json, running):
-    project_id = get_project_id(service_account_json)
-    if project_id is None:
-        raise ValueError(
-            'Missing "project_id" in service_account_json "{}"'.format(
-                service_account_json))
-
-    credentials = get_credentials(service_account_json)
-    cloudml = cloud_service(credentials, 'ml')
+def jobs(running):
+    account = ServiceAccount()
+    cloudml = account.cloud_service('ml')
     request = cloudml.projects().jobs().list(
-        parent='projects/{}'.format(project_id))
+        parent='projects/{}'.format(account.project_id))
 
     try:
         response = request.execute()
@@ -421,19 +432,12 @@ def jobs(service_account_json, running):
 
 
 @gc.command(help='Show logs from a running job')
-@click.argument('job_id')
-@click.option('--service-account-json', required=True)
+@click.option('--job-id', required=True)
 @click.option('--polling-interval', default=60, help='Polling interval in seconds.')  # noqa
 @check_dependencies
-def logs(job_id, service_account_json, polling_interval):
-    project_id = get_project_id(service_account_json)
-    if project_id is None:
-        raise ValueError(
-            'Missing "project_id" in service_account_json "{}"'.format(
-                service_account_json))
-
-    credentials = get_credentials(service_account_json)
-    cloudlog = cloud_service(credentials, 'logging', 'v2')
+def logs(job_id, polling_interval):
+    account = ServiceAccount()
+    cloudlog = account.cloud_service('logging', 'v2')
 
     job_filter = 'resource.labels.job_id = "{}"'.format(job_id)
     last_timestamp = None
@@ -447,7 +451,7 @@ def logs(job_id, service_account_json, polling_interval):
         next_page = None
         while True:
             request = cloudlog.entries().list(body={
-                'resourceNames': 'projects/{}'.format(project_id),
+                'resourceNames': 'projects/{}'.format(account.project_id),
                 'filter': ' AND '.join(filters),
                 'pageToken': next_page,
             })
