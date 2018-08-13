@@ -159,7 +159,8 @@ class ServiceAccount(object):
             if err.resp.status == 404:
                 click.echo(
                     'Error: Couldn\'t find region "{}" for '
-                    'project "{}".'.format(region, self.project_id))
+                    'project "{}".'.format(region, self.project_id),
+                    err=True)
             elif err.resp.status == 403:
                 click.echo('Error: Forbidden access to resources.')
                 click.echo('Raw response:\n{}\n'.format(err.content))
@@ -172,10 +173,11 @@ class ServiceAccount(object):
                     '  gcloud services enable compute.googleapis.com '
                     'ml.googleapis.com storage-component.googleapis.com\n\n'
                     'For information on how to enable these APIs, see here: '
-                    'https://support.google.com/cloud/answer/6158841'
+                    'https://support.google.com/cloud/answer/6158841',
+                    err=True
                 )
             else:
-                click.echo('Unknown error: {}'.format(err.resp))
+                click.echo('Unknown error: {}'.format(err.resp), err=True)
             sys.exit(1)
 
 
@@ -326,7 +328,8 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
     if bucket_name is None:
         bucket_name = 'luminoth-{}'.format(account.client_id)
         click.echo(
-            'Bucket name not specified. Using "{}".'.format(bucket_name))
+            'Bucket name not specified. Using "{}".'.format(bucket_name),
+            err=True)
 
     if rebuild:
         job_folder = 'lumi_{}'.format(job_id)
@@ -338,8 +341,9 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
     else:
         # Get old training package from the training folder.
         # There should only be one file ending in `.tar.gz`.
-        train_packages_dir = '{}/{}'.format(train_folder,
-            DEFAULT_PACKAGES_PATH)
+        train_packages_dir = '{}/{}'.format(
+            train_folder, DEFAULT_PACKAGES_PATH
+        )
 
         try:
             package_files = tf.gfile.ListDirectory(train_packages_dir)
@@ -352,7 +356,8 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
             click.echo(
                 'Could not find a `.tar.gz` Python package of Luminoth in '
                 '{}.\n\nCheck that the --train-folder parameter is '
-                'correct.'.format(train_packages_dir)
+                'correct.'.format(train_packages_dir),
+                err=True
             )
             sys.exit(1)
 
@@ -394,7 +399,8 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
     except Exception as err:
         click.echo(
             'There was an error creating the evaluation job. '
-            'Check the details: \n{}'.format(err._get_reason())
+            'Check the details: \n{}'.format(err._get_reason()),
+            err=True
         )
 
 
@@ -418,7 +424,7 @@ def jobs(running):
         if running:
             jobs = [j for j in jobs if j['state'] == 'RUNNING']
             if not jobs:
-                click.echo('There are no jobs running.')
+                click.echo('There are no running jobs.')
                 return
 
         for job in jobs:
@@ -427,7 +433,8 @@ def jobs(running):
     except Exception as err:
         click.echo(
             'There was an error fetching jobs. '
-            'Check the details: \n{}'.format(err._get_reason())
+            'Check the details: \n{}'.format(err._get_reason()),
+            err=True
         )
 
 
@@ -465,7 +472,8 @@ def logs(job_id, polling_interval):
             except Exception as err:
                 click.echo(
                     'There was an error fetching the logs. '
-                    'Check the details: \n{}'.format(err._get_reason())
+                    'Check the details: \n{}'.format(err._get_reason()),
+                    err=True
                 )
                 break
 
