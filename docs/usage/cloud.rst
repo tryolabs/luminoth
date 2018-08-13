@@ -39,7 +39,7 @@ Pre-requisites
 
      gcloud services enable compute.googleapis.com ml.googleapis.com storage-component.googleapis.com
 
-   Don't worry, it can take a few minutes!
+   Be patient, it can take a few minutes!
 
 #. Upload your dataset's TFRecord files to a Cloud Storage bucket::
 
@@ -67,8 +67,8 @@ Optional arguments:
     ``gs://<bucket_name>/<path>``. If not present, will default from the
     value specified in the YAML config file (``dataset.dir``).
   - ``--bucket``: Bucket name for storing data for the job, such as the logs.
-  - ``--job-id``: Identifies the training job. Defaults to ``train_<timestamp>``.
     Defaults to ``luminoth-<client_id>``.
+  - ``--job-id``: Identifies the training job. Defaults to ``train_<timestamp>``.
   - ``--region``: `Google Cloud region
     <https://cloud.google.com/compute/docs/regions-zones/>`_ in which to set up
     the cluster.
