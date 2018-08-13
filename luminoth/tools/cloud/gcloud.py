@@ -291,7 +291,7 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
     try:
         click.echo('Submitting training job.')
         res = jobrequest.execute()
-        click.echo('Job submitted successfully.'.format(job_id))
+        click.echo('Job submitted successfully.')
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
         click.echo('\nJob id: {}'.format(job_id))
@@ -391,7 +391,7 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
     try:
         click.echo('Submitting evaluation job.')
         res = jobrequest.execute()
-        click.echo('Job submitted successfully.'.format(job_id))
+        click.echo('Job submitted successfully.')
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
         click.echo('\nJob id: {}'.format(job_id))
