@@ -98,9 +98,7 @@ def build_package(bucket, base_path):
     )
 
     tarball_filename = os.listdir(output_dir)[0]
-    tarball_path = os.path.join(
-        output_dir, tarball_filename
-    )
+    tarball_path = os.path.join(output_dir, tarball_filename)
 
     path = upload_file(
         bucket, '{}/{}'.format(base_path, DEFAULT_PACKAGES_PATH), tarball_path
@@ -233,7 +231,7 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
     base_path = 'lumi_{}'.format(job_id)
 
     package_path = build_package(bucket, base_path)
-    job_dir = 'gs://{}'.format(os.path.join(bucket_name, base_path))
+    job_dir = 'gs://{}/{}'.format(bucket_name, base_path)
 
     override_params = [
         'train.job_dir={}'.format(job_dir),
@@ -248,17 +246,17 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
     config = get_config(config_files, override_params=override_params)
 
     # Update final config file to job bucket
-    config_path = os.path.join(base_path, DEFAULT_CONFIG_FILENAME)
+    config_path = '{}/{}'.format(base_path, DEFAULT_CONFIG_FILENAME)
     upload_data(bucket, config_path, dump_config(config))
 
-    args = ['--config', os.path.join(job_dir, DEFAULT_CONFIG_FILENAME)]
+    args = ['--config', '{}/{}'.format(job_dir, DEFAULT_CONFIG_FILENAME)]
 
     cloudml = account.cloud_service('ml')
 
     training_inputs = {
         'scaleTier': scale_tier,
         'packageUris': [
-            'gs://{}'.format(os.path.join(bucket_name, package_path))
+            'gs://{}/{}'.format(bucket_name, package_path)
         ],
         'pythonModule': 'luminoth.train',
         'args': args,
@@ -333,20 +331,19 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
         # Make new package in the bucket for eval results
         bucket = account.get_bucket(bucket_name)
         package_path = build_package(bucket, job_folder)
-        full_package_path = 'gs://{}'.format(
-            os.path.join(bucket_name, package_path)
-        )
+        full_package_path = 'gs://{}/{}'.format(bucket_name, package_path)
     else:
         # Get old training package from the training folder.
         # There should only be one file ending in `.tar.gz`.
-        train_packages_dir = os.path.join(train_folder, DEFAULT_PACKAGES_PATH)
+        train_packages_dir = '{}/{}'.format(train_folder,
+            DEFAULT_PACKAGES_PATH)
 
         try:
             package_files = tf.gfile.ListDirectory(train_packages_dir)
             package_filename = [
                 n for n in package_files if n.endswith('tar.gz')
             ][0]
-            full_package_path = os.path.join(
+            full_package_path = '{}/{}'.format(
                 train_packages_dir, package_filename)
         except (IndexError, tf.errors.NotFoundError):
             click.echo(
@@ -356,7 +353,7 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
             )
             sys.exit(1)
 
-    train_config_path = os.path.join(train_folder, DEFAULT_CONFIG_FILENAME)
+    train_config_path = '{}/{}'.format(train_folder, DEFAULT_CONFIG_FILENAME)
     cloudml = account.cloud_service('ml')
 
     args = [
