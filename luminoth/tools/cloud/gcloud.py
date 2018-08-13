@@ -118,7 +118,7 @@ class ServiceAccount(object):
         try:
             data = json.load(
                 tf.gfile.GFile(
-                    os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'), 'r'
+                    os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''), 'r'
                 )
             )
 
@@ -128,11 +128,14 @@ class ServiceAccount(object):
             self.credentials = service_account.ServiceAccountCredentials.\
                 from_json_keyfile_dict(data)
         except (ValueError, tf.errors.NotFoundError):
-            raise ValueError(
+            click.echo(
+                'Error: could not read service account credentials.\n\n'
                 'Make sure the GOOGLE_APPLICATION_CREDENTIALS environment '
                 'variable is set and points to a valid service account JSON '
-                'file.'
+                'file.',
+                err=True
             )
+            sys.exit(1)
 
     def cloud_service(self, service, version='v1'):
         return discovery.build(service, version, credentials=self.credentials)
