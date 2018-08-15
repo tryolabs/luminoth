@@ -29,3 +29,4 @@ Depending on your use case, you should install either `tensorflow` or
 # Import functions that are part of Luminoth's public interface.
 from luminoth.cli import cli  # noqa
 from luminoth.tasks import Detector  # noqa
+from luminoth.vis import vis_objects  # noqa
