@@ -449,7 +449,7 @@ def jobs(running):
 
 @gc.command(help='Show logs from a running job')
 @click.option('--job-id', required=True)
-@click.option('--polling-interval', default=60, help='Polling interval in seconds.')  # noqa
+@click.option('--polling-interval', default=30, help='Polling interval in seconds.')  # noqa
 @check_dependencies
 def logs(job_id, polling_interval):
     account = ServiceAccount()
