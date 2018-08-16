@@ -64,10 +64,10 @@ def build_colormap():
     return colormap
 
 
-def draw_rectangle(draw, coordinates, color, width=1):
+def draw_rectangle(draw, coordinates, color, width=1, fill=30):
     """Draw a rectangle with an optional width."""
     # Add alphas to the color so we have a small overlay over the object.
-    fill = color + (30,)
+    fill = color + (fill,)
     outline = color + (255,)
 
     # Pillow doesn't support width in rectangles, so we must emulate it with a
@@ -88,13 +88,13 @@ def draw_rectangle(draw, coordinates, color, width=1):
             draw.rectangle(coords, outline=outline)
 
 
-def draw_label(draw, coords, color, label, prob):
+def draw_label(draw, coords, label, prob, color, scale=1):
     """Draw a box with the label and probability."""
     # Attempt to get a native TTF font. If not, use the default bitmap font.
     global SYSTEM_FONT
     if SYSTEM_FONT:
-        label_font = SYSTEM_FONT.font_variant(size=16)
-        prob_font = SYSTEM_FONT.font_variant(size=12)
+        label_font = SYSTEM_FONT.font_variant(size=round(16 * scale))
+        prob_font = SYSTEM_FONT.font_variant(size=round(12 * scale))
     else:
         label_font = ImageFont.load_default()
         prob_font = ImageFont.load_default()
@@ -135,7 +135,7 @@ def draw_label(draw, coords, color, label, prob):
     ], prob, font=prob_font)
 
 
-def vis_objects(image, objects, colormap=None, labels=True):
+def vis_objects(image, objects, colormap=None, labels=True, scale=1, fill=30):
     """Visualize objects as returned by `Detector`.
 
     Arguments:
@@ -144,6 +144,10 @@ def vis_objects(image, objects, colormap=None, labels=True):
             `Detector` instance.
         colormap (function): Colormap function to use for the objects.
         labels (boolean): Whether to draw labels.
+        scale (float): Scale factor for the box sizes, which will enlarge or
+            shrink the width of the boxes and the fonts.
+        fill (int): Integer between 0..255 to use as fill for the bounding
+            boxes.
 
     Returns:
         A PIL image with the detected objects' bounding boxes and labels drawn.
@@ -162,8 +166,13 @@ def vis_objects(image, objects, colormap=None, labels=True):
     for obj in objects:
         # TODO: Can we do image resolution-agnostic?
         color = colormap(obj['label'])
-        draw_rectangle(draw, obj['bbox'], color, width=3)
+        draw_rectangle(
+            draw, obj['bbox'], color, width=round(3 * scale), fill=fill
+        )
         if labels:
-            draw_label(draw, obj['bbox'][:2], color, obj['label'], obj['prob'])
+            draw_label(
+                draw, obj['bbox'][:2], obj['label'], obj['prob'], color,
+                scale=scale
+            )
 
     return image
