@@ -300,7 +300,8 @@ def train(job_id, resume_job_id, bucket_name, region, config_files, dataset,
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
         if resume_job_id:
-            click.echo('\nNote: this job is resuming job {}.\n'.format(job_id))
+            click.echo(
+                '\nNote: this job is resuming job {}.\n'.format(resume_job_id))
         click.echo('Job id: {}'.format(job_id))
         click.echo('Job directory: {}'.format(job_dir))
 
