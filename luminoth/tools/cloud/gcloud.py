@@ -203,8 +203,9 @@ def gc():
 
 
 @gc.command(help='Start a training job')
-@click.option('--job-id', help='Job Id for naming the folder where checkpoints and logs will be stored.')  # noqa
-@click.option('--bucket', 'bucket_name', help='Bucket where to create the folder to save checkpoints and logs.')  # noqa
+@click.option('--job-id', help='Job Id to use. Will use it to name the folder where checkpoints and logs will be stored, except when resuming a previous training job.')  # noqa
+@click.option('--resume', 'resume_job_id', help='Id of the previous job to resume (start from last stored checkpoint). In case you are resuming multiple times, must always point to the first job (ie. the one that first created the checkpoint).')  # noqa
+@click.option('--bucket', 'bucket_name', help='Bucket where to create the folder to save checkpoints and logs. If resuming a job, it must match the bucket used for the original job.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
 @click.option('--dataset', help='Complete path (bucket included) to the folder where the dataset is located (TFRecord files).')  # noqa
 @click.option('config_files', '--config', '-c', required=True, multiple=True, help='Path to config to use in training.')  # noqa
@@ -215,9 +216,9 @@ def gc():
 @click.option('--parameter-server-type', default=DEFAULT_PS_TYPE, type=click.Choice(MACHINE_TYPES))  # noqa
 @click.option('--parameter-server-count', default=DEFAULT_PS_COUNT, type=int)
 @check_dependencies
-def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
-          master_type, worker_type, worker_count, parameter_server_type,
-          parameter_server_count):
+def train(job_id, resume_job_id, bucket_name, region, config_files, dataset,
+          scale_tier, master_type, worker_type, worker_count,
+          parameter_server_type, parameter_server_count):
     account = ServiceAccount()
     account.validate_region(region)
 
@@ -232,8 +233,10 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
     if not job_id:
         job_id = 'train_{}'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
 
-    # Define path in bucket to store job's config, logs, etc.
-    base_path = 'lumi_{}'.format(job_id)
+    # Path in bucket to store job's config, logs, etc.
+    # If we are resuming a previous job, then we will use the same path
+    # that job used, so Luminoth will load the checkpoint from there.
+    base_path = 'lumi_{}'.format(resume_job_id if resume_job_id else job_id)
 
     package_path = build_package(bucket, base_path)
     job_dir = 'gs://{}/{}'.format(bucket_name, base_path)
@@ -248,6 +251,8 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
             dataset = 'gs://{}'.format(dataset)
         override_params.append('dataset.dir={}'.format(dataset))
 
+    # Even if we are resuming job, we will use a new config. Thus, we will
+    # overwrite the config in the old job's dir if it existed.
     config = get_config(config_files, override_params=override_params)
 
     # Update final config file to job bucket
@@ -294,7 +299,10 @@ def train(job_id, bucket_name, region, config_files, dataset, scale_tier,
         click.echo('Job submitted successfully.')
         click.echo('state = {}, createTime = {}'.format(
             res.get('state'), res.get('createTime')))
-        click.echo('\nJob id: {}'.format(job_id))
+        if resume_job_id:
+            click.echo('\nNote: this job is resuming job {}.\n'.format(job_id))
+        click.echo('Job id: {}'.format(job_id))
+        click.echo('Job directory: {}'.format(job_dir))
 
         save_run(config, environment='gcloud', extra_config=job_spec)
 
@@ -392,9 +400,10 @@ def evaluate(job_id, train_folder, bucket_name, dataset_split, region,
         click.echo('Submitting evaluation job.')
         res = jobrequest.execute()
         click.echo('Job submitted successfully.')
-        click.echo('state = {}, createTime = {}'.format(
+        click.echo('state = {}, createTime = {}\n'.format(
             res.get('state'), res.get('createTime')))
-        click.echo('\nJob id: {}'.format(job_id))
+        click.echo('Job id: {}'.format(job_id))
+        click.echo('Job directory: {}'.format('gs://{}'.format(bucket_name)))
 
     except Exception as err:
         click.echo(
