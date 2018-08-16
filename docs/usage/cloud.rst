@@ -66,9 +66,10 @@ Optional arguments:
   - ``--dataset``: full path to bucket with the dataset's TFRecord files, ie.
     ``gs://<bucket_name>/<path>``. If not present, will default from the
     value specified in the YAML config file (``dataset.dir``).
+  - ``--resume``: Id of the previous job to resume (start from last stored checkpoint). In case you are resuming multiple times, must always point to the first job (ie. the one that first created the checkpoint).
   - ``--bucket``: Bucket name for storing data for the job, such as the logs.
     Defaults to ``luminoth-<client_id>``.
-  - ``--job-id``: Identifies the training job. Defaults to ``train_<timestamp>``.
+  - ``--job-id``: Identifies the training job in Google Cloud. Defaults to ``train_<timestamp>``.
   - ``--region``: `Google Cloud region
     <https://cloud.google.com/compute/docs/regions-zones/>`_ in which to set up
     the cluster.
@@ -85,6 +86,30 @@ Example::
         --bucket luminoth-train-jobs \
         --dataset gs://luminoth-train-datasets/coco/tfrecords \
         -c config.yml
+
+Resuming a previous training job
+````````````````````````````````
+Sometimes, you may wish to restart a previous training job without losing all
+the progress made so far (ie. resume from checkpoint). For example, it might be
+the case that you have updated your TFRecords dataset and want your model
+fine-tuned with the new data.
+
+The way to achieve this in Google Cloud is by launching a **new training job**,
+but telling Luminoth to resume a previous job id::
+
+    lumi cloud gc train \
+        --resume <previous-job-id> \
+        --bucket luminoth-train-jobs \
+        --dataset gs://luminoth-train-datasets/coco/tfrecords \
+        -c config.yml
+
+Keep in mind that for this to work:
+  - ``bucket`` must match the same bucket name that was used for the
+    job you are resuming.
+  - In case you are resuming a job multiple times, ``previous-job-id`` must
+    be the id of the job that first created the checkpoint. This is so
+    Luminoth keeps writing the new files to the same folder.
+
 
 Listing jobs
 ````````````

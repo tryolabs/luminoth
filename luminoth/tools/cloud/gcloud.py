@@ -203,7 +203,7 @@ def gc():
 
 
 @gc.command(help='Start a training job')
-@click.option('--job-id', help='Job Id to use. Will use it to name the folder where checkpoints and logs will be stored, except when resuming a previous training job.')  # noqa
+@click.option('--job-id', help='Identifies the training job in Google Cloud. Will use it to name the folder where checkpoints and logs will be stored, except when resuming a previous training job.')  # noqa
 @click.option('--resume', 'resume_job_id', help='Id of the previous job to resume (start from last stored checkpoint). In case you are resuming multiple times, must always point to the first job (ie. the one that first created the checkpoint).')  # noqa
 @click.option('--bucket', 'bucket_name', help='Bucket where to create the folder to save checkpoints and logs. If resuming a job, it must match the bucket used for the original job.')  # noqa
 @click.option('--region', default='us-central1', help='Region in which to run the job.')  # noqa
