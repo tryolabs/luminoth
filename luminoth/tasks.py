@@ -33,7 +33,8 @@ class Detector(object):
         """Instantiate a detector object with the appropriate config.
 
         Arguments:
-            checkpoint (str): Checkpoint name to instantiate the detector as.
+            checkpoint (str): Checkpoint id or alias to instantiate the
+                detector as.
             config (dict): Configuration parameters describing the desired
                 model. See `get_config` to load a config file.
 
@@ -142,8 +143,9 @@ class Detector(object):
         else:
             classes = set(classes)
 
-        # TODO: Remove the loop. Neither Faster R-CNN nor SSD support batch
-        # size yet, so it's the same for now.
+        # TODO: Remove the loop once (and if) we implement batch sizes. Neither
+        # Faster R-CNN nor SSD support batch size yet, so it's the same for
+        # now.
         predictions = []
         for image in images:
             predictions.append([
