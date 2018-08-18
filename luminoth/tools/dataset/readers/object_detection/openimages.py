@@ -17,10 +17,10 @@ from luminoth.utils.dataset import read_image
 
 # Compatible with OpenImages V4
 # Files available at: https://storage.googleapis.com/openimages/web/index.html
-CLASSES_TRAINABLE = 'train-annotations-human-imagelabels-boxable.csv'
+CLASSES_TRAINABLE = '{split}-annotations-human-imagelabels-boxable.csv'
+ANNOTATIONS_FILENAME = '{split}-annotations-bbox.csv'
 CLASSES_DESC = 'class-descriptions-boxable.csv'
-ANNOTATIONS_FILENAME = 'train-annotations-bbox.csv'
-IMAGES_LOCATION = 'gs://open-images-dataset'
+IMAGES_LOCATION = 's3://open-images-dataset'
 
 
 class OpenImagesReader(ObjectDetectionReader):
@@ -56,9 +56,37 @@ class OpenImagesReader(ObjectDetectionReader):
         # Flag to notify threads if the execution is halted.
         self._alive = True
 
+    def _get_classes_path(self):
+        """
+        Return the full path to the CLASSES_TRAINABLE for the current split
+        in the data directory.
+
+        We expect this file to be located in a directory corresponding to the
+        split, ie. "train", "validation", "test".
+        """
+        return os.path.join(
+            self._data_dir, self._split, CLASSES_TRAINABLE
+        ).format(split=self._split)
+
+    def _get_annotations_path(self):
+        """
+        Return the full path to the ANNOTATIONS_FILENAME for the current split
+        in the data directory.
+
+        We expect this file to be located in a directory corresponding to the
+        split, ie. "train", "validation", "test".
+        """
+        return os.path.join(
+            self._data_dir, self._split, ANNOTATIONS_FILENAME
+        ).format(split=self._split)
+
+    def _get_image_path(self, image_id):
+        return os.path.join(
+            IMAGES_LOCATION, self._split, '{}.jpg'.format(image_id)
+        ).format(split=self._split)
+
     def get_classes(self):
-        trainable_labels_file = os.path.join(
-            self._data_dir, CLASSES_TRAINABLE)
+        trainable_labels_file = self._get_classes_path()
         trainable_labels = set()
         try:
             with tf.gfile.Open(trainable_labels_file) as tl:
@@ -69,12 +97,15 @@ class OpenImagesReader(ObjectDetectionReader):
                     trainable_labels.add(line[2])
         except tf.errors.NotFoundError:
             raise InvalidDataDirectory(
-                'Missing label file "{}" from data_dir'.format(
-                    CLASSES_TRAINABLE))
+                'The label file "{}" must be in the root data '
+                'directory: {}'.format(
+                    os.path.split(trainable_labels_file)[1], self._data_dir
+                )
+            )
+
         self.trainable_labels = self._filter_classes(trainable_labels)
 
-        labels_descriptions_file = os.path.join(
-            self._data_dir, CLASSES_DESC)
+        labels_descriptions_file = os.path.join(self._data_dir, CLASSES_DESC)
         desc_by_label = {}
         try:
             with tf.gfile.Open(labels_descriptions_file) as ld:
@@ -84,8 +115,9 @@ class OpenImagesReader(ObjectDetectionReader):
                         desc_by_label[line[0]] = line[1]
         except tf.errors.NotFoundError:
             raise InvalidDataDirectory(
-                'Missing label description file "{}" from data_dir'.format(
-                    CLASSES_DESC))
+                'Missing label description file "{}" from root data '
+                'directory: {}'.format(CLASSES_DESC, self._data_dir)
+            )
 
         return [
             desc for _, desc in
@@ -284,13 +316,3 @@ class OpenImagesReader(ObjectDetectionReader):
     def _stop_reading(self, signal, frame):
         self._alive = False
         sys.exit(1)
-
-    def _get_annotations_path(self):
-        return os.path.join(
-            self._data_dir, self._split, ANNOTATIONS_FILENAME
-        )
-
-    def _get_image_path(self, image_id):
-        return os.path.join(
-            IMAGES_LOCATION, self._split, '{}.jpg'.format(image_id)
-        )
