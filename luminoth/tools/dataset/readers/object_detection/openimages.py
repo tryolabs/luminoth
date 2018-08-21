@@ -165,6 +165,10 @@ class OpenImagesReader(ObjectDetectionReader):
                 if not self._is_valid(line['ImageID']):
                     continue
 
+                # Filter group annotations (we only want single instances)
+                if line['IsGroupOf'] == '1':
+                    continue
+
                 if line['ImageID'] != current_image_id:
                     # Yield if image changes and we have current image.
                     if current_image_id is not None:
@@ -174,7 +178,6 @@ class OpenImagesReader(ObjectDetectionReader):
                             tf.logging.debug(
                                 'Dropping record {} without gt_boxes.'.format(
                                     partial_record))
-                            pass
 
                     # Start new record.
                     current_image_id = line['ImageID']
