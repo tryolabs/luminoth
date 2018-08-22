@@ -79,7 +79,7 @@ class CSVReader(ObjectDetectionReader):
             if self._stop_iteration():
                 return
 
-            if not self._is_valid(image_id):
+            if self._should_skip(image_id=image_id):
                 continue
 
             image_path = self._get_image_path(image_id)
@@ -104,6 +104,15 @@ class CSVReader(ObjectDetectionReader):
             width = image_pil.width
             height = image_pil.height
 
+            try:
+                image = read_image(image_path)
+            except tf.errors.NotFoundError:
+                tf.logging.debug('Could not find image "{}" in "{}".'.format(
+                    image_id, image_path
+                ))
+                self.errors += 1
+                continue
+
             gt_boxes = []
             for b in image_data:
                 try:
@@ -113,6 +122,10 @@ class CSVReader(ObjectDetectionReader):
                         b['label']
                     ))
                     continue
+
+                if self._should_skip(label=label_id):
+                    continue
+                self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
                     'label': label_id,
@@ -195,7 +208,8 @@ class CSVReader(ObjectDetectionReader):
         return os.path.join(self._data_dir, self._split, possible_files[0])
 
     def _get_labels_filename(self):
-        """Get the label file.
+        """
+        Get the label file.
         """
         root_labels = os.path.join(
             self._data_dir, '{}.csv'.format(self._split)

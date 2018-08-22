@@ -83,7 +83,7 @@ class FlatReader(ObjectDetectionReader):
 
             image_id = annotation['image_id']
 
-            if not self._is_valid(image_id):
+            if self._should_skip(image_id=image_id):
                 continue
 
             try:
@@ -108,6 +108,10 @@ class FlatReader(ObjectDetectionReader):
                     )
                 except ValueError:
                     continue
+
+                if self._should_skip(label=label_id):
+                    continue
+                self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
                     'label': label_id,

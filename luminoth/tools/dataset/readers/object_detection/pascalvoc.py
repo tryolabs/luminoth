@@ -1,4 +1,5 @@
 import os
+
 import tensorflow as tf
 
 from luminoth.tools.dataset.readers import InvalidDataDirectory
@@ -76,8 +77,7 @@ class PascalVOCReader(ObjectDetectionReader):
                 # Finish iteration.
                 return
 
-            if not self._is_valid(image_id):
-                # Ignore image when using image_id is not valid.
+            if self._should_skip(image_id=image_id):
                 continue
 
             try:
@@ -101,6 +101,10 @@ class PascalVOCReader(ObjectDetectionReader):
                     label_id = self.classes.index(b['name'])
                 except ValueError:
                     continue
+
+                if self._should_skip(label=label_id):
+                    continue
+                self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
                     'label': label_id,

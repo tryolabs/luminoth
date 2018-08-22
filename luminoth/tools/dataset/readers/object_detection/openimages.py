@@ -162,7 +162,7 @@ class OpenImagesReader(ObjectDetectionReader):
                 if self._stop_iteration():
                     break
 
-                if not self._is_valid(line['ImageID']):
+                if self._should_skip(image_id=line['ImageID']):
                     continue
 
                 # Filter group annotations (we only want single instances)
@@ -194,6 +194,10 @@ class OpenImagesReader(ObjectDetectionReader):
                     label = self.trainable_labels.index(line['LabelName'])
                 except ValueError:
                     continue
+
+                if self._should_skip(label=label):
+                    continue
+                self._per_class_counter[label] += 1
 
                 partial_record['gt_boxes'].append({
                     'xmin': float(line['XMin']),
