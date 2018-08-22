@@ -1,4 +1,3 @@
-import os
 import click
 import tensorflow as tf
 
@@ -15,11 +14,11 @@ from .writers import ObjectDetectionWriter
 @click.option('splits', '--split', required=True, multiple=True, help='The splits to transform (ie. train, test, val).')  # noqa
 @click.option('--only-classes', help='Keep only examples of these classes. Comma separated list.')  # noqa
 @click.option('--only-images', help='Create dataset with specific examples. Useful to test model if your model has the ability to overfit.')  # noqa
-@click.option('--limit-examples', type=int, help='Limit dataset with to the first global `N` examples (not per class).')  # noqa
+@click.option('--max-per-class', type=int, help='Limit to a maximum of `N` examples per class.')  # noqa
 @click.option('overrides', '--override', '-o', multiple=True, help='Custom parameters for readers.')  # noqa
 @click.option('--debug', is_flag=True, help='Set level logging to DEBUG.')
 def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
-              only_images, limit_examples, overrides, debug):
+              only_images, max_per_class, overrides, debug):
     """
     Prepares dataset for ingestion.
 
@@ -46,7 +45,7 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
             split_reader = reader(
                 data_dir, split,
                 only_classes=only_classes, only_images=only_images,
-                limit_examples=limit_examples, **reader_kwargs
+                max_per_class=max_per_class, **reader_kwargs
             )
 
             if classes is None:

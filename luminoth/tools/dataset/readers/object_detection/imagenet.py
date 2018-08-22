@@ -50,7 +50,7 @@ class ImageNetReader(ObjectDetectionReader):
             if self._stop_iteration():
                 return
 
-            if not self._is_valid(image_id):
+            if self._should_skip(image_id=image_id):
                 continue
 
             try:
@@ -91,6 +91,10 @@ class ImageNetReader(ObjectDetectionReader):
                     old_height=int(annotation['size']['height']),
                     new_width=width, new_height=height
                 )
+
+                if self._should_skip(label=label_id):
+                    continue
+                self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
                     'label': label_id,

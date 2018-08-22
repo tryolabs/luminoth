@@ -1,6 +1,8 @@
 import abc
 import six
 
+from collections import Counter
+
 from luminoth.tools.dataset.readers import BaseReader
 
 
@@ -18,16 +20,19 @@ class ObjectDetectionReader(BaseReader):
         - get_total
         - get_classes
         - iterate
+
+    Additionally, must use the `_per_class_counter` variable to honor the max
+    number of examples per class in an efficient way.
     """
     def __init__(self, only_classes=None, only_images=None,
-                 limit_examples=None, **kwargs):
+                 max_per_class=None, **kwargs):
         """
         Args:
             - only_classes: string or list of strings used as a class
                 whitelist.
             - only_images: string or list of strings used as a image_id
                 whitelist.
-            - limit_examples: limit number of examples to use.
+            - max_per_class: max number of examples to use per class.
         """
         super(ObjectDetectionReader, self).__init__()
         if isinstance(only_classes, six.string_types):
@@ -40,9 +45,10 @@ class ObjectDetectionReader(BaseReader):
             only_images = only_images.split(',')
         self._only_images = only_images
 
-        self._limit_examples = limit_examples
         self._total = None
         self._classes = None
+        self._max_per_class = max_per_class
+        self._per_class_counter = Counter()
 
     @property
     def total(self):
@@ -77,15 +83,16 @@ class ObjectDetectionReader(BaseReader):
         Filters total number of records in dataset based on reader options
         used.
         """
-        # Define smaller number of records when limiting examples.
-        if self._only_images:  # not none and not empty
-            new_total = len(self._only_images)
-        elif self._limit_examples is not None and self._limit_examples > 0:
-            new_total = min(self._limit_examples, original_total_records)
-        else:
-            new_total = original_total_records
+        if self._only_images:  # not None and not empty
+            return len(self._only_images)
 
-        return new_total
+        if self._max_per_class is not None:
+            # We don't know the exact total, but we know the bound, so
+            # return that (only to make the progressbar of the writer more
+            # accurate).
+            return len(self.classes) * self._max_per_class
+
+        return original_total_records
 
     def _filter_classes(self, original_classes):
         """
@@ -98,17 +105,29 @@ class ObjectDetectionReader(BaseReader):
 
         return new_classes
 
-    def _is_valid(self, image_id):
+    def _should_skip(self, image_id=None, label=None):
         """
-        Checks if image_id is valid based on the reader options used.
+        Determine if we should skip the current image, based on the options
+        used for the reader.
 
         Args:
             - image_id: String with id of image.
+            - label: String or number with the corresponding label.
 
         Returns:
-            bool
+            bool: True if record should be skipped, False if not.
         """
-        return self._only_images is None or image_id in self._only_images
+        if self._only_images is not None and image_id is not None:
+            # Skip because the current image_id was not asked for.
+            if image_id not in self._only_images:
+                return True
+
+        if self._max_per_class is not None and label is not None:
+            # Skip because current class is maxed out
+            if self._per_class_counter[label] >= self._max_per_class:
+                return True
+
+        return False
 
     def _stop_iteration(self):
         return self.yielded_records == self.total

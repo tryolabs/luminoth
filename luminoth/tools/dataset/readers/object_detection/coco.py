@@ -54,6 +54,10 @@ class COCOReader(ObjectDetectionReader):
             except ValueError:
                 continue
 
+            if self._should_skip(label=annotation_class):
+                continue
+            self._per_class_counter[annotation_class] += 1
+
             self._image_to_bboxes.setdefault(image_id, []).append({
                 'xmin': x,
                 'ymin': y,
@@ -87,15 +91,15 @@ class COCOReader(ObjectDetectionReader):
             if self._stop_iteration():
                 return
 
-            if not self._is_valid(image_id):
-                continue
-
             filename = image_details['file_name']
             width = image_details['width']
             height = image_details['height']
 
             gt_boxes = self._image_to_bboxes.get(image_id, [])
             if len(gt_boxes) == 0:
+                continue
+
+            if self._should_skip(image_id=image_id):
                 continue
 
             # Read the image *after* checking whether any ground truth box is
