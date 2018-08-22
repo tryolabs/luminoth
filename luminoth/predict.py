@@ -176,7 +176,7 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
 @click.option('config_files', '--config', '-c', multiple=True, help='Config to use.')  # noqa
 @click.option('--checkpoint', help='Checkpoint to use.')
 @click.option('override_params', '--override', '-o', multiple=True, help='Override model config params.')  # noqa
-@click.option('output_path', '--output', '-f', default='-', help='Output file.')  # noqa
+@click.option('output_path', '--output', '-f', default='-', help='Output file with the predictions (for example, JSON bounding boxes).')  # noqa
 @click.option('--save-media-to', '-d', help='Directory to store media to.')
 @click.option('--min-prob', default=0.5, type=float, help='When drawing, only draw bounding boxes with probability larger than.')  # noqa
 @click.option('--max-detections', default=100, type=int, help='Maximum number of detections per image.')  # noqa
