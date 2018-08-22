@@ -7,10 +7,11 @@ import sys
 import time
 import tensorflow as tf
 
-from PIL import Image, ImageDraw
+from PIL import Image
 from luminoth.tools.checkpoint import get_checkpoint_config
 from luminoth.utils.config import get_config, override_config_params
 from luminoth.utils.predicting import PredictorNetwork
+from luminoth.vis import vis_objects
 
 IMAGE_FORMATS = ['jpg', 'jpeg', 'png']
 VIDEO_FORMATS = ['mov', 'mp4', 'avi']  # TODO: check if more formats work
@@ -65,50 +66,6 @@ def filter_classes(objects, only_classes=None, ignore_classes=None):
     return objects
 
 
-def draw_bboxes_on_image(image, objects):
-    # Open as 'RGBA' in order to draw translucent boxes.
-    draw = ImageDraw.Draw(image, 'RGBA')
-
-    for ind, obj in enumerate(objects):
-        # Choose colors for bbox, the 60 and 255 correspond to transparency.
-        color = get_color(str(obj['label']))
-        fill = tuple(color + [60])
-        outline = tuple(color + [255])
-
-        draw.rectangle(obj['bbox'], fill=fill, outline=outline)
-
-        # Draw the object's label.
-        prob = '{:.2f}'.format(obj['prob'])
-        label = '{} - {}'.format(obj['label'], prob) if obj['label'] else prob
-        draw.text(obj['bbox'][:2], label)
-
-
-def get_color(class_label):
-    """Rudimentary way to create color palette for plotting clases.
-
-    Accepts integer or strings as class_labels.
-    """
-    # We get these colors from the luminoth web client
-    web_colors_hex = [
-        'ff0029', '377eb8', '66a61e', '984ea3', '00d2d5', 'ff7f00', 'af8d00',
-        '7f80cd', 'b3e900', 'c42e60', 'a65628', 'f781bf', '8dd3c7', 'bebada',
-        'fb8072', '80b1d3', 'fdb462', 'fccde5', 'bc80bd', 'ffed6f', 'c4eaff',
-        'cf8c00', '1b9e77', 'd95f02', 'e7298a', 'e6ab02', 'a6761d', '0097ff',
-        '00d067', '000000', '252525', '525252', '737373', '969696', 'bdbdbd',
-        'f43600', '4ba93b', '5779bb', '927acc', '97ee3f', 'bf3947', '9f5b00',
-        'f48758', '8caed6', 'f2b94f', 'eff26e', 'e43872', 'd9b100', '9d7a00',
-        '698cff', 'd9d9d9', '00d27e', 'd06800', '009f82', 'c49200', 'cbe8ff',
-        'fecddf', 'c27eb6', '8cd2ce', 'c4b8d9', 'f883b0', 'a49100', 'f48800',
-        '27d0df', 'a04a9b'
-    ]
-    hex_color = web_colors_hex[hash(class_label) % len(web_colors_hex)]
-    return hex_to_rgb(hex_color)
-
-
-def hex_to_rgb(x):
-    return [int(x[i:i + 2], 16) for i in (0, 2, 4)]
-
-
 def predict_image(network, path, only_classes=None, ignore_classes=None,
                   save_path=None):
     click.echo('Predicting {}...'.format(path), nl=False)
@@ -134,8 +91,7 @@ def predict_image(network, path, only_classes=None, ignore_classes=None,
 
     # Save predicted image.
     if save_path:
-        draw_bboxes_on_image(image, objects)
-        image.save(save_path)
+        vis_objects(np.array(image), objects).save(save_path)
 
     click.echo(' done.')
     return objects
@@ -189,10 +145,10 @@ def predict_video(network, path, only_classes=None, ignore_classes=None,
                 })
 
                 # Draw the image and write it to the video file.
-                image = Image.fromarray(frame)
-                draw_bboxes_on_image(image, objects)
                 if save_path:
-                    writer.writeFrame(np.array(image))
+                    writer.writeFrame(
+                        np.array(vis_objects(frame, objects))
+                    )
 
             stop_time = time.time()
             click.echo(
