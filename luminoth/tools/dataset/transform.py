@@ -8,18 +8,6 @@ from .readers import get_reader, READERS
 from .writers import ObjectDetectionWriter
 
 
-def get_output_subfolder(only_classes, only_images, limit_examples):
-    """
-    Returns: subfolder name for records.
-    """
-    if only_classes is not None:
-        return 'classes-{}'.format(only_classes.replace('/', ''))
-    elif only_images is not None:
-        return 'only-{}'.format(only_images)
-    elif limit_examples is not None:
-        return 'limit-{}'.format(limit_examples)
-
-
 @click.command()
 @click.option('dataset_reader', '--type', type=click.Choice(READERS.keys()), required=True)  # noqa
 @click.option('--data-dir', required=True, help='Where to locate the original data.')  # noqa
@@ -37,18 +25,9 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
 
     Converts the dataset into different (one per split) TFRecords files.
     """
+    tf.logging.set_verbosity(tf.logging.INFO)
     if debug:
         tf.logging.set_verbosity(tf.logging.DEBUG)
-    else:
-        tf.logging.set_verbosity(tf.logging.INFO)
-
-    # We forcefully save modified datasets into subfolders to avoid
-    # overwriting and/or unnecessary clutter.
-    output_subfolder = get_output_subfolder(
-        only_classes, only_images, limit_examples
-    )
-    if output_subfolder:
-        output_dir = os.path.join(output_dir, output_subfolder)
 
     try:
         reader = get_reader(dataset_reader)

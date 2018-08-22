@@ -1,5 +1,4 @@
 import abc
-import random
 import six
 
 from luminoth.tools.dataset.readers import BaseReader
