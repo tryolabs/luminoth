@@ -57,10 +57,14 @@ class ObjectDetectionReader(BaseReader):
             self._classes = self.get_classes()
         return self._classes
 
+    @classes.setter
+    def classes(self, classes):
+        self._classes = classes
+
     @abc.abstractmethod
     def get_total(self):
         """
-        Returns the total amount of records in the dataset.
+        Returns the total number of records in the dataset.
         """
 
     @abc.abstractmethod
@@ -129,6 +133,3 @@ class ObjectDetectionReader(BaseReader):
                     xmax (int): x value for bottom-right point.
                     ymax (int): y value for bottom-right point.
         """
-
-    def set_classes(self, classes):
-        self._classes = classes

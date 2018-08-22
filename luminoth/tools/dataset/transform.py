@@ -75,7 +75,7 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
                 classes = split_reader.classes
             else:
                 # Overwrite classes after first split for consistency.
-                split_reader.set_classes(classes)
+                split_reader.classes = classes
 
             # We assume we are saving object detection objects, but it should
             # be easy to modify once we have different types of objects.
