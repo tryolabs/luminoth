@@ -70,10 +70,13 @@ classes present in it, cars, trucks, buses and motorcycles. You can do so with
 the ``--only-classes`` option, by passing a comma-separated list of classes to
 keep in the final dataset.
 
-During development, it is often useful to verify that the model can actually
-overfit a small dataset. You can use the ``--limit-examples`` and
-``--limit-classes`` options for this, allowing you to create a dataset limited
-to up to ``N`` examples and/or ``M`` random classes.
+Moreover, if you wish to use several classes but not the entire set of images
+available in a (possibly large) dataset, you may use the ``--max-per-class``
+option.
+
+During development, it is often useful to verify that the model can actually overfit a
+small dataset. You can create such a dataset by using a small number for
+``--max-per-class``, and using it together with the ``--only-classes`` option.
 
 Examples
 ^^^^^^^^
