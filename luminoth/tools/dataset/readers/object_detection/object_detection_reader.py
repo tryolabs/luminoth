@@ -6,21 +6,19 @@ from luminoth.tools.dataset.readers import BaseReader
 
 
 class ObjectDetectionReader(BaseReader):
-    """Reads data suitable for object detection.
+    """
+    Reads data suitable for object detection.
 
-    Object detections needs:
-        - images
-        - gt_boxes with labels
+    The object detection task needs the following information:
+        - images.
+        - ground truth, rectangular bounding boxes with associated labels.
 
-    For implementing a subclass of object detection one needs to implement the
-    following methods:
-        - __init__(data_dir, split, **kwargs)
-        - get_total(self)
-            Get total amount of records.
-        - get_classes(self)
-            Get all classes in records.
-        - iterate(self)
-            Iterate over all records.
+    For implementing a subclass of object detection, one needs to implement
+    the following methods:
+        - __init__
+        - get_total
+        - get_classes
+        - iterate
     """
     def __init__(self, only_classes=None, only_images=None,
                  limit_examples=None, **kwargs):
