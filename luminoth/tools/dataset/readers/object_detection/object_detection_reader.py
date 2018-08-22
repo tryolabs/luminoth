@@ -23,7 +23,7 @@ class ObjectDetectionReader(BaseReader):
             Iterate over all records.
     """
     def __init__(self, only_classes=None, only_images=None,
-                 limit_examples=None, limit_classes=None, seed=None, **kwargs):
+                 limit_examples=None, **kwargs):
         """
         Args:
             - only_classes: string or list of strings used as a class
@@ -31,8 +31,6 @@ class ObjectDetectionReader(BaseReader):
             - only_images: string or list of strings used as a image_id
                 whitelist.
             - limit_examples: limit number of examples to use.
-            - limit_classes: limit number of classes to use.
-            - seed: seed for random.
         """
         super(ObjectDetectionReader, self).__init__()
         if isinstance(only_classes, six.string_types):
@@ -46,9 +44,6 @@ class ObjectDetectionReader(BaseReader):
         self._only_images = only_images
 
         self._limit_examples = limit_examples
-        self._limit_classes = limit_classes
-        random.seed(seed)
-
         self._total = None
         self._classes = None
 
@@ -66,16 +61,19 @@ class ObjectDetectionReader(BaseReader):
 
     @abc.abstractmethod
     def get_total(self):
-        """Returns the total amount of records in the dataset.
+        """
+        Returns the total amount of records in the dataset.
         """
 
     @abc.abstractmethod
     def get_classes(self):
-        """Returns all the classes available in the dataset.
+        """
+        Returns all the classes available in the dataset.
         """
 
     def _filter_total(self, original_total_records):
-        """Filters total number of records in dataset based on reader options
+        """
+        Filters total number of records in dataset based on reader options
         used.
         """
         # Define smaller number of records when limiting examples.
@@ -89,16 +87,11 @@ class ObjectDetectionReader(BaseReader):
         return new_total
 
     def _filter_classes(self, original_classes):
-        """Filters classes based on reader options used.
+        """
+        Filters classes based on reader options used.
         """
         if self._only_classes:  # not None and not empty
             new_classes = sorted(self._only_classes)
-        # Choose random classes when limiting them
-        elif self._limit_classes is not None and self._limit_classes > 0:
-            total_classes = min(len(original_classes), self._limit_classes)
-            new_classes = sorted(
-                random.sample(original_classes, total_classes)
-            )
         else:
             new_classes = list(original_classes) if original_classes else None
 
@@ -121,7 +114,8 @@ class ObjectDetectionReader(BaseReader):
 
     @abc.abstractmethod
     def iterate(self):
-        """Iterate over object detection records read from the dataset source.
+        """
+        Iterate over object detection records read from the dataset source.
 
         Returns:
             iterator of records of type `dict` with the following keys:
