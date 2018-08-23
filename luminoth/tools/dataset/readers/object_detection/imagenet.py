@@ -50,7 +50,7 @@ class ImageNetReader(ObjectDetectionReader):
             if self._stop_iteration():
                 return
 
-            if self._should_skip(image_id=image_id):
+            if self._should_skip(image_id):
                 continue
 
             try:
@@ -92,8 +92,6 @@ class ImageNetReader(ObjectDetectionReader):
                     new_width=width, new_height=height
                 )
 
-                if self._should_skip(label=label_id):
-                    continue
                 self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
@@ -107,9 +105,7 @@ class ImageNetReader(ObjectDetectionReader):
             if len(gt_boxes) == 0:
                 continue
 
-            self.yielded_records += 1
-
-            yield {
+            record = {
                 'width': width,
                 'height': height,
                 'depth': 3,
@@ -117,6 +113,11 @@ class ImageNetReader(ObjectDetectionReader):
                 'image_raw': image,
                 'gt_boxes': gt_boxes,
             }
+
+            self._will_add_record(record)
+            self.yielded_records += 1
+
+            yield record
 
     def _validate_structure(self):
         if not tf.gfile.Exists(self._data_dir):

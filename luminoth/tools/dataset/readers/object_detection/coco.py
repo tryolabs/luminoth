@@ -54,8 +54,6 @@ class COCOReader(ObjectDetectionReader):
             except ValueError:
                 continue
 
-            if self._should_skip(label=annotation_class):
-                continue
             self._per_class_counter[annotation_class] += 1
 
             self._image_to_bboxes.setdefault(image_id, []).append({
@@ -99,7 +97,7 @@ class COCOReader(ObjectDetectionReader):
             if len(gt_boxes) == 0:
                 continue
 
-            if self._should_skip(image_id=image_id):
+            if self._should_skip(image_id):
                 continue
 
             # Read the image *after* checking whether any ground truth box is
@@ -114,9 +112,7 @@ class COCOReader(ObjectDetectionReader):
                 self.errors += 1
                 continue
 
-            self.yielded_records += 1
-
-            yield {
+            record = {
                 'width': width,
                 'height': height,
                 'depth': 3,
@@ -124,6 +120,10 @@ class COCOReader(ObjectDetectionReader):
                 'image_raw': image,
                 'gt_boxes': gt_boxes,
             }
+            self._will_add_record(record)
+            self.yielded_records += 1
+
+            yield record
 
     def _get_annotations_path(self):
         filename = 'instances_{}{}.json'.format(self._split, self._year)

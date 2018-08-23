@@ -77,7 +77,7 @@ class PascalVOCReader(ObjectDetectionReader):
                 # Finish iteration.
                 return
 
-            if self._should_skip(image_id=image_id):
+            if self._should_skip(image_id):
                 continue
 
             try:
@@ -102,8 +102,6 @@ class PascalVOCReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                if self._should_skip(label=label_id):
-                    continue
                 self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
@@ -117,9 +115,7 @@ class PascalVOCReader(ObjectDetectionReader):
             if len(gt_boxes) == 0:
                 continue
 
-            self.yielded_records += 1
-
-            yield {
+            record = {
                 'width': annotation['size']['width'],
                 'height': annotation['size']['height'],
                 'depth': annotation['size']['depth'],
@@ -127,3 +123,7 @@ class PascalVOCReader(ObjectDetectionReader):
                 'image_raw': image,
                 'gt_boxes': gt_boxes,
             }
+            self._will_add_record(record)
+            self.yielded_records += 1
+
+            yield record
