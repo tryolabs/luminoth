@@ -62,7 +62,7 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
             writer = ObjectDetectionWriter(split_reader, output_dir, split)
             writer.save()
 
-            tf.logging.info('Dataset composition per class:')
+            tf.logging.info('Composition per class ({}):'.format(split))
             for label, count in split_reader._per_class_counter.most_common():
                 tf.logging.info(
                     '\t%s: %d', split_reader.pretty_name(label), count
