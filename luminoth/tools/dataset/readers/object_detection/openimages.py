@@ -54,6 +54,7 @@ class OpenImagesReader(ObjectDetectionReader):
         self.yielded_records = 0
         self.errors = 0
 
+        self._total_queued = 0
         # Flag to notify threads if the execution is halted.
         self._alive = True
 
@@ -141,11 +142,14 @@ class OpenImagesReader(ObjectDetectionReader):
             self._image_ids = image_ids
         return self._image_ids
 
-    def _queue_partial_record(self, records_queue, partial_record):
-        if not partial_record['gt_boxes']:
+    def _queue_record(self, records_queue, record):
+        if (self._limit_examples is not None and
+            self._total_queued >= self._limit_examples):
+            return
+
+        if not record['gt_boxes']:
             tf.logging.debug(
-                'Dropping record {} without gt_boxes.'.format(
-                    partial_record))
+                'Dropping record {} without gt_boxes.'.format(record))
             return
 
         # If asking for a limited number per class, only yield if the current
@@ -155,23 +159,23 @@ class OpenImagesReader(ObjectDetectionReader):
         # while an image containing both "Person" and "Bus" instances will.
         if self._max_per_class:
             labels_in_image = set([
-                self.classes[bbox['label']]
-                for bbox in partial_record['gt_boxes']
+                self.classes[bbox['label']] for bbox in record['gt_boxes']
             ])
             not_maxed_out = labels_in_image - self._maxed_out_classes
 
             if not not_maxed_out:
                 tf.logging.debug(
                     'Dropping record {} with maxed-out labels: {}'.format(
-                        partial_record['filename'], labels_in_image))
+                        record['filename'], labels_in_image))
                 return
 
             tf.logging.debug(
                 'Queuing record {} with labels: {}'.format(
-                    partial_record['filename'], labels_in_image))
+                    record['filename'], labels_in_image))
 
-        self._will_add_record(partial_record)
-        records_queue.put(partial_record)
+        self._will_add_record(record)
+        self._total_queued += 1
+        records_queue.put(record)
 
     def _queue_records(self, records_queue):
         """
@@ -214,9 +218,7 @@ class OpenImagesReader(ObjectDetectionReader):
                 if line['ImageID'] != current_image_id:
                     # Yield if image changes and we have current image.
                     if current_image_id is not None:
-                        self._queue_partial_record(
-                            records_queue, partial_record
-                        )
+                        self._queue_record(records_queue, partial_record)
 
                     # Start new record.
                     current_image_id = line['ImageID']
@@ -235,7 +237,7 @@ class OpenImagesReader(ObjectDetectionReader):
                 })
 
             else:
-                self._queue_partial_record(records_queue, partial_record)
+                self._queue_record(records_queue, partial_record)
 
         # Wait for all task to be consumed.
         records_queue.join()
