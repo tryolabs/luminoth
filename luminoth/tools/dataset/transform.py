@@ -14,11 +14,12 @@ from .writers import ObjectDetectionWriter
 @click.option('splits', '--split', required=True, multiple=True, help='The splits to transform (ie. train, test, val).')  # noqa
 @click.option('--only-classes', help='Keep only examples of these classes. Comma separated list.')  # noqa
 @click.option('--only-images', help='Create dataset with specific examples. Useful to test model if your model has the ability to overfit.')  # noqa
-@click.option('--max-per-class', type=int, help='Finish when every class has at least `N` number of samples. This is an approximate lower bound (a few more examples might be added).')  # noqa
+@click.option('--limit-examples', type=int, help='Limit the dataset to the first `N` examples.')  # noqa
+@click.option('--max-per-class', type=int, help='Finish when every class has at least `N` number of samples. This will be the attempted lower bound; more examples might be added or a class might finish with less samples depending on the dataset.')  # noqa
 @click.option('overrides', '--override', '-o', multiple=True, help='Custom parameters for readers.')  # noqa
 @click.option('--debug', is_flag=True, help='Set level logging to DEBUG.')
 def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
-              only_images, max_per_class, overrides, debug):
+              only_images, limit_examples, max_per_class, overrides, debug):
     """
     Prepares dataset for ingestion.
 
@@ -45,7 +46,8 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
             split_reader = reader(
                 data_dir, split,
                 only_classes=only_classes, only_images=only_images,
-                max_per_class=max_per_class, **reader_kwargs
+                limit_examples=limit_examples, max_per_class=max_per_class,
+                **reader_kwargs
             )
 
             if classes is None:
