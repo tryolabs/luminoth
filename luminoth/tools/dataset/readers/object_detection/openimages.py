@@ -237,7 +237,9 @@ class OpenImagesReader(ObjectDetectionReader):
                 })
 
             else:
-                self._queue_record(records_queue, partial_record)
+                # No data we care about in dataset -- nothing to queue
+                if partial_record:
+                    self._queue_record(records_queue, partial_record)
 
         # Wait for all task to be consumed.
         records_queue.join()
