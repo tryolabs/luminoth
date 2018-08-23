@@ -14,7 +14,7 @@ from .writers import ObjectDetectionWriter
 @click.option('splits', '--split', required=True, multiple=True, help='The splits to transform (ie. train, test, val).')  # noqa
 @click.option('--only-classes', help='Keep only examples of these classes. Comma separated list.')  # noqa
 @click.option('--only-images', help='Create dataset with specific examples. Useful to test model if your model has the ability to overfit.')  # noqa
-@click.option('--max-per-class', type=int, help='Limit to a maximum of `N` examples per class.')  # noqa
+@click.option('--max-per-class', type=int, help='Finish when every class has at least `N` number of samples. This is an approximate lower bound (a few more examples might be added).')  # noqa
 @click.option('overrides', '--override', '-o', multiple=True, help='Custom parameters for readers.')  # noqa
 @click.option('--debug', is_flag=True, help='Set level logging to DEBUG.')
 def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
@@ -59,5 +59,12 @@ def transform(dataset_reader, data_dir, output_dir, splits, only_classes,
             # be easy to modify once we have different types of objects.
             writer = ObjectDetectionWriter(split_reader, output_dir, split)
             writer.save()
+
+            tf.logging.info('Dataset composition per class:')
+            for label, count in split_reader._per_class_counter.most_common():
+                tf.logging.info(
+                    '\t%s: %d', split_reader.pretty_name(label), count
+                )
+
     except InvalidDataDirectory as e:
         tf.logging.error('Error reading dataset: {}'.format(e))

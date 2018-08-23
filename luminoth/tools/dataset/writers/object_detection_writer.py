@@ -54,7 +54,11 @@ class ObjectDetectionWriter(BaseWriter):
 
         # Save classes in simple json format for later use.
         classes_file = os.path.join(self._output_dir, CLASSES_FILENAME)
-        json.dump(self._reader.classes, tf.gfile.GFile(classes_file, 'w'))
+        json.dump([
+            self._reader.pretty_name(label)
+            for label in self._reader.classes
+        ], tf.gfile.GFile(classes_file, 'w'))
+
         record_file = os.path.join(
             self._output_dir, '{}.tfrecords'.format(self._split))
         writer = tf.python_io.TFRecordWriter(record_file)

@@ -83,7 +83,7 @@ class FlatReader(ObjectDetectionReader):
 
             image_id = annotation['image_id']
 
-            if self._should_skip(image_id=image_id):
+            if self._should_skip(image_id):
                 continue
 
             try:
@@ -109,8 +109,6 @@ class FlatReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                if self._should_skip(label=label_id):
-                    continue
                 self._per_class_counter[label_id] += 1
 
                 gt_boxes.append({
@@ -127,9 +125,7 @@ class FlatReader(ObjectDetectionReader):
                 self.errors += 1
                 continue
 
-            self.yielded_records += 1
-
-            yield {
+            record = {
                 'width': width,
                 'height': height,
                 'depth': 3,
@@ -137,6 +133,10 @@ class FlatReader(ObjectDetectionReader):
                 'image_raw': image,
                 'gt_boxes': gt_boxes,
             }
+            self._will_add_record(record)
+            self.yielded_records += 1
+
+            yield record
 
     @property
     def annotations(self):

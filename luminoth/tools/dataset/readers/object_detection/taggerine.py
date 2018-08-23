@@ -134,7 +134,7 @@ class TaggerineReader(ObjectDetectionReader):
 
             image_id = annotation['image_id']
 
-            if self._should_skip(image_id=image_id):
+            if self._should_skip(image_id):
                 continue
 
             try:
@@ -160,8 +160,6 @@ class TaggerineReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                if self._should_skip(label=label_id):
-                    continue
                 self._per_class_counter[label_id] += 1
 
                 if 'height' in b and 'width' in b and 'x' in b and 'y' in b:
@@ -187,9 +185,7 @@ class TaggerineReader(ObjectDetectionReader):
                 self.errors += 1
                 continue
 
-            self.yielded_records += 1
-
-            yield {
+            record = {
                 'width': img_width,
                 'height': img_height,
                 'depth': 3,
@@ -197,3 +193,8 @@ class TaggerineReader(ObjectDetectionReader):
                 'image_raw': image,
                 'gt_boxes': gt_boxes,
             }
+
+            self._will_add_record(record)
+            self.yielded_records += 1
+
+            yield record

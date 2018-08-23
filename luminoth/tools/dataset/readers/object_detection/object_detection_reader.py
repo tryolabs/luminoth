@@ -1,5 +1,6 @@
 import abc
 import six
+import tensorflow as tf
 
 from collections import Counter
 
@@ -20,6 +21,9 @@ class ObjectDetectionReader(BaseReader):
         - get_total
         - get_classes
         - iterate
+
+    Optionally:
+        - pretty_name
 
     Additionally, must use the `_per_class_counter` variable to honor the max
     number of examples per class in an efficient way.
@@ -47,8 +51,10 @@ class ObjectDetectionReader(BaseReader):
 
         self._total = None
         self._classes = None
+
         self._max_per_class = max_per_class
         self._per_class_counter = Counter()
+        self._maxed_out_classes = set()
 
     @property
     def total(self):
@@ -75,22 +81,26 @@ class ObjectDetectionReader(BaseReader):
     @abc.abstractmethod
     def get_classes(self):
         """
-        Returns all the classes available in the dataset.
+        Returns a list of all the classes available in the dataset.
         """
+
+    def pretty_name(self, label):
+        """
+        Return the "pretty" name for easy human identification of a given
+        label.
+        """
+        return label
 
     def _filter_total(self, original_total_records):
         """
-        Filters total number of records in dataset based on reader options
-        used.
+        Filters total number of records we will need to iterate over in dataset
+        based on reader options used.
         """
         if self._only_images:  # not None and not empty
             return len(self._only_images)
 
-        if self._max_per_class is not None:
-            # We don't know the exact total, but we know the bound, so
-            # return that (only to make the progressbar of the writer more
-            # accurate).
-            return len(self.classes) * self._max_per_class
+        # With _max_per_class we potentially have to iterate over every record,
+        # so we don't know the total ahead of time.
 
         return original_total_records
 
@@ -105,14 +115,13 @@ class ObjectDetectionReader(BaseReader):
 
         return new_classes
 
-    def _should_skip(self, image_id=None, label=None):
+    def _should_skip(self, image_id):
         """
         Determine if we should skip the current image, based on the options
         used for the reader.
 
         Args:
             - image_id: String with id of image.
-            - label: String or number with the corresponding label.
 
         Returns:
             bool: True if record should be skipped, False if not.
@@ -122,15 +131,41 @@ class ObjectDetectionReader(BaseReader):
             if image_id not in self._only_images:
                 return True
 
-        if self._max_per_class is not None and label is not None:
-            # Skip because current class is maxed out
-            if self._per_class_counter[label] >= self._max_per_class:
-                return True
-
         return False
 
     def _stop_iteration(self):
-        return self.yielded_records == self.total
+        if self.yielded_records == self.total:
+            return True
+
+        # Every class is maxed out
+        if self._max_per_class is not None:
+            return len(self._maxed_out_classes) == len(self.classes)
+
+        return False
+
+    def _will_add_record(self, record):
+        """
+        Called whenever a new record is to be added.
+        """
+        # Adjust per-class counter from totals from current record
+        for box in record['gt_boxes']:
+            self._per_class_counter[self.classes[box['label']]] += 1
+
+        if self._max_per_class is not None:
+            # Check which classes we have maxed out.
+            old_maxed_out = self._maxed_out_classes.copy()
+
+            self._maxed_out_classes |= set([
+                label
+                for label, count in self._per_class_counter.items()
+                if count >= self._max_per_class
+            ])
+
+            for label in self._maxed_out_classes - old_maxed_out:
+                tf.logging.debug('Maxed out "{}" at {} examples'.format(
+                    self.pretty_name(label),
+                    self._per_class_counter[label]
+                ))
 
     @abc.abstractmethod
     def iterate(self):

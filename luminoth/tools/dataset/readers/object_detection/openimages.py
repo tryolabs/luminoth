@@ -49,6 +49,7 @@ class OpenImagesReader(ObjectDetectionReader):
         self._download_threads = download_threads
 
         self._image_ids = None
+        self.desc_by_label = {}
 
         self.yielded_records = 0
         self.errors = 0
@@ -105,24 +106,25 @@ class OpenImagesReader(ObjectDetectionReader):
 
         self.trainable_labels = self._filter_classes(trainable_labels)
 
+        # Build the map from classes to description for pretty printing their
+        # names.
         labels_descriptions_file = os.path.join(self._data_dir, CLASSES_DESC)
-        desc_by_label = {}
         try:
             with tf.gfile.Open(labels_descriptions_file) as ld:
                 reader = csv.reader(ld)
                 for line in reader:
                     if line[0] in self.trainable_labels:
-                        desc_by_label[line[0]] = line[1]
+                        self.desc_by_label[line[0]] = line[1]
         except tf.errors.NotFoundError:
             raise InvalidDataDirectory(
                 'Missing label description file "{}" from root data '
                 'directory: {}'.format(CLASSES_DESC, self._data_dir)
             )
 
-        return [
-            desc for _, desc in
-            sorted(desc_by_label.items(), key=lambda x: x[0])
-        ]
+        return self.trainable_labels
+
+    def pretty_name(self, label):
+        return '{} ({})'.format(self.desc_by_label[label], label)
 
     def get_total(self):
         return len(self.image_ids)
@@ -139,6 +141,38 @@ class OpenImagesReader(ObjectDetectionReader):
             self._image_ids = image_ids
         return self._image_ids
 
+    def _queue_partial_record(self, records_queue, partial_record):
+        if not partial_record['gt_boxes']:
+            tf.logging.debug(
+                'Dropping record {} without gt_boxes.'.format(
+                    partial_record))
+            return
+
+        # If asking for a limited number per class, only yield if the current
+        # example adds at least 1 new class that hasn't been maxed out. For
+        # example, if "Persons" has been maxed out but "Bus" has not, a new
+        # image containing only instances of "Person" will not be yielded,
+        # while an image containing both "Person" and "Bus" instances will.
+        if self._max_per_class:
+            labels_in_image = set([
+                self.classes[bbox['label']]
+                for bbox in partial_record['gt_boxes']
+            ])
+            not_maxed_out = labels_in_image - self._maxed_out_classes
+
+            if not not_maxed_out:
+                tf.logging.debug(
+                    'Dropping record {} with maxed-out labels: {}'.format(
+                        partial_record['filename'], labels_in_image))
+                return
+
+            tf.logging.debug(
+                'Queuing record {} with labels: {}'.format(
+                    partial_record['filename'], labels_in_image))
+
+        self._will_add_record(partial_record)
+        records_queue.put(partial_record)
+
     def _queue_records(self, records_queue):
         """
         Read annotations from file and queue them.
@@ -148,7 +182,7 @@ class OpenImagesReader(ObjectDetectionReader):
         lines and merge all the annotations for one image into a single record.
         We do it this way to avoid loading the complete file in memory.
 
-        It is VERY important that the annotation files is sorted by image_id,
+        It is VERY important that the annotation file is sorted by image_id,
         otherwise this way of reading them will not work.
         """
         annotations_file = self._get_annotations_path()
@@ -162,30 +196,12 @@ class OpenImagesReader(ObjectDetectionReader):
                 if self._stop_iteration():
                     break
 
-                if self._should_skip(image_id=line['ImageID']):
+                if self._should_skip(line['ImageID']):
                     continue
 
                 # Filter group annotations (we only want single instances)
                 if line['IsGroupOf'] == '1':
                     continue
-
-                if line['ImageID'] != current_image_id:
-                    # Yield if image changes and we have current image.
-                    if current_image_id is not None:
-                        if len(partial_record['gt_boxes']) > 0:
-                            records_queue.put(partial_record)
-                        else:
-                            tf.logging.debug(
-                                'Dropping record {} without gt_boxes.'.format(
-                                    partial_record))
-
-                    # Start new record.
-                    current_image_id = line['ImageID']
-
-                    partial_record = {
-                        'filename': current_image_id,
-                        'gt_boxes': []
-                    }
 
                 # Append annotation to current record.
                 try:
@@ -195,9 +211,20 @@ class OpenImagesReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                if self._should_skip(label=label):
-                    continue
-                self._per_class_counter[label] += 1
+                if line['ImageID'] != current_image_id:
+                    # Yield if image changes and we have current image.
+                    if current_image_id is not None:
+                        self._queue_partial_record(
+                            records_queue, partial_record
+                        )
+
+                    # Start new record.
+                    current_image_id = line['ImageID']
+
+                    partial_record = {
+                        'filename': current_image_id,
+                        'gt_boxes': []
+                    }
 
                 partial_record['gt_boxes'].append({
                     'xmin': float(line['XMin']),
@@ -208,13 +235,7 @@ class OpenImagesReader(ObjectDetectionReader):
                 })
 
             else:
-                if len(partial_record['gt_boxes']) > 0:
-                    # One last yield for the last record.
-                    records_queue.put(partial_record)
-                else:
-                    tf.logging.debug(
-                        'Dropping record {} without gt_boxes.'.format(
-                            partial_record))
+                self._queue_partial_record(records_queue, partial_record)
 
         # Wait for all task to be consumed.
         records_queue.join()
@@ -267,7 +288,6 @@ class OpenImagesReader(ObjectDetectionReader):
         - multiple threads to download images and complete the records
         - the main thread to yield the completed records
         """
-
         signal.signal(signal.SIGINT, self._stop_reading)
 
         self._partial_records_queue = queue.Queue()
