@@ -144,7 +144,7 @@ class OpenImagesReader(ObjectDetectionReader):
 
     def _queue_record(self, records_queue, record):
         if (self._limit_examples is not None and
-            self._total_queued >= self._limit_examples):
+                self._total_queued >= self._limit_examples):
             return
 
         if not record['gt_boxes']:
