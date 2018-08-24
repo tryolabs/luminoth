@@ -29,7 +29,7 @@ class ObjectDetectionReader(BaseReader):
     number of examples per class in an efficient way.
     """
     def __init__(self, only_classes=None, only_images=None,
-                 limit_examples=None, max_per_class=None, **kwargs):
+                 limit_examples=None, class_examples=None, **kwargs):
         """
         Args:
             - only_classes: string or list of strings used as a class
@@ -37,7 +37,7 @@ class ObjectDetectionReader(BaseReader):
             - only_images: string or list of strings used as a image_id
                 whitelist.
             - limit_examples: max number of examples (images) to use.
-            - max_per_class: finish when every class has this approximate
+            - class_examples: finish when every class has this approximate
                 number of examples.
         """
         super(ObjectDetectionReader, self).__init__()
@@ -55,7 +55,7 @@ class ObjectDetectionReader(BaseReader):
         self._classes = None
 
         self._limit_examples = limit_examples
-        self._max_per_class = max_per_class
+        self._class_examples = class_examples
         self._per_class_counter = Counter()
         self._maxed_out_classes = set()
 
@@ -105,8 +105,8 @@ class ObjectDetectionReader(BaseReader):
         if self._limit_examples is not None and self._limit_examples > 0:
             return min(self._limit_examples, original_total_records)
 
-        # With _max_per_class we potentially have to iterate over every record,
-        # so we don't know the total ahead of time.
+        # With _class_examples we potentially have to iterate over every
+        # record, so we don't know the total ahead of time.
 
         return original_total_records
 
@@ -144,7 +144,7 @@ class ObjectDetectionReader(BaseReader):
             return True
 
         # Every class is maxed out
-        if self._max_per_class is not None:
+        if self._class_examples is not None:
             return len(self._maxed_out_classes) == len(self.classes)
 
         return False
@@ -157,14 +157,14 @@ class ObjectDetectionReader(BaseReader):
         for box in record['gt_boxes']:
             self._per_class_counter[self.classes[box['label']]] += 1
 
-        if self._max_per_class is not None:
+        if self._class_examples is not None:
             # Check which classes we have maxed out.
             old_maxed_out = self._maxed_out_classes.copy()
 
             self._maxed_out_classes |= set([
                 label
                 for label, count in self._per_class_counter.items()
-                if count >= self._max_per_class
+                if count >= self._class_examples
             ])
 
             for label in self._maxed_out_classes - old_maxed_out:

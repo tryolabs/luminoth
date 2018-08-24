@@ -157,7 +157,7 @@ class OpenImagesReader(ObjectDetectionReader):
         # example, if "Persons" has been maxed out but "Bus" has not, a new
         # image containing only instances of "Person" will not be yielded,
         # while an image containing both "Person" and "Bus" instances will.
-        if self._max_per_class:
+        if self._class_examples:
             labels_in_image = set([
                 self.classes[bbox['label']] for bbox in record['gt_boxes']
             ])
