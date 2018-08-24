@@ -92,8 +92,6 @@ class ImageNetReader(ObjectDetectionReader):
                     new_width=width, new_height=height
                 )
 
-                self._per_class_counter[label_id] += 1
-
                 gt_boxes.append({
                     'label': label_id,
                     'xmin': xmin,
