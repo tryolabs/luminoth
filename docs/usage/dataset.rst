@@ -71,12 +71,11 @@ the ``--only-classes`` option, by passing a comma-separated list of classes to
 keep in the final dataset.
 
 Moreover, if you wish to use several classes but not the entire set of images
-available in a (possibly large) dataset, you may use the ``--max-per-class``
+available in a (possibly large) dataset, you may use the ``--class-examples``
 option.
 
 During development, it is often useful to verify that the model can actually overfit a
-small dataset. You can create such a dataset by using a small number for
-``--max-per-class``, and using it together with the ``--only-classes`` option.
+small dataset. You can create such a dataset by using the ``--limit-examples`` option.
 
 Examples
 ^^^^^^^^
