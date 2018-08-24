@@ -54,8 +54,6 @@ class COCOReader(ObjectDetectionReader):
             except ValueError:
                 continue
 
-            self._per_class_counter[annotation_class] += 1
-
             self._image_to_bboxes.setdefault(image_id, []).append({
                 'xmin': x,
                 'ymin': y,

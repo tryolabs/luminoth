@@ -160,8 +160,6 @@ class TaggerineReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                self._per_class_counter[label_id] += 1
-
                 if 'height' in b and 'width' in b and 'x' in b and 'y' in b:
                     gt_boxes.append({
                         'label': label_id,

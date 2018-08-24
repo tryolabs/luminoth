@@ -109,8 +109,6 @@ class FlatReader(ObjectDetectionReader):
                 except ValueError:
                     continue
 
-                self._per_class_counter[label_id] += 1
-
                 gt_boxes.append({
                     'label': label_id,
                     'xmin': b[self._x_min_key],
