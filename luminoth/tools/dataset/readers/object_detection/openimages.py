@@ -53,7 +53,6 @@ class OpenImagesReader(ObjectDetectionReader):
 
         self.yielded_records = 0
         self.errors = 0
-
         self._total_queued = 0
         # Flag to notify threads if the execution is halted.
         self._alive = True
@@ -142,11 +141,7 @@ class OpenImagesReader(ObjectDetectionReader):
             self._image_ids = image_ids
         return self._image_ids
 
-    def _queue_record(self, records_queue, record):
-        if (self._limit_examples is not None and
-                self._total_queued >= self._limit_examples):
-            return
-
+    def _queue_record(self, queue, record):
         if not record['gt_boxes']:
             tf.logging.debug(
                 'Dropping record {} without gt_boxes.'.format(record))
@@ -174,10 +169,9 @@ class OpenImagesReader(ObjectDetectionReader):
                     record['filename'], labels_in_image))
 
         self._will_add_record(record)
-        self._total_queued += 1
-        records_queue.put(record)
+        queue.put(record)
 
-    def _queue_records(self, records_queue):
+    def _queue_partial_records(self, partial_records_queue, records_queue):
         """
         Read annotations from file and queue them.
 
@@ -190,14 +184,24 @@ class OpenImagesReader(ObjectDetectionReader):
         otherwise this way of reading them will not work.
         """
         annotations_file = self._get_annotations_path()
+
         with tf.gfile.Open(annotations_file) as af:
             reader = csv.DictReader(af)
 
             current_image_id = None
             partial_record = {}
 
+            # Number of records we have queued so far, which should be
+            # completed by another thread.
+            num_queued_records = 0
+
             for line in reader:
-                if self._stop_iteration():
+                if num_queued_records == self.total:
+                    # Reached the max number of records we can or want to
+                    # process.
+                    break
+
+                if self._all_maxed_out():
                     break
 
                 if self._should_skip(line['ImageID']):
@@ -218,11 +222,14 @@ class OpenImagesReader(ObjectDetectionReader):
                 if line['ImageID'] != current_image_id:
                     # Yield if image changes and we have current image.
                     if current_image_id is not None:
-                        self._queue_record(records_queue, partial_record)
+                        num_queued_records += 1
+                        self._queue_record(
+                            partial_records_queue,
+                            partial_record
+                        )
 
                     # Start new record.
                     current_image_id = line['ImageID']
-
                     partial_record = {
                         'filename': current_image_id,
                         'gt_boxes': []
@@ -239,27 +246,38 @@ class OpenImagesReader(ObjectDetectionReader):
             else:
                 # No data we care about in dataset -- nothing to queue
                 if partial_record:
-                    self._queue_record(records_queue, partial_record)
+                    num_queued_records += 1
+                    self._queue_record(
+                        partial_records_queue,
+                        partial_record
+                    )
 
-        # Wait for all task to be consumed.
-        records_queue.join()
+        tf.logging.debug('Stopped queuing records.')
 
-        for _ in range(self._download_threads):
-            records_queue.put(None)
+        # Wait for all records to be consumed by the threads that complete them
+        partial_records_queue.join()
+
+        tf.logging.debug('All records consumed!')
+
+        # Signal the main thread that we have finished producing and every
+        # record in the the queues has been consumed.
+        records_queue.put(None)
 
     def _complete_records(self, input_queue, output_queue):
-        while not self._stop_iteration():
-            partial_record = input_queue.get()
+        """
+        Daemon thread that will complete queued records from `input_queue` and
+        put them in `output_queue`, where they will be read and yielded by the
+        main thread.
 
-            if partial_record is None:
-                input_queue.task_done()
-                break
-
+        This is the thread that will actually download the images of the
+        dataset.
+        """
+        while True:
             try:
+                partial_record = input_queue.get()
+
                 image_id = partial_record['filename']
-                image_raw = read_image(
-                    self._get_image_path(image_id)
-                )
+                image_raw = read_image(self._get_image_path(image_id))
                 image = Image.open(six.BytesIO(image_raw))
 
                 for gt_box in partial_record['gt_boxes']:
@@ -282,9 +300,6 @@ class OpenImagesReader(ObjectDetectionReader):
             finally:
                 input_queue.task_done()
 
-        # Notify it finished
-        output_queue.put(None)
-
     def iterate(self):
         """
         We have a generator/consumer-generator/consumer setup where we have:
@@ -294,41 +309,42 @@ class OpenImagesReader(ObjectDetectionReader):
         """
         signal.signal(signal.SIGINT, self._stop_reading)
 
-        self._partial_records_queue = queue.Queue()
-        generator = threading.Thread(
-            target=self._queue_records,
-            args=(self._partial_records_queue, )
-        )
-        generator.start()
+        # Which records to complete (missing image)
+        partial_records_queue = queue.Queue()
 
         # Limit records queue to 250 because we don't want to end up with all
         # the images in memory.
-        self._records_queue = queue.Queue(maxsize=250)
-        consumer_threads = []
+        records_queue = queue.Queue(maxsize=250)
+
+        generator = threading.Thread(
+            target=self._queue_partial_records,
+            args=(partial_records_queue, records_queue)
+        )
+        generator.start()
+
         for _ in range(self._download_threads):
             t = threading.Thread(
                 target=self._complete_records,
-                args=(self._partial_records_queue, self._records_queue)
+                args=(partial_records_queue, records_queue)
             )
+            t.daemon = True
             t.start()
-            consumer_threads.append(t)
 
         while not self._stop_iteration():
-            record = self._records_queue.get()
+            record = records_queue.get()
 
-            self._records_queue.task_done()
             if record is None:
                 break
 
             self.yielded_records += 1
             yield record
 
-        self._empty_queue(self._partial_records_queue)
-        self._empty_queue(self._records_queue)
+        # In case we were killed by signal
+        self._empty_queue(partial_records_queue)
+        self._empty_queue(records_queue)
 
+        # Wait for generator to finish peacefuly...
         generator.join()
-        for t in consumer_threads:
-            t.join()
 
     def _empty_queue(self, queue_to_empty):
         while not queue_to_empty.empty():
@@ -339,10 +355,12 @@ class OpenImagesReader(ObjectDetectionReader):
             queue_to_empty.task_done()
 
     def _stop_iteration(self):
-        return (
-            not self._alive or
-            super(OpenImagesReader, self)._stop_iteration()
-        )
+        """
+        Override the parent implementation, because we deal with this in the
+        producer thread.
+        """
+        if not self._alive:
+            return True
 
     def _stop_reading(self, signal, frame):
         self._alive = False
