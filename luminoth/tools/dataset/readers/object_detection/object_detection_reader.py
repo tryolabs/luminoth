@@ -139,13 +139,19 @@ class ObjectDetectionReader(BaseReader):
 
         return False
 
+    def _all_maxed_out(self):
+        # Every class is maxed out
+        if self._class_examples is not None:
+            return len(self._maxed_out_classes) == len(self.classes)
+
+        return False
+
     def _stop_iteration(self):
         if self.yielded_records == self.total:
             return True
 
-        # Every class is maxed out
-        if self._class_examples is not None:
-            return len(self._maxed_out_classes) == len(self.classes)
+        if self._all_maxed_out():
+            return True
 
         return False
 
