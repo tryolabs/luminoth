@@ -47,7 +47,7 @@ Download a remote checkpoint::
 
 Create a checkpoint::
 
-  $ lumi checkpoint create config.yml -e name='Faster R-CNN with cars' alias=cars
+  $ lumi checkpoint create config.yml -e name='Faster R-CNN with cars' -e alias=cars
   Creating checkpoint for given configuration...
   Checkpoint b5c140450f48 created successfully.
 
