@@ -41,6 +41,12 @@ The supported types are:
 - ``coco``: format used by the `COCO <http://cocodataset.org/#download>`_
   dataset.
 
+- ``openimages``: format used by the `OpenImages
+  <https://storage.googleapis.com/openimages/web/index.html>`_ dataset.
+
+- ``csv``: specify the bounding boxes using a CSV file with one
+  annotation per line.
+
 Input and output
 ^^^^^^^^^^^^^^^^
 
