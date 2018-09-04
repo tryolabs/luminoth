@@ -33,13 +33,13 @@ class OpenImagesReader(ObjectDetectionReader):
     def __init__(self, data_dir, split, download_threads=25, **kwargs):
         """
         Args:
-            - data_dir: Path to base directory where to find all the necessary
+            data_dir: Path to base directory where to find all the necessary
                 files and folders.
-            - split: Split to use, it is used for reading the appropiate
+            split: Split to use, it is used for reading the appropiate
                 annotations.
-            - download_threads: Number of threads to use for downloading
+            download_threads: Number of threads to use for downloading
                 images.
-            - only_classes: String with classes ids to be used as filter for
+            only_classes: String with classes ids to be used as filter for
                 all the available classes. If the string contains ',' it will
                 split the string using them.
         """
