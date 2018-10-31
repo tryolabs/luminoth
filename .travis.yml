@@ -1,5 +1,5 @@
-sudo: false
 language: python
+sudo: false
 python:
   - '2.7'
   - '3.4'
@@ -20,6 +20,7 @@ deploy:
     distributions: sdist bdist_wheel
     user: $PYPI_TEST_USERNAME
     password: $PYPI_TEST_PASSWORD
+    skip_existing: true
     on:
       branch: master
       tags: false
