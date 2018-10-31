@@ -108,7 +108,7 @@ def run(config, target='', cluster_spec=None, is_chief=True, job_name=None,
         model_saver = tf.train.Saver(
             set(tf.global_variables()) - set(slot_variables),
             name='model_saver',
-            max_to_keep=config.get('checkpoints_keep_amount', 1),
+            max_to_keep=config.train.get('checkpoints_max_keep', 1),
         )
 
         # Create saver for loading pretrained checkpoint into base network

@@ -31,6 +31,8 @@ train:
   save_timeline: False
   # The frequency, in seconds, that a checkpoint is saved.
   save_checkpoint_secs: 600
+  # The maximum number of checkpoints to keep
+  checkpoints_max_keep: 1
   # The frequency, in number of global steps, that the summaries are written to
   # disk.
   save_summaries_steps:
