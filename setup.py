@@ -43,7 +43,7 @@ INSTALL_REQUIRES = [
     'Flask>=0.12',
     'PyYAML>=3.12,<4',
     'click>=6.7,<7',
-    'dm-sonnet>=1.12',
+    'dm-sonnet>=1.12,<=1.23',
     'easydict>=1.7,<2',
     'six>=1.11',
 ]
