@@ -43,8 +43,11 @@ INSTALL_REQUIRES = [
     'Flask>=0.12',
     'PyYAML>=3.12,<4',
     'click>=6.7,<7',
+    # Sonnet 1.25+ requires tensorflow_probability which we do not need here.
     'dm-sonnet>=1.12,<=1.23',
-    'easydict>=1.7,<2',
+    # Can remove easydict <=1.8 pin after
+    # https://github.com/makinacorpus/easydict/pull/14 is merged.
+    'easydict>=1.7,<=1.8',
     'six>=1.11',
 ]
 TEST_REQUIRES = []
