@@ -635,7 +635,12 @@ def import_(path):
     path = os.path.expanduser(path)
     try:
         with tarfile.open(path) as f:
-            metadata = json.load(f.extractfile('metadata.json'))
+            # This way of loading the JSON works in all supported versions of
+            # Python 2 and 3.
+            # See: https://github.com/tryolabs/luminoth/issues/222
+            metadata = json.loads(
+                f.extractfile('metadata.json').read().decode('utf-8')
+            )
     except tarfile.ReadError:
         click.echo("Invalid file. Is it an exported checkpoint?")
         return
