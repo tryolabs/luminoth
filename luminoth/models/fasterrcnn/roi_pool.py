@@ -95,7 +95,7 @@ class ROIPoolingLayer(snt.AbstractModule):
         return prediction_dict
 
     def _roi_pooling(self, roi_proposals, conv_feature_map, im_shape):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def _build(self, roi_proposals, conv_feature_map, im_shape):
         if self._pooling_mode == CROP:
@@ -103,5 +103,5 @@ class ROIPoolingLayer(snt.AbstractModule):
         elif self._pooling_mode == ROI_POOLING:
             return self._roi_pooling(roi_proposals, conv_feature_map, im_shape)
         else:
-            raise NotImplemented(
+            raise NotImplementedError(
                 'Pooling mode {} does not exist.'.format(self._pooling_mode))
