@@ -223,7 +223,7 @@ def train(job_id, resume_job_id, bucket_name, region, config_files, dataset,
     account.validate_region(region)
 
     if bucket_name is None:
-        bucket_name = 'luminoth-{}'.formata(account.client_id)
+        bucket_name = 'luminoth-{}'.format(account.client_id)
         click.echo(
             'Bucket name not specified. Using "{}".'.format(bucket_name))
 
