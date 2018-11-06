@@ -102,7 +102,7 @@ setup(
     setup_requires=[
     ],
     install_requires=INSTALL_REQUIRES,
-    test_requires=TEST_REQUIRES,
+    test_require=TEST_REQUIRES,
     extras_require={
         'tf': ['tensorflow>={}'.format(MIN_TF_VERSION)],
         'tf-gpu': ['tensorflow-gpu>='.format(MIN_TF_VERSION)],
