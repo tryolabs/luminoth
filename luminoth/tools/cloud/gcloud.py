@@ -1,5 +1,6 @@
 import click
 import json
+import luminoth
 import os
 import shutil
 import subprocess
@@ -8,8 +9,8 @@ import tempfile
 import tensorflow as tf
 import time
 
-from functools import wraps
 from datetime import datetime
+from functools import wraps
 
 from luminoth.utils.config import get_config, dump_config
 from luminoth.utils.experiments import save_run
@@ -23,7 +24,13 @@ except ImportError:
     MISSING_DEPENDENCIES = True
 
 
-RUNTIME_VERSION = '1.9'
+RUNTIME_VERSION = '1.10'
+
+# We cannot use Python 3 yet, unless we figure out a way to set environment
+# variables before Luminoth is launched (set locale).
+# See Click issue: https://bit.ly/2zxEkmM
+PYTHON_VERSION = '2.7'
+
 SCALE_TIERS = [
     'BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'BASIC_TPU', 'CUSTOM'
 ]
