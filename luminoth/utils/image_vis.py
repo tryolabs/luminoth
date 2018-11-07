@@ -96,12 +96,8 @@ summaries_fn = {
         },
     },
     'ssd': {
-        'train': {
-            'draw_object_prediction': None,
-        },
-        'eval': {
-            'draw_object_prediction': None,
-        },
+        'train': {},
+        'eval': {},
         'debug': {
             'draw_object_prediction': None,
             'draw_ssd_target_proposals': None,
