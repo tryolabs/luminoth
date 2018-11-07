@@ -1,5 +1,6 @@
 import click
 import json
+import luminoth
 import os
 import shutil
 import subprocess
@@ -8,8 +9,8 @@ import tempfile
 import tensorflow as tf
 import time
 
-from functools import wraps
 from datetime import datetime
+from functools import wraps
 
 from luminoth.utils.config import get_config, dump_config
 from luminoth.utils.experiments import save_run
@@ -23,7 +24,13 @@ except ImportError:
     MISSING_DEPENDENCIES = True
 
 
-RUNTIME_VERSION = '1.9'
+RUNTIME_VERSION = '1.10'
+
+# We cannot use Python 3 yet, unless we figure out a way to set environment
+# variables before Luminoth is launched (set locale).
+# See Click issue: https://bit.ly/2zxEkmM
+PYTHON_VERSION = '2.7'
+
 SCALE_TIERS = [
     'BASIC', 'STANDARD_1', 'PREMIUM_1', 'BASIC_GPU', 'BASIC_TPU', 'CUSTOM'
 ]
@@ -43,6 +50,24 @@ DEFAULT_PS_COUNT = 0
 
 DEFAULT_CONFIG_FILENAME = 'config.yml'
 DEFAULT_PACKAGES_PATH = 'packages'
+
+# We will create this Python package with only a `setup.py` file, in order to
+# install the current version of Luminoth as a dependency in GCP.
+GCP_TRAINER_PACKAGE_SETUP = """
+from setuptools import find_packages
+from setuptools import setup
+
+REQUIRED_PACKAGES = ['luminoth=={version}']
+
+setup(
+    name='luminoth-gcp-setup',
+    version='{version}',
+    install_requires=REQUIRED_PACKAGES,
+    packages=find_packages(),
+    include_package_data=True,
+    description='Installs Luminoth in GCP.'
+)
+""".format(version=luminoth.__version__)
 
 
 def check_dependencies(f):
@@ -65,45 +90,50 @@ def check_dependencies(f):
 
 
 def build_package(bucket, base_path):
-    package_path = os.path.abspath(
-        os.path.join(os.path.realpath(__file__), '..', '..', '..', '..')
-    )
-
-    click.echo('Building custom Luminoth package from "{}".'.format(
-        package_path
-    ))
-
     temp_dir = tempfile.mkdtemp()
     output_dir = os.path.join(temp_dir, 'output')
 
+    #
+    # Option 1: try to find `setup.py` file in package dir.
+    #
+    # Will only work if the package is installed with -e (useful for
+    # development).
+    #
+    package_path = os.path.abspath(
+        os.path.join(os.path.realpath(__file__), '..', '..', '..', '..')
+    )
+    setup_file = os.path.join(package_path, 'setup.py')
+    if os.path.isfile(setup_file):
+        click.echo(
+            'Found `setup.py` file in "{}". '
+            'Using it instead of shim.'.format(package_path))
+    else:
+        #
+        # Option 2: generate a `setup.py` file that can install current version
+        #           of Luminoth.
+        #
+        package_dir = temp_dir
+        setup_file = os.path.join(package_dir, 'setup.py')
+        with open(setup_file, 'w') as f:
+            f.write(GCP_TRAINER_PACKAGE_SETUP)
+
+        click.echo('Generating "{}" for installing luminoth=={}.'.format(
+            setup_file, luminoth.__version__
+        ))
+
     devnull = open(os.devnull, 'w')
     subprocess.call(
-        [
-            'python', 'setup.py', 'egg_info', '--egg-base', temp_dir,
-            'build', '--build-base', temp_dir, '--build-temp', temp_dir,
-            'sdist', '--dist-dir', output_dir
-        ],
-        cwd=package_path, stdout=devnull, stderr=devnull
-    )
-    subprocess.call(
-        [
-            'python', 'setup.py', 'build', '--build-base', temp_dir,
-            '--build-temp', temp_dir, 'sdist', '--dist-dir', output_dir
-        ],
-        cwd=package_path, stdout=devnull, stderr=devnull
-    )
-    subprocess.call(
         ['python', 'setup.py', 'sdist', '--dist-dir', output_dir],
-        cwd=package_path, stdout=devnull, stderr=devnull
+        cwd=package_path, stdout=devnull, stderr=devnull,
     )
 
     tarball_filename = os.listdir(output_dir)[0]
     tarball_path = os.path.join(output_dir, tarball_filename)
+    click.echo('Built tarball for GCP: "{}".'.format(tarball_path))
 
     path = upload_file(
         bucket, '{}/{}'.format(base_path, DEFAULT_PACKAGES_PATH), tarball_path
     )
-
     shutil.rmtree(temp_dir)
 
     return path
@@ -272,7 +302,8 @@ def train(job_id, resume_job_id, bucket_name, region, config_files, dataset,
         'args': args,
         'region': region,
         'jobDir': job_dir,
-        'runtimeVersion': RUNTIME_VERSION
+        'runtimeVersion': RUNTIME_VERSION,
+        'pythonVersion': PYTHON_VERSION,
     }
 
     if scale_tier == 'CUSTOM':
