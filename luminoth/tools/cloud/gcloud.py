@@ -124,7 +124,7 @@ def build_package(bucket, base_path):
     devnull = open(os.devnull, 'w')
     subprocess.call(
         ['python', 'setup.py', 'sdist', '--dist-dir', output_dir],
-        cwd=package_path, stdout=devnull, stderr=devnull,
+        cwd=package_dir, stdout=devnull, stderr=devnull,
     )
 
     tarball_filename = os.listdir(output_dir)[0]
