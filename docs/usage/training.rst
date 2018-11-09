@@ -79,4 +79,4 @@ Google Cloud
 Luminoth can easily run in `Google Cloud ML Engine <https://cloud.google.com/ml-engine/>`_
 with a single command.
 
-For more information, see (:ref:`usage/cloud`).
+For more information, see :ref:`usage/cloud`.
