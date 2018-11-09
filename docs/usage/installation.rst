@@ -10,12 +10,13 @@ TensorFlow
 ^^^^^^^^^^
 
 To use Luminoth, `TensorFlow <https://tensorflow.org>`_ must be installed beforehand.
+
 If you want **GPU support**, you should install the GPU version of TensorFlow with
 ``pip install tensorflow-gpu``, or else you can use the CPU version using
 ``pip install tensorflow``.
 
-You can see more details into installing TensorFlow manually `here
-<https://www.tensorflow.org/install/>`_, including how to use CUDA and cuDNN.
+You can see more details of how to install TensorFlow manually `here
+<https://www.tensorflow.org/install/>`__, including how to use CUDA and cuDNN.
 
 FFmpeg
 ^^^^^^
@@ -30,7 +31,7 @@ Installing from PyPI
 
 Use ``pip`` to install Luminoth, by running the following command::
 
-  $ pip install luminoth
+  pip install luminoth
 
 Google Cloud
 ^^^^^^^^^^^^
@@ -46,9 +47,9 @@ Installing from source
 
 Start by cloning the Luminoth repository::
 
-  $ git clone https://github.com/tryolabs/luminoth.git
+  git clone https://github.com/tryolabs/luminoth.git
 
 Then install the library by running::
 
-  $ cd luminoth
-  $ python setup.py install
+  cd luminoth
+  pip install -e .

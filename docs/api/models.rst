@@ -7,16 +7,13 @@ Models
   :members:
   :private-members:
 
-
 .. autoclass:: luminoth.models.base.TruncatedBaseNetwork
   :members:
   :private-members:
 
-
 .. autoclass:: luminoth.models.fasterrcnn.FasterRCNN
   :members:
   :private-members:
-
 
 .. autoclass:: luminoth.models.ssd.SSD
   :members:

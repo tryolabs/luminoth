@@ -34,6 +34,7 @@ Pre-requisites
      * Compute Engine
      * Cloud Machine Learning Engine
      * Google Cloud Storage
+
    You can do it through the `web console <https://support.google.com/cloud/answer/6158841>`_
    or with the following command::
 
@@ -46,10 +47,12 @@ Pre-requisites
     gsutil -o GSUtil:parallel_composite_upload_threshold=150M cp -r /path/to/dataset/tfrecords gs://your_bucket/path
 
 #. Create a `Service Account Key <https://console.cloud.google.com/iam-admin/serviceaccounts/project>`_
-   (JSON format) and download it to your directory of choice. You may add it as an Editor of your project.
-   If necessary, add required roles (permissions) to your service account.
+   (JSON format) and download it to your directory of choice. You may add it as an Editor
+   of your project. If necessary, add required roles (permissions) to your service
+   account.
 
-#. Point the ``GOOGLE_APPLICATION_CREDENTIALS`` environment variable to the JSON file of the service account.
+#. Point the ``GOOGLE_APPLICATION_CREDENTIALS`` environment variable to the JSON file of
+   the service account.
 
 Running a training job
 ``````````````````````
@@ -66,10 +69,13 @@ Optional arguments:
   - ``--dataset``: full path to bucket with the dataset's TFRecord files, ie.
     ``gs://<bucket_name>/<path>``. If not present, will default from the
     value specified in the YAML config file (``dataset.dir``).
-  - ``--resume``: Id of the previous job to resume (start from last stored checkpoint). In case you are resuming multiple times, must always point to the first job (ie. the one that first created the checkpoint).
-  - ``--bucket``: Bucket name for storing data for the job, such as the logs.
+  - ``--resume``: Id of the previous job to resume (start from last stored checkpoint). In
+    case you are resuming multiple times, must always point to the first job (ie. the one
+    that first created the checkpoint). - ``--bucket``: Bucket name for storing data for
+    the job, such as the logs.
     Defaults to ``luminoth-<client_id>``.
-  - ``--job-id``: Identifies the training job in Google Cloud. Defaults to ``train_<timestamp>``.
+  - ``--job-id``: Identifies the training job in Google Cloud. Defaults to
+    ``train_<timestamp>``.
   - ``--region``: `Google Cloud region
     <https://cloud.google.com/compute/docs/regions-zones/>`_ in which to set up
     the cluster.
@@ -114,7 +120,7 @@ Keep in mind that for this to work:
 Listing jobs
 ````````````
 
-``lumi cloud gc jobs`` - List project’s jobs.
+``lumi cloud gc jobs`` - List project's jobs.
 
 Optional arguments:
   - ``--running``: Show running jobs only.
