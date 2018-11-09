@@ -24,8 +24,6 @@ helper functions to visualize the bounding boxes.
 
    vis_objects(image, objects).save('traffic-out.png')
 
---
+----
 
-This was the end of the hands on! Hope you enjoyed :)
-
-https://luminoth.ai
+This was the end of the tutorial! Hope you enjoyed :)
