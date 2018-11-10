@@ -99,14 +99,15 @@ def build_package(bucket, base_path):
     # Will only work if the package is installed with -e (useful for
     # development).
     #
-    package_path = os.path.abspath(
+    tentative_dir = os.path.abspath(
         os.path.join(os.path.realpath(__file__), '..', '..', '..', '..')
     )
-    setup_file = os.path.join(package_path, 'setup.py')
+    setup_file = os.path.join(tentative_dir, 'setup.py')
     if os.path.isfile(setup_file):
+        package_dir = tentative_dir
         click.echo(
             'Found `setup.py` file in "{}". '
-            'Using it instead of shim.'.format(package_path))
+            'Using it instead of shim.'.format(tentative_dir))
     else:
         #
         # Option 2: generate a `setup.py` file that can install current version
