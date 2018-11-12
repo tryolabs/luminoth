@@ -93,8 +93,8 @@ def draw_label(draw, coords, label, prob, color, scale=1):
     # Attempt to get a native TTF font. If not, use the default bitmap font.
     global SYSTEM_FONT
     if SYSTEM_FONT:
-        label_font = SYSTEM_FONT.font_variant(size=round(16 * scale))
-        prob_font = SYSTEM_FONT.font_variant(size=round(12 * scale))
+        label_font = SYSTEM_FONT.font_variant(size=int(round(16 * scale)))
+        prob_font = SYSTEM_FONT.font_variant(size=int(round(12 * scale)))
     else:
         label_font = ImageFont.load_default()
         prob_font = ImageFont.load_default()
@@ -166,8 +166,11 @@ def vis_objects(image, objects, colormap=None, labels=True, scale=1, fill=30):
     for obj in objects:
         # TODO: Can we do image resolution-agnostic?
         color = colormap(obj['label'])
+
+        # Cast `width` to int so it also works in Python 2
         draw_rectangle(
-            draw, obj['bbox'], color, width=round(3 * scale), fill=fill
+            draw, obj['bbox'], color, width=int(round(3 * scale)),
+            fill=fill
         )
         if labels:
             draw_label(
