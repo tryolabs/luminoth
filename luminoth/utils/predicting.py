@@ -130,7 +130,12 @@ class PredictorNetwork(object):
             # If scale factor is a scalar, height and width get scaled by the
             # same amount
             objects /= scale_factor
-        objects = [[round(coord) for coord in obj] for obj in objects.tolist()]
+
+        # Cast to int to consistently return the same type in Python 2 and 3
+        objects = [
+            [int(round(coord)) for coord in obj]
+            for obj in objects.tolist()
+        ]
 
         predictions = sorted([
             {
