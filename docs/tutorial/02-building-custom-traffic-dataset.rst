@@ -57,7 +57,6 @@ following were hand-picked after examining the full file:
    /m/0h2r6,Van
    /m/0k4j,Car
 
-
 Using the Luminoth dataset reader
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -65,7 +64,19 @@ Luminoth includes a **dataset reader** that can take OpenImages format. As the d
 so large, this will never download every single image, but fetch only those we want to use
 and store them directly in the TFRecords file.
 
-Go into the folder where you extracted the dataset and run the following command:
+Note that the dataset reader expects a particular directory layout so it knows where the
+files are located. In this case, files corresponding to the examples must be in a folder
+named like their split (`train`, `test`, ...). So, you should have the following:
+
+.. code-block:: text
+
+    .
+    ├── class-descriptions-boxable.csv
+    └── train
+        ├── train-annotations-bbox.csv
+        └── train-annotations-human-imagelabels-boxable.csv
+
+Next, run the following command:
 
 .. code-block:: bash
 
