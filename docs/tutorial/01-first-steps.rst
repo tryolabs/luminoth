@@ -119,7 +119,7 @@ checkpoint list``:
 
 Here, you can see the “accurate” checkpoint that we have used for our predictions before,
 and that we also have another “fast” checkpoint that is the SSD model trained with Pascal
-VOC dataset. Let's get some information about the “accurate” checkpoint:
+VOC dataset. Let's get some information about the “accurate” checkpoint: ``lumi checkpoint info e1c2565b51e9`` or ``lumi checkpoint info accurate``
 
 .. code-block:: text
 
@@ -138,7 +138,7 @@ VOC dataset. Let's get some information about the “accurate” checkpoint:
    URL: https://github.com/tryolabs/luminoth/releases/download/v0.1.0/e1c2565b51e9.tar
 
 You can see that this dataset consists of 80 classes, and other useful information. Let's
-see what the ``fast`` checkpoint is about:
+see what the ``fast`` checkpoint is about: ``lumi checkpoint info aad6912e94d9`` or ``lumi checkpoint info fast``
 
 .. code-block:: text
 
