@@ -384,7 +384,8 @@ class RCNN(snt.AbstractModule):
                 bbox_flatten, cls_flatten, 'bbox_offset_cleaned')
 
             bbox_offsets_target_labeled_cleaned = tf.boolean_mask(
-                bbox_offsets_target_labeled, cls_flatten, 'bbox_offsets_target_labeled_cleaned'
+                bbox_offsets_target_labeled, cls_flatten,
+                'bbox_offsets_target_labeled_cleaned'
             )
 
             # Calculate the smooth l1 loss between the "cleaned" bboxes
