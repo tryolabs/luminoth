@@ -5,7 +5,7 @@ needed for training and using deep learning models.
 
 It's base subcommands are:
     train: For training locally.
-    cloud: For traning and monitoring in the cloud.
+    cloud: For training and monitoring in the cloud.
     dataset: For modifying and transforming datasets.
 """
 
