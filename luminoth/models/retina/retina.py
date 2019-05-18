@@ -11,7 +11,6 @@ from luminoth.models.retina.retina_proposal import RetinaProposal
 from luminoth.utils.anchors import generate_anchors_reference
 from luminoth.utils.image import adjust_bboxes
 from luminoth.utils.losses import smooth_l1_loss, focal_loss
-from luminoth.utils.vars import get_saver
 
 
 class Retina(snt.AbstractModule):
@@ -363,8 +362,8 @@ class Retina(snt.AbstractModule):
         )
         return trainable_vars
 
-    def get_saver(self):
-        return get_saver((self, self.fpn))
+    def get_base_network_checkpoint_vars(self):
+        return self.fpn.get_base_network_checkpoint_vars()
 
-    def load_pretrained_weights(self):
-        return self.fpn.load_weights()
+    def get_checkpoint_file(self):
+        self.fpn.get_checkpoint_file()
