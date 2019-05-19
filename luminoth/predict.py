@@ -250,7 +250,7 @@ def predict(path_or_dir, config_files, checkpoint, override_params,
         else:
             config.model.rpn.proposals.post_nms_top_n = max_detections
         config.model.rcnn.proposals.min_prob_threshold = min_prob
-    elif config.model.type == 'ssd':
+    elif config.model.type in ['ssd', 'retina']:
         config.model.proposals.total_max_detections = max_detections
         config.model.proposals.min_prob_threshold = min_prob
     else:

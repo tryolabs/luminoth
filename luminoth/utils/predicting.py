@@ -71,7 +71,7 @@ class PredictorNetwork(object):
                 )
                 self.session.run(init_op)
 
-            if config.model.type == 'ssd':
+            if config.model.type in ['ssd', 'retina']:
                 cls_prediction = pred_dict['classification_prediction']
                 objects_tf = cls_prediction['objects']
                 objects_labels_tf = cls_prediction['labels']
