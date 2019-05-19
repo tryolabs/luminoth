@@ -9,8 +9,9 @@ class FPN(BaseNetwork):
 
     As seen in "Feature Pyramid Networks for Object Detection" (2017).
     """
-    def __init__(self, config, parent_name=None, name='fpn_builder'):
-        super(FPN, self).__init__(config, name=name)
+    def __init__(self, config, base_config, parent_name=None,
+                 name='fpn_builder'):
+        super(FPN, self).__init__(base_config, name=name)
         self._config = config
         self._parent_name = parent_name
         # Copy the endpoints to prevent unwanted behaviour.

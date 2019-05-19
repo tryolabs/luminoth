@@ -70,7 +70,7 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
 
         # Also overwrite `min_prob_threshold` in order to use all detections.
         config.model.rcnn.proposals.min_prob_threshold = 0.0
-    elif config.model.type == 'ssd':
+    elif config.model.type in ['ssd', 'retina']:
         config.model.proposals.total_max_detections = max_detections
         config.model.proposals.min_prob_threshold = 0.0
     else:
@@ -102,7 +102,10 @@ def eval(dataset_split, config_files, watch, from_global_step, override_params,
     # intermediate tensors.
     prediction_dict = model(train_image, train_objects)
 
-    if config.model.type == 'ssd' or config.model.network.with_rcnn:
+    if (
+        config.model.type in ['ssd', 'retina']
+        or config.model.network.with_rcnn
+    ):
         pred = prediction_dict['classification_prediction']
         pred_objects = pred['objects']
         pred_objects_classes = pred['labels']

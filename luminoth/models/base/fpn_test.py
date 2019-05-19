@@ -10,25 +10,33 @@ class FPNTest(tf.test.TestCase):
     def setUp(self):
         super(FPNTest, self).setUp()
         self._config_resnet = EasyDict({
-            'architecture': 'resnet_v2_101',
-            'endpoints': [
-                'block4/unit_3/bottleneck_v2/conv3',
-                'block3/unit_23/bottleneck_v2/conv1',
-                'block2/unit_4/bottleneck_v2/conv1',
-                'block1/unit_3/bottleneck_v2/conv1',
-            ],
-            'num_channels': 256,
-            'train_base': False
+            'base_network': {
+                'architecture': 'resnet_v2_101',
+                'trainable': False
+            },
+            'fpn': {
+                'endpoints': [
+                    'block4/unit_3/bottleneck_v2/conv3',
+                    'block3/unit_23/bottleneck_v2/conv1',
+                    'block2/unit_4/bottleneck_v2/conv1',
+                    'block1/unit_3/bottleneck_v2/conv1',
+                ],
+                'num_channels': 256,
+            },
         })
         self._config_vgg = EasyDict({
-            'architecture': 'vgg_16',
-            'endpoints': [
-                'conv5/conv5_3',
-                'conv4/conv4_3',
-                'conv3/conv3_3',
-            ],
-            'num_channels': 256,
-            'train_base': False
+            'base_network': {
+                'architecture': 'vgg_16',
+                'trainable': False,
+            },
+            'fpn': {
+                'endpoints': [
+                    'conv5/conv5_3',
+                    'conv4/conv4_3',
+                    'conv3/conv3_3',
+                ],
+                'num_channels': 256,
+            },
         })
         self._run_count = 0
 
@@ -44,9 +52,9 @@ class FPNTest(tf.test.TestCase):
         # it. We need to know the name to later access the endpoints.
         base_name = 'base_network_{}'.format(self._run_count)
         self._run_count += 1
-        base_model = BaseNetwork(config=config, name=base_name)
+        base_model = BaseNetwork(config=config.base_network, name=base_name)
 
-        model = FPN(config=config)
+        model = FPN(config=config.fpn, base_config=config.base_network)
         image_ph = tf.placeholder(tf.float32, [None, None, None, 3])
         net = model(image_ph, is_training=training)
         base_net = base_model(image_ph, is_training=training)
@@ -58,11 +66,11 @@ class FPNTest(tf.test.TestCase):
                 image_ph: random_image
             })
             self.assertEqual(
-                fpn_levels[0].shape[3], config.num_channels
+                fpn_levels[0].shape[3], config.fpn.num_channels
             )
             # Test each level is smaller than the one after, following the
             # config.
-            for i in range(len(config.endpoints) - 1):
+            for i in range(len(config.fpn.endpoints) - 1):
                 try:
                     self.assertLess(
                         self._shape_size(fpn_levels[i]),
@@ -77,7 +85,7 @@ class FPNTest(tf.test.TestCase):
                         'Levels {} and {} of {} are the offenders.'.format(
                             e,
                             i, i + 1,
-                            config.architecture
+                            config.base_network.architecture
                         ))
 
             # Assertions in comparison with the BaseNetwork.
@@ -87,9 +95,9 @@ class FPNTest(tf.test.TestCase):
             base_end_points_unfiltered = base_dict['end_points']
             base_end_points = []
 
-            for ep in config.endpoints:
+            for ep in config.fpn.endpoints:
                 ep = "{}/{}/{}".format(
-                    base_name, config.architecture, ep)
+                    base_name, config.base_network.architecture, ep)
                 base_end_points.append(base_end_points_unfiltered[ep])
 
             # Assert FPN levels are the same size as endpoints.

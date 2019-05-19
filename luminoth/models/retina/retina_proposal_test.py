@@ -12,7 +12,7 @@ from luminoth.utils.config import get_base_config
 class RetinaProposalTest(tf.test.TestCase):
     def setUp(self):
         super(RetinaProposalTest, self).setUp()
-        self._config = EasyDict(get_base_config(Retina)['model']['proposal'])
+        self._config = EasyDict(get_base_config(Retina)['model']['proposals'])
 
         self._num_classes = 3
         self._placeholder_label = 2

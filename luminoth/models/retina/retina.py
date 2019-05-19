@@ -39,7 +39,7 @@ class Retina(snt.AbstractModule):
         self._seed = config.train.seed
 
         self.fpn = FPN(
-            config.model.fpn, parent_name=name
+            config.model.fpn, config.model.base_network, parent_name=name
         )
 
         self._losses_collections = ['retina_losses']
@@ -92,7 +92,7 @@ class Retina(snt.AbstractModule):
                 num_classes=self._num_classes
             )
         self._proposal = RetinaProposal(
-            self._config.model.proposal, num_classes=self._num_classes
+            self._config.model.proposals, num_classes=self._num_classes
         )
 
         bbox_preds = []
@@ -358,7 +358,7 @@ class Retina(snt.AbstractModule):
         # TODO: allow fine_tune_from, etc.
         trainable_vars = snt.get_variables_in_module(self)
         trainable_vars += self.fpn.get_trainable_vars(
-            train_base=self._config.model.fpn.train_base
+            train_base=self._config.model.base_network.trainable
         )
         return trainable_vars
 

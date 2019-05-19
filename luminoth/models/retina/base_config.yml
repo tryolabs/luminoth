@@ -14,14 +14,21 @@ model:
 
   network:
     num_classes: 20
-  fpn:
-    arg_scope:
-      # Regularization
-      weight_decay: 0.0005
-    num_channels: 256  # paper values
+  base_network:
+    # Which type of pretrained network to use
     architecture: resnet_v1_101
-    train_base: True
+    # Should we train the pretrained network
+    trainable: True
+    # From which file to load the weights
+    weights:
+    # Should we download weights if not available
     download: True
+    arg_scope:
+      # The l2 regularization coefficient.
+      weight_decay: 0.0005
+    dropout_keep_prob: 1.0
+  fpn:
+    num_channels: 256 # paper value
     endpoints:
       - 'block4/unit_3/bottleneck_v1/conv3'
       - 'block3/unit_23/bottleneck_v1/conv1'
@@ -88,7 +95,7 @@ model:
     background_threshold_high: 0.4  # AMIP (Retina)
     background_threshold_low: 0.0
 
-  proposal:
+  proposals:
     # Maximum number of detections for each class
     class_max_detections: 100
     # NMS threshold used to remove "almost duplicate" of the same class
@@ -169,6 +176,8 @@ train:
   # Run TensorFlow using full_trace mode for memory and running time logging
   # Debug mode must be enabled.
   full_trace: False
+  # Clip gradients by norm, making sure the maximum value is 10.
+  clip_by_norm: False
   # Learning rate config.
   learning_rate:
     # Because we're using kwargs, we want the learning_rate dict to be replaced
