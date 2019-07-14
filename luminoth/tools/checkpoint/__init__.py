@@ -366,7 +366,7 @@ def list():
 
 @click.command(help='Display detailed information on checkpoint.')
 @click.argument('id_or_alias')
-@click.option('--config-info','-config','-c', is_flag=True)
+@click.option('--config-info', '-config', '-c', is_flag=True)
 def info(id_or_alias, config_info):
     db = read_checkpoint_db()
 
@@ -399,8 +399,7 @@ def info(id_or_alias, config_info):
     click.echo()
 
     if config_info:
-        path = get_checkpoint_path(checkpoint['id'])
-        click.echo(get_checkpoint_config('accurate'))
+        click.echo(get_checkpoint_config(checkpoint))
 
     click.echo('Creation date: {}'.format(checkpoint['created_at']))
     click.echo('Luminoth version: {}'.format(checkpoint['luminoth_version']))
