@@ -1,7 +1,0 @@
-include *.md *.txt tox.ini LICENSE *.yml
-graft luminoth
-recursive-include docs *
-recursive-include examples *
-
-global-exclude __pycache__
-global-exclude *.py[co]

@@ -1,4 +1,0 @@
-.. _api/datasets:
-
-Datasets
-========

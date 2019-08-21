@@ -26,12 +26,10 @@ CLASSIFIERS = [
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Topic :: Software Development :: Libraries',
     'Programming Language :: Python',
-    'Programming Language :: Python :: 2',
-    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
 ]
 
 INSTALL_REQUIRES = [
@@ -82,9 +80,6 @@ def find_meta(meta):
     raise RuntimeError('Unable to find __{meta}__ string.'.format(meta=meta))
 
 
-MIN_TF_VERSION = find_meta('min_tf_version')
-
-
 setup(
     name=NAME,
     version=find_meta('version'),
@@ -104,8 +99,6 @@ setup(
     install_requires=INSTALL_REQUIRES,
     test_require=TEST_REQUIRES,
     extras_require={
-        'tf': ['tensorflow>={}'.format(MIN_TF_VERSION)],
-        'tf-gpu': ['tensorflow-gpu>='.format(MIN_TF_VERSION)],
         'gcloud': [
             'google-api-python-client>=1.6.2,<2',
             'google-cloud-storage>=1.2.0',
@@ -118,5 +111,5 @@ setup(
         [console_scripts]
         lumi=luminoth:cli
     """,
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*',
+    python_requires='>=3.5',
 )
