@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--data-path', default='/datasets01/COCO/022719/', help='dataset')
     parser.add_argument('--dataset', default='coco', help='dataset')
-    parser.add_argument('--model', default='maskrcnn_resnet50_fpn', help='model')
+    parser.add_argument('--model', default='fasterrcnn_resnet50_fpn', help='model')
     parser.add_argument('--device', default='cuda', help='device')
     parser.add_argument('-b', '--batch-size', default=2, type=int,
                         help='images per gpu, the total batch size is $NGPU x batch_size')
