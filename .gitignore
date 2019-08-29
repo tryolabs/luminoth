@@ -88,10 +88,6 @@ ENV/
 # Ctags
 tags
 
-# pipenv
-Pipfile
-Pipfile.lock
-
 # Flake8
 .flake8
 
