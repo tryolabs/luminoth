@@ -98,5 +98,6 @@ Pipfile.lock
 # Luminoth
 /datasets
 /logs
-/models
 /jobs
+data
+data/
