@@ -1,15 +1,16 @@
 import copy
 import os
-from PIL import Image
+import json
 
 import torch
 import torch.utils.data
-import torchvision
 
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
 
 import transforms as T
+
+from .coco import CocoDetection
 
 
 class FilterAndRemapCocoCategories(object):
@@ -133,7 +134,7 @@ def _coco_remove_images_without_annotations(dataset, cat_list=None):
             return True
         return False
 
-    assert isinstance(dataset, torchvision.datasets.CocoDetection)
+    assert isinstance(dataset, CocoDetection)
     ids = []
     for ds_idx, img_id in enumerate(dataset.ids):
         ann_ids = dataset.coco.getAnnIds(imgIds=img_id, iscrowd=None)
@@ -200,33 +201,21 @@ def convert_to_coco_api(ds):
 
 def get_coco_api_from_dataset(dataset):
     for _ in range(10):
-        if isinstance(dataset, torchvision.datasets.CocoDetection):
+        if isinstance(dataset, CocoDetection):
             break
         if isinstance(dataset, torch.utils.data.Subset):
             dataset = dataset.dataset
-    if isinstance(dataset, torchvision.datasets.CocoDetection):
+    if isinstance(dataset, CocoDetection):
         return dataset.coco
     return convert_to_coco_api(dataset)
 
 
-class CocoDetection(torchvision.datasets.CocoDetection):
-    def __init__(self, img_folder, ann_file, transforms):
-        super(CocoDetection, self).__init__(img_folder, ann_file)
-        self._transforms = transforms
-
-    def __getitem__(self, idx):
-        img, target = super(CocoDetection, self).__getitem__(idx)
-        image_id = self.ids[idx]
-        target = dict(image_id=image_id, annotations=target)
-        if self._transforms is not None:
-            img, target = self._transforms(img, target)
-        return img, target
-
-
-def get_coco(root, image_set, transforms, mode='instances'):
+def get_coco(root, image_set, transforms, mode='instances', gs_bucket=None):
     anno_file_template = "{}_{}2017.json"
     PATHS = {
-        "train": ("train2017", os.path.join("annotations", anno_file_template.format(mode, "train"))),
+        "train": (
+            "train2017", os.path.join("annotations", anno_file_template.format(mode, "train"))
+        ),
         "val": ("val2017", os.path.join("annotations", anno_file_template.format(mode, "val"))),
         # "train": ("val2017", os.path.join("annotations", anno_file_template.format(mode, "val")))
     }
@@ -239,17 +228,47 @@ def get_coco(root, image_set, transforms, mode='instances'):
 
     img_folder, ann_file = PATHS[image_set]
     img_folder = os.path.join(root, img_folder)
-    ann_file = os.path.join(root, ann_file)
+    ann_file_path = os.path.join(root, ann_file)
 
-    dataset = CocoDetection(img_folder, ann_file, transforms=transforms)
+    # This can't run inside the __init__ of each dataset because they get copied to
+    # each worker subprocess and the gcloud client's auth fails when being copied around.
+    coco_annotations_handler = get_coco_annotations_handler(ann_file_path, gs_bucket=gs_bucket)
+
+    dataset = CocoDetection(
+        img_folder,
+        coco_annotations_handler,
+        transforms=transforms,
+        gs_bucket_name=None if gs_bucket is None else gs_bucket.name
+    )
 
     if image_set == "train":
         dataset = _coco_remove_images_without_annotations(dataset)
-
-    # dataset = torch.utils.data.Subset(dataset, [i for i in range(500)])
 
     return dataset
 
 
 def get_coco_kp(root, image_set, transforms):
     return get_coco(root, image_set, transforms, mode="person_keypoints")
+
+
+def get_coco_annotations_handler(ann_file_path, gs_bucket):
+    """ We need to create one google cloud client for each worker, but the
+        creation of these clients needs to happen while running in the
+        worker subprocess for the authentication to work. We can't just
+        copy one client object around.
+
+        So we create one client to download the coco annotation handler which
+        is copied to all the workers, and is needed in the __init__ of the
+        dataset objects, which runs in the main process. And then instantiate
+        a new client for each worker by creating it in the dataset's __call__
+        method, and use these clients to download the images from google cloud
+        storage.
+    """
+    if gs_bucket is not None:
+        gs_bucket = gs_bucket
+        ann_file_blob = gs_bucket.get_blob(ann_file_path)
+        annotation_dict = json.loads(ann_file_blob.download_as_string())
+        coco = COCO(annotation_dict)
+    else:
+        coco = COCO(ann_file_path)
+    return coco

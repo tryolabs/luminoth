@@ -8,6 +8,7 @@ verify_ssl = true
 [packages]
 torchvision = "*"
 pycocotools = {editable = true,subdirectory = "PythonAPI",git = "git@github.com/tryolabs/cocoapi.git"}
+google-cloud-storage = "*"
 
 [requires]
 python_version = "3.6"

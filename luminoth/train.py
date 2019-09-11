@@ -12,31 +12,34 @@ If you use different number of gpus, the learning rate should be changed to 0.02
 import datetime
 import os
 import time
+import warnings
 
 import torch
 import torch.utils.data
-from torch import nn
 import torchvision
 import torchvision.models.detection
 import torchvision.models.detection.mask_rcnn
 
-from coco_utils import get_coco, get_coco_kp
+from datasets.coco_utils import get_coco, get_coco_kp
 
-from group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
+from datasets.group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
 from engine import train_one_epoch, evaluate
 
 import utils
 import transforms as T
+from urllib.parse import urlparse
 
 
-def get_dataset(name, image_set, transform, data_path):
-    paths = {
-        "coco": (data_path, get_coco, 91),
-        "coco_kp": (data_path, get_coco_kp, 2)
-    }
-    p, ds_fn, num_classes = paths[name]
+def get_dataset(name, image_set, transform, data_path, gs_bucket=None):
+    if name == "coco":
+        ds_fn, num_classes = get_coco, 91
+    elif name == "coco_kp":
+        ds_fn, num_classes = get_coco_kp, 2
+    else:
+        print("Dataset must be 'coco' or 'coco_kp'")
+        exit()
 
-    ds = ds_fn(p, image_set=image_set, transforms=transform)
+    ds = ds_fn(data_path, image_set=image_set, transforms=transform, gs_bucket=gs_bucket)
     return ds, num_classes
 
 
@@ -50,15 +53,29 @@ def get_transform(train):
 
 def main(args):
     utils.init_distributed_mode(args)
-    print(args)
 
-    device = torch.device(args.device)
+    # Check if dataset is in google cloud storage
+    url_path = urlparse(args.data_path)
+    if url_path.scheme == 'gs':
+        from google.cloud import storage
+        # https://github.com/googleapis/google-auth-library-python/issues/271
+        warnings.filterwarnings(
+            "ignore", "Your application has authenticated using end user credentials"
+        )
+        client = storage.Client()
+        args.data_path = url_path.path[1:]  # Remove leftover '/'
+        bucket_name = url_path.netloc
+        gs_bucket = client.get_bucket(bucket_name)
+        print(f"Streaming datasets from Google Cloud Storage bucket named '{bucket_name}'")
+    else:
+        gs_bucket = None
 
-    # Data loading code
-    print("Loading data")
-
-    dataset, num_classes = get_dataset(args.dataset, "train", get_transform(train=True), args.data_path)
-    dataset_test, _ = get_dataset(args.dataset, "val", get_transform(train=False), args.data_path)
+    dataset, num_classes = get_dataset(
+        args.dataset, "train", get_transform(train=True), args.data_path, gs_bucket
+    )
+    dataset_test, _ = get_dataset(
+        args.dataset, "val", get_transform(train=False), args.data_path, gs_bucket
+    )
 
     print("Creating data loaders")
     if args.distributed:
@@ -87,6 +104,7 @@ def main(args):
     print("Creating model")
     model = torchvision.models.detection.__dict__[args.model](num_classes=num_classes,
                                                               pretrained=args.pretrained)
+    device = torch.device(args.device)
     model.to(device)
 
     model_without_ddp = model

@@ -11,6 +11,8 @@ import torchvision
 
 from PIL import Image
 
+from .coco import CocoDetection
+
 
 class GroupedBatchSampler(BatchSampler):
     """
@@ -155,7 +157,7 @@ def compute_aspect_ratios(dataset, indices=None):
     if hasattr(dataset, "get_height_and_width"):
         return _compute_aspect_ratios_custom_dataset(dataset, indices)
 
-    if isinstance(dataset, torchvision.datasets.CocoDetection):
+    if isinstance(dataset, CocoDetection):
         return _compute_aspect_ratios_coco_dataset(dataset, indices)
 
     if isinstance(dataset, torchvision.datasets.VOCDetection):
