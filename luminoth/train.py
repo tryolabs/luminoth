@@ -51,8 +51,23 @@ def get_transform(train):
     return T.Compose(transforms)
 
 
+def print_cuda_devices_info():
+    num_cuda_devices = torch.cuda.device_count()
+    if num_cuda_devices:
+        print("CUDA GPUs Found:")
+        for i in range(num_cuda_devices):
+            device_name = torch.cuda.get_device_name(i)
+            device_mega_bytes = round(
+                torch.cuda.get_device_properties(i).total_memory / (1024 ** 2)
+            )
+            print("    {}: {} ({}MB) ".format(i, device_name, device_mega_bytes))
+    else:
+        print("No CUDA GPUs Found")
+
+
 def main(args):
     utils.init_distributed_mode(args)
+    print_cuda_devices_info()
 
     # Check if dataset is in google cloud storage
     url_path = urlparse(args.data_path)
@@ -77,7 +92,7 @@ def main(args):
         args.dataset, "val", get_transform(train=False), args.data_path, gs_bucket
     )
 
-    print("Creating data loaders")
+    # print("Creating data loaders")
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
         test_sampler = torch.utils.data.distributed.DistributedSampler(dataset_test)
