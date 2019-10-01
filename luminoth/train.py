@@ -17,8 +17,6 @@ import warnings
 import torch
 import torch.utils.data
 import torchvision
-import torchvision.models.detection
-import torchvision.models.detection.mask_rcnn
 
 from datasets.coco_utils import get_coco, get_coco_kp
 
@@ -29,6 +27,7 @@ import utils
 import transforms as T
 from urllib.parse import urlparse
 
+from models import detection
 
 def get_dataset(name, image_set, transform, data_path, gs_bucket=None):
     if name == "coco":
@@ -60,9 +59,9 @@ def print_cuda_devices_info():
             device_mega_bytes = round(
                 torch.cuda.get_device_properties(i).total_memory / (1024 ** 2)
             )
-            print("    {}: {} ({}MB) ".format(i, device_name, device_mega_bytes))
+            print("  {}: {} ({}MB) ".format(i, device_name, device_mega_bytes))
     else:
-        print("No CUDA GPUs Found")
+        print("No CUDA GPUs Found.")
 
 
 def main(args):
@@ -117,8 +116,7 @@ def main(args):
         collate_fn=utils.collate_fn)
 
     print("Creating model")
-    model = torchvision.models.detection.__dict__[args.model](num_classes=num_classes,
-                                                              pretrained=args.pretrained)
+    model = detection.__dict__[args.model](num_classes=num_classes, pretrained=args.pretrained)
     device = torch.device(args.device)
     model.to(device)
 
