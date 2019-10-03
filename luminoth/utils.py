@@ -301,24 +301,39 @@ def save_on_master(*args, **kwargs):
         torch.save(*args, **kwargs)
 
 
-def init_distributed_mode(args):
+def init_distributed_mode(local_rank, args):
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+        # We still support the use of `-m torch.distributed.launch --env`
+        # TODO: Check that we still do support it!
         args.rank = int(os.environ["RANK"])
         args.world_size = int(os.environ['WORLD_SIZE'])
-        args.gpu = int(os.environ['LOCAL_RANK'])  # Just rank % nproc_per_node basically
+        local_rank = int(os.environ['LOCAL_RANK'])
     elif 'SLURM_PROCID' in os.environ:
         args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
+        local_rank = args.rank % torch.cuda.device_count()
+    elif args.world_size > 1:
+        if args.dist_url == 'env://':
+            os.environ["MASTER_ADDR"] = "127.0.0.1"
+            os.environ["MASTER_PORT"] = "29500"
+        # We enforce that all nodes use the same number of gpus, this could be fixed
+        # if we think of a way to do it without adding too many CLI arguments.
+        # https://pytorch.org/tutorials/intermediate/dist_tuto.html
+        # https://pytorch.org/docs/stable/_modules/torch/multiprocessing/spawn.html#spawn
+        args.rank = len(args.local_gpus) * args.node_rank + local_rank
     else:
         args.distributed = False
         return
 
     args.distributed = True
 
-    torch.cuda.set_device(args.gpu)
+    torch.cuda.set_device(local_rank)
     args.dist_backend = 'nccl'
+    # TODO: Improve this printed message, maybe merge it with the 'GPU found in machine' message
     print('| distributed init (rank {}): {}'.format(
         args.rank, args.dist_url), flush=True)
+    # TODO: Check if I can avoid specifying rank with multicast?
+    #   https://pytorch.org/docs/0.3.0/distributed.html#tcp-initialization
+    # maybe this is the solution for the variable number of gpus per machine
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
     torch.distributed.barrier()

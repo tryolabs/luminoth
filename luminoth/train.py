@@ -50,23 +50,24 @@ def get_transform(train):
     return T.Compose(transforms)
 
 
-def print_cuda_devices_info():
+def print_cuda_devices_info(local_gpus):
     num_cuda_devices = torch.cuda.device_count()
     if num_cuda_devices:
-        print("CUDA GPUs Found:")
+        print("CUDA GPUs found in this machine:")
         for i in range(num_cuda_devices):
             device_name = torch.cuda.get_device_name(i)
             device_mega_bytes = round(
                 torch.cuda.get_device_properties(i).total_memory / (1024 ** 2)
             )
-            print("  {}: {} ({}MB) ".format(i, device_name, device_mega_bytes))
+            print("  {}: {} ({}MB) {}".format(
+                i, device_name, device_mega_bytes,
+                "- Selected" if i in local_gpus else ""))
     else:
-        print("No CUDA GPUs Found.")
+        print("No CUDA GPUs found in this machine.")
 
 
-def main(args):
-    utils.init_distributed_mode(args)
-    print_cuda_devices_info()
+def main_worker(local_rank, args):
+    utils.init_distributed_mode(local_rank, args)
 
     # Check if dataset is in google cloud storage
     url_path = urlparse(args.data_path)
@@ -122,15 +123,18 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
         model_without_ddp = model.module
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.lr_steps, gamma=args.lr_gamma)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(
+    #     optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=args.lr_steps, gamma=args.lr_gamma
+    )
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location='cpu')
@@ -188,34 +192,52 @@ if __name__ == "__main__":
     parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
-    parser.add_argument('--lr-step-size', default=8, type=int, help='decrease lr every step-size epochs')
-    parser.add_argument('--lr-steps', default=[8, 11], nargs='+', type=int, help='decrease lr every step-size epochs')
-    parser.add_argument('--lr-gamma', default=0.1, type=float, help='decrease lr by a factor of lr-gamma')
+    parser.add_argument('--lr-step-size', default=8, type=int,
+                        help='decrease lr every step-size epochs')
+    parser.add_argument('--lr-steps', default=[8, 11], nargs='+', type=int,
+                        help='decrease lr every step-size epochs')
+    parser.add_argument('--lr-gamma', default=0.1, type=float,
+                        help='decrease lr by a factor of lr-gamma')
     parser.add_argument('--print-freq', default=20, type=int, help='print frequency')
     parser.add_argument('--output-dir', default='.', help='path where to save')
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--aspect-ratio-group-factor', default=0, type=int)
-    parser.add_argument(
-        "--test-only",
-        dest="test_only",
-        help="Only test the model",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--pretrained",
-        dest="pretrained",
-        help="Use pre-trained models from the modelzoo",
-        action="store_true",
-    )
+    parser.add_argument("--test-only",
+                        dest="test_only",
+                        help="Only test the model",
+                        action="store_true")
+    parser.add_argument("--pretrained",
+                        dest="pretrained",
+                        help="Use pre-trained models from the modelzoo",
+                        action="store_true")
 
-    # distributed training parameters
+    # Distributed training parameters
     parser.add_argument('--world-size', default=1, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
+    parser.add_argument('--node-rank', default=0, type=int,
+                        help=('For identifying each machine(node), '
+                              'should be consecutive: 0, 1, 2, ...'))
+    parser.add_argument('--dist-url', default='env://',
+                        help='url used to set up distributed training')
+    parser.add_argument('--local-gpus', default=[0], nargs='+', type=int,
+                        help='Which local gpus to use in this node')
 
     args = parser.parse_args()
 
     if args.output_dir:
         utils.mkdir(args.output_dir)
 
-    main(args)
+    if args.world_size == 1 and len(args.local_gpus) > 1:
+        args.world_size = len(args.local_gpus)
+    if args.world_size != 1 and args.world_size < len(args.local_gpus):
+        print("--world-size should be equal or larger than"
+              "the number of gpus selected in --local-gpus")
+        exit()
+
+    print_cuda_devices_info(args.local_gpus)
+
+    if args.node_rank != 0 or len(args.local_gpus) > 1:
+        from torch import multiprocessing
+        multiprocessing.spawn(main_worker, nprocs=len(args.local_gpus), args=tuple([args]))
+    else:
+        main_worker(args.local_gpus[0], args)
