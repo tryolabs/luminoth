@@ -2,6 +2,10 @@
 
 ---
 
+**(Jan 2020) Luminoth is not maintained anymore**. We recommend switching to Facebook's [Detectron2](https://github.com/facebookresearch/detectron2), which implements more modern algorithms supporting additional use cases.
+
+---
+
 [![Build Status](https://travis-ci.org/tryolabs/luminoth.svg?branch=master)](https://travis-ci.org/tryolabs/luminoth)
 [![Documentation Status](https://readthedocs.org/projects/luminoth/badge/?version=latest)](http://luminoth.readthedocs.io/en/latest/?badge=latest)
 [![codecov](https://codecov.io/gh/tryolabs/luminoth/branch/master/graph/badge.svg)](https://codecov.io/gh/tryolabs/luminoth)
