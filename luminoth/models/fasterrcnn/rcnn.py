@@ -383,11 +383,16 @@ class RCNN(snt.AbstractModule):
             bbox_offset_cleaned = tf.boolean_mask(
                 bbox_flatten, cls_flatten, 'bbox_offset_cleaned')
 
+            bbox_offsets_target_labeled_cleaned = tf.boolean_mask(
+                bbox_offsets_target_labeled, cls_flatten,
+                'bbox_offsets_target_labeled_cleaned'
+            )
+
             # Calculate the smooth l1 loss between the "cleaned" bboxes
             # offsets (that means, the useful results) and the labeled
             # targets.
             reg_loss_per_proposal = smooth_l1_loss(
-                bbox_offset_cleaned, bbox_offsets_target_labeled,
+                bbox_offset_cleaned, bbox_offsets_target_labeled_cleaned,
                 sigma=self._l1_sigma
             )
 
