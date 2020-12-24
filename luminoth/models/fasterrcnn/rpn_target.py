@@ -92,7 +92,7 @@ class RPNTarget(snt.AbstractModule):
                 The last dimension is used for the label.
             im_shape:
                 Shape of original image (height, width) in order to define
-                anchor targers in respect with gt_boxes.
+                anchor targets in respect with gt_boxes.
 
         Returns:
             Tuple of the tensors of:
